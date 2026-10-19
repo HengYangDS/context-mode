@@ -4,22 +4,22 @@
   "model": "claude-sonnet-5-5",
   "effort": "low",
   "budgetUsd": "0.25",
-  "sessionsDone": 110,
+  "sessionsDone": 120,
   "arms": {
     "on": {
-      "sessions": 55,
-      "pass": 55,
-      "costUsd": 1.2938,
-      "medianSessionInput": 38608,
+      "sessions": 60,
+      "pass": 60,
+      "costUsd": 1.4121,
+      "medianSessionInput": 38612,
       "medianFreshInput": 4495,
       "mcpCallSessions": 15
     },
     "off": {
-      "sessions": 55,
-      "pass": 55,
-      "costUsd": 1.1724,
-      "medianSessionInput": 36159,
-      "medianFreshInput": 3732,
+      "sessions": 60,
+      "pass": 60,
+      "costUsd": 1.2744,
+      "medianSessionInput": 36160.5,
+      "medianFreshInput": 3968.5,
       "mcpCallSessions": 0
     }
   },
@@ -30,11 +30,11 @@
     "tasks": 20
   },
   "savingFresh": {
-    "median": -0.1794,
+    "median": -0.1858,
     "min": -0.2224,
     "max": -0.0426
   },
-  "totalCostUsd": 2.4662,
+  "totalCostUsd": 2.6865,
   "perTask": [
     {
       "task": "log-1",
@@ -188,53 +188,53 @@
     },
     {
       "task": "file-3",
-      "nOn": 2,
-      "nOff": 2,
-      "passOn": 2,
-      "passOff": 2,
-      "savingTotal": -0.068,
-      "savingFresh": -0.187,
-      "savingTotalOk": -0.068
+      "nOn": 3,
+      "nOff": 3,
+      "passOn": 3,
+      "passOff": 3,
+      "savingTotal": -0.0687,
+      "savingFresh": -0.2108,
+      "savingTotalOk": -0.0687
     },
     {
       "task": "file-4",
-      "nOn": 2,
-      "nOff": 2,
-      "passOn": 2,
-      "passOff": 2,
-      "savingTotal": -0.0671,
-      "savingFresh": -0.1786,
-      "savingTotalOk": -0.0671
+      "nOn": 3,
+      "nOff": 3,
+      "passOn": 3,
+      "passOff": 3,
+      "savingTotal": -0.0672,
+      "savingFresh": -0.1957,
+      "savingTotalOk": -0.0672
     },
     {
       "task": "git-1",
-      "nOn": 2,
-      "nOff": 2,
-      "passOn": 2,
-      "passOff": 2,
-      "savingTotal": -0.0679,
-      "savingFresh": -0.1748,
-      "savingTotalOk": -0.0679
+      "nOn": 3,
+      "nOff": 3,
+      "passOn": 3,
+      "passOff": 3,
+      "savingTotal": -0.0681,
+      "savingFresh": -0.1756,
+      "savingTotalOk": -0.0681
     },
     {
       "task": "git-2",
-      "nOn": 2,
-      "nOff": 2,
-      "passOn": 2,
-      "passOff": 2,
+      "nOn": 3,
+      "nOff": 3,
+      "passOn": 3,
+      "passOff": 3,
       "savingTotal": -0.0685,
-      "savingFresh": -0.1784,
+      "savingFresh": -0.1792,
       "savingTotalOk": -0.0685
     },
     {
       "task": "git-3",
-      "nOn": 2,
-      "nOff": 2,
-      "passOn": 2,
-      "passOff": 2,
-      "savingTotal": -0.0686,
-      "savingFresh": -0.1802,
-      "savingTotalOk": -0.0686
+      "nOn": 3,
+      "nOff": 3,
+      "passOn": 3,
+      "passOff": 3,
+      "savingTotal": -0.0685,
+      "savingFresh": -0.1793,
+      "savingTotalOk": -0.0685
     }
   ]
 }
