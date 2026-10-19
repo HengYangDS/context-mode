@@ -153,11 +153,19 @@ function v2Unit() {
   const tests = count("tests");
   const pass = count("pass");
   const failN = count("fail");
-  if (r.status !== 0 || tests === undefined || failN !== 0 || tests === 0) {
+  const skipped = count("skipped");
+  const todo = count("todo");
+  const cancelled = count("cancelled");
+  // D-M7-gate-1: pass, fail, skip and todo are shown apart; pass + fail + skip + todo + cancelled must equal tests.
+  const counts = `pass ${pass ?? "?"}, fail ${failN ?? "?"}, skip ${skipped ?? "?"}, todo ${todo ?? "?"} of ${tests ?? "?"}`;
+  const parts = [pass, failN, skipped, todo, cancelled];
+  const sum = parts.every((n) => n !== undefined) ? parts.reduce((a, b) => a + b, 0) : undefined;
+  if (r.status !== 0 || tests === undefined || tests === 0 || sum !== tests || failN !== 0 || cancelled !== 0) {
     dumpChild("v2-unit", r);
-    return { status: "FAIL", detail: `node --test tests/v2/ exit ${r.status}, tests ${tests ?? "?"}, fail ${failN ?? "?"}` };
+    return { status: "FAIL", detail: `node --test tests/v2/ exit ${r.status}: ${counts}, cancelled ${cancelled ?? "?"}` };
   }
-  return { status: "PASS", detail: `node --test tests/v2/: ${pass}/${tests} tests pass` };
+  const named = r.stdout.split("\n").filter((l) => /^\s*ok \d+ - .*# (SKIP|TODO)/.test(l)).map((l) => l.replace(/^\s*ok \d+ - /, "").trim());
+  return { status: "PASS", detail: `node --test tests/v2/: ${counts}${named.length ? `; not run: ${named.join(" | ")}` : ""}` };
 }
 
 // ---- layer 1b: ci.yml checks no other layer runs (DEVIATIONS D-M4-GS4-1) ----
@@ -254,7 +262,13 @@ function live(quick) {
     return { status: "FAIL", detail: `e2e/live/run.mjs --base ${base.slice(0, 12)} exit ${r.status} ${header}` };
   }
   process.stderr.write(r.stdout);
-  return { status: "PASS", detail: `e2e/live/run.mjs --base ${base.slice(0, 12)} ${header}` };
+  // D-M7-gate-2: 0 live cases run is SKIP, not PASS. Live runs cost money and are by hand (ADR-0012).
+  const m = header.match(/\| (\d+)\/(\d+) cases/);
+  if (!m) return { status: "FAIL", detail: `e2e/live/run.mjs printed no "N/M cases" header: ${header || "(none)"}` };
+  if (Number(m[1]) === 0) {
+    return { status: "SKIP", detail: `0/${m[2]} live cases ran: no case covers the files changed since ${base.slice(0, 12)}; run by hand with --all (ADR-0012) ${header}` };
+  }
+  return { status: "PASS", detail: `${m[1]}/${m[2]} live cases ran; e2e/live/run.mjs --base ${base.slice(0, 12)} ${header}` };
 }
 
 function readDone() {
