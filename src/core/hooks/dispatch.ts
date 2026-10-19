@@ -12,7 +12,7 @@ import {
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
 import type {
-  AdapterRow, CanonicalHookEvent, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall,
+  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall,
 } from "../contracts/types.ts";
 import { getAdapter } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
@@ -24,7 +24,7 @@ import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { readSessionEvents } from "../journal/read.ts";
 import { renderState } from "../compaction/render.ts";
 import { chunkText } from "../index/chunk.ts";
-import { selectChunks, selectChunksInMemory, type Selection } from "../index/select.ts";
+import { selectChunksInMemory } from "../index/select.ts";
 import { indexText } from "../index/text.ts";
 import { appendDetached } from "./detached.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
@@ -316,23 +316,24 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   if (subCase === "A") return ALLOW;
   const label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + String(ev.turn ?? 0);
   const intent = str(tool.input.description);
-  let selected: Selection;
+  // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
+  // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
+  const chunks = chunkText(text, "text");
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
     const db = await openDb(project);
-    const { sourceId } = indexText(db, project, ev.sessionId, label, text, "text");
-    selected = selectChunks(db, sourceId, intent, OUTPUT_CAP);
+    indexText(db, project, ev.sessionId, label, text, "text", chunks);
   } else {
-    selected = selectChunksInMemory(chunkText(text, "text"), intent, OUTPUT_CAP, label);
-    indexDetached(project, ev.sessionId, label, text);
+    indexDetached(project, ev.sessionId, label, text, chunks);
   }
+  const selected = selectChunksInMemory(chunks, intent, OUTPUT_CAP, label);
   return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
 }
 
 // F1: above SYNC_INDEX_MAX_BYTES the FTS5 write never blocks the decision; same rules as appendDetached.
-function indexDetached(project: ProjectContext, sessionId: string, label: string, text: string): void {
+function indexDetached(project: ProjectContext, sessionId: string, label: string, text: string, chunks: Chunk[]): void {
   void openDb(project)
     .then((db) => {
-      indexText(db, project, sessionId, label, text, "text");
+      indexText(db, project, sessionId, label, text, "text", chunks);
     })
     .catch((err: unknown) => {
       process.stderr.write("hooks: index write failed: " + message(err) + "\n");
