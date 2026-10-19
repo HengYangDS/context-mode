@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-19",
+  "agent": "2.1.303 (Claude Code)",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "sessionsDone": 2,
+  "arms": {
+    "on": {
+      "sessions": 1,
+      "pass": 1,
+      "costUsd": 0.08,
+      "medianSessionInput": 38534,
+      "medianFreshInput": 19373,
+      "mcpCallSessions": 0
+    },
+    "off": {
+      "sessions": 1,
+      "pass": 1,
+      "costUsd": 0.0263,
+      "medianSessionInput": 36162,
+      "medianFreshInput": 5437,
+      "mcpCallSessions": 0
+    }
+  },
+  "savingTotal": {
+    "median": -0.0656,
+    "min": -0.0656,
+    "max": -0.0656,
+    "tasks": 1
+  },
+  "savingFresh": {
+    "median": -2.5632,
+    "min": -2.5632,
+    "max": -2.5632
+  },
+  "totalCostUsd": 0.1063,
+  "perTask": [
+    {
+      "task": "log-1",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0656,
+      "savingFresh": -2.5632,
+      "savingTotalOk": -0.0656
+    }
+  ]
+}
