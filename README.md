@@ -156,6 +156,21 @@ Read more: [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](do
 }
 ```
 
+## Benchmarks
+
+Only measured numbers. Full method, caveats and sources: [docs/v2/benchmarks.md](docs/v2/benchmarks.md), [docs/v2/prompt/results.md](docs/v2/prompt/results.md), [docs/performance.md](docs/performance.md).
+
+| What | Result | Source, date, agent |
+|---|---|---|
+| Offline replay, bytes v2 would return vs bytes the model got (23175 tool calls, 820 sessions) | 1.1% saving; -1.5% with the re-run bound | benchmarks.md, 2026-10-19, Claude Code transcripts, mostly 2.1.149 to 2.1.283 |
+| Live A/B, 20 tasks x 3 runs per arm, session input saving (median over tasks) | -6.7% (min -6.9, max +29.7); the plugin arm read more | benchmarks.md, 2026-10-19, Claude Code 2.1.303, claude-sonnet-5-5 low |
+| Live A/B success | on 60/60, off 60/60 | same |
+| Live routing, under / over-routing (new rule, run 4, 20 large + 20 small per model) | under 0/20 on all 3 models; over 0/20, 0/20, 1/20 (opus-5-5, sonnet-5-5, haiku-5-5) | prompt/results.md, 2026-10-19, Claude Code 2.1.303 |
+| Claude Code hook p95 (GS6) | 41 ms, budget 40 ms: FAIL | TECH-SPEC §1.1, 2026-10-20, macOS, Node 26 |
+| 64 KB PostToolUse hook p95 (`T-F1`) | 62 ms, budget 60 ms: FAIL | TECH-SPEC §1.1, 2026-10-20 |
+
+On these runs v2 shows no token saving on single-task sessions. Only three JSON tasks (json-1 to json-3), where the model called a ctx tool, saved 29.6 to 29.7% session input.
+
 ## Privacy
 
 - No telemetry. Context Mode sends no data about you or your code anywhere.
