@@ -4,37 +4,37 @@
   "model": "claude-sonnet-5-5",
   "effort": "low",
   "budgetUsd": "0.25",
-  "sessionsDone": 30,
+  "sessionsDone": 40,
   "arms": {
     "on": {
-      "sessions": 15,
-      "pass": 15,
-      "costUsd": 0.3626,
-      "medianSessionInput": 38583,
-      "medianFreshInput": 4993,
+      "sessions": 20,
+      "pass": 20,
+      "costUsd": 0.4856,
+      "medianSessionInput": 38609.5,
+      "medianFreshInput": 5029,
       "mcpCallSessions": 5
     },
     "off": {
-      "sessions": 15,
-      "pass": 15,
-      "costUsd": 0.3342,
-      "medianSessionInput": 36159,
-      "medianFreshInput": 4315,
+      "sessions": 20,
+      "pass": 20,
+      "costUsd": 0.4425,
+      "medianSessionInput": 36170.5,
+      "medianFreshInput": 4329.5,
       "mcpCallSessions": 0
     }
   },
   "savingTotal": {
-    "median": -0.067,
+    "median": -0.0675,
     "min": -0.1077,
     "max": 0.2973,
-    "tasks": 15
+    "tasks": 20
   },
   "savingFresh": {
-    "median": -0.1754,
+    "median": -0.1747,
     "min": -0.3661,
     "max": -0.0426
   },
-  "totalCostUsd": 0.6968,
+  "totalCostUsd": 0.9281,
   "perTask": [
     {
       "task": "log-1",
@@ -184,6 +184,56 @@
       "passOff": 1,
       "savingTotal": -0.0684,
       "savingFresh": -0.1783,
+      "savingTotalOk": -0.0684
+    },
+    {
+      "task": "file-3",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0673,
+      "savingFresh": -0.1667,
+      "savingTotalOk": -0.0673
+    },
+    {
+      "task": "file-4",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0669,
+      "savingFresh": -0.164,
+      "savingTotalOk": -0.0669
+    },
+    {
+      "task": "git-1",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0677,
+      "savingFresh": -0.174,
+      "savingTotalOk": -0.0677
+    },
+    {
+      "task": "git-2",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0683,
+      "savingFresh": -0.1762,
+      "savingTotalOk": -0.0683
+    },
+    {
+      "task": "git-3",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0684,
+      "savingFresh": -0.1793,
       "savingTotalOk": -0.0684
     }
   ]
