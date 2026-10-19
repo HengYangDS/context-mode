@@ -14,6 +14,10 @@ PRAGMA busy_timeout = ${DB_TIMEOUT_MS};
 PRAGMA journal_mode = WAL;
 `;
 
+// The one tokenizer literal (DECISIONS-r9 V24): the chunks table below and rankTexts' scratch table
+// (store/fts.ts) both use it, so the in-memory BM25 tokenizes exactly as the store does.
+export const FTS_TOKENIZE = "tokenize = 'unicode61 remove_diacritics 2'";
+
 // Version 1. Future versions append their own step to MIGRATIONS; never edit this block.
 // "SessionDB" = events; "ContentStore" = sources + chunks (DECISIONS-r9 M14).
 export const DDL: string = `
@@ -61,7 +65,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
   agent UNINDEXED,
   ord UNINDEXED,
   body,
-  tokenize = 'unicode61 remove_diacritics 2'
+  ${FTS_TOKENIZE}
 );
 
 CREATE TABLE IF NOT EXISTS meta (

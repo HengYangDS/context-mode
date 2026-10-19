@@ -9,7 +9,7 @@ import { CtxError } from "../contracts/errors.ts";
 import { DECISION_SOURCE, INDEX_WRITE_CHUNK, RRF_K, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
-import { applyMigrations } from "./schema.ts";
+import { FTS_TOKENIZE } from "./schema.ts";
 
 // The DB owns sources.id (AUTOINCREMENT, D-M1-4, D-M2-1).
 const INSERT_SOURCE = `
@@ -343,11 +343,15 @@ export function ftsQueryTimeline(
 
 // ---- In-memory BM25 (impl/05 §5 step 2, DECISIONS-r9 F1) ----
 
-const RANK_INSERT = "INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (0, '', '', '', ?, ?)";
-const RANK_QUERY = "SELECT ord, bm25(chunks) AS bm FROM chunks WHERE chunks MATCH ?";
+// Scratch table: one contentless column with the store's tokenizer. bm25() reads only the indexed
+// columns, and every other chunks column is UNINDEXED, so the scores equal the chunks table's to the
+// bit; the scratch table skips the four UNINDEXED columns and the stored copy of each text
+// (DEVIATIONS D-M7-FT-1: 1 MiB / 10.7k texts 18.6 -> 12.8 ms). rowid = index + 1.
+const RANK_DDL = `CREATE VIRTUAL TABLE r USING fts5(body, ${FTS_TOKENIZE}, content='')`;
+const RANK_INSERT = "INSERT INTO r(rowid, body) VALUES (?, ?)";
+const RANK_QUERY = "SELECT rowid AS id, bm25(r) AS bm FROM r WHERE r MATCH ?";
 
-// Scores a plain text set with the same FTS5 table, tokenizer and BM25 as ftsQuery: a private
-// in-memory DB built by the one schema migration (no second tokenizer literal, no second BM25).
+// Scores a plain text set with the same tokenizer and BM25 as ftsQuery, in a private in-memory DB.
 // Returns one score per input text, same index: -bm25 (> 0) for a match, 0 for no match.
 export function rankTexts(texts: string[], q: string): number[] {
   const scores = texts.map(() => 0);
@@ -357,13 +361,13 @@ export function rankTexts(texts: string[], q: string): number[] {
   if (sqlite === undefined) throw new CtxError("NO_SQLITE");
   const mem = new sqlite.DatabaseSync(":memory:");
   try {
-    applyMigrations(mem, 0);
+    mem.exec(RANK_DDL);
     const ins = mem.prepare(RANK_INSERT);
     mem.exec("BEGIN");
-    texts.forEach((t, i) => ins.run(i, t));
+    for (let i = 0; i < texts.length; i++) ins.run(i + 1, texts[i]);
     mem.exec("COMMIT");
-    for (const r of mem.prepare(RANK_QUERY).all(match) as unknown as Array<{ ord: number; bm: number }>) {
-      scores[Number(r.ord)] = -r.bm;
+    for (const r of mem.prepare(RANK_QUERY).all(match) as unknown as Array<{ id: number; bm: number }>) {
+      scores[Number(r.id) - 1] = -r.bm;
     }
     return scores;
   } finally {

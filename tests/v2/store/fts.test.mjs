@@ -372,6 +372,36 @@ test("rankTexts scores an in-memory text set with the store's BM25: match > 0, m
   assert.deepEqual(rankTexts(["x y"], '(" *'), [0]);
 });
 
+// D-M7-FT-1: the contentless scratch table must score exactly as the store's chunks table.
+test("[M7] rankTexts scores equal bm25 over the migrated chunks table, bit for bit", async () => {
+  const { DatabaseSync } = await import("node:sqlite");
+  const { applyMigrations } = await import("../../../src/core/store/schema.ts");
+  const words = ["read", "the", "output", "of", "Café", "cafe", "naïve", "Привет", "a\u0301", "x_y", "42", "ok"];
+  const texts = [];
+  let seed = 7;
+  for (let i = 0; i < 400; i++) {
+    const n = 1 + (i % 37);
+    const w = [];
+    for (let k = 0; k < n; k++) { seed = (seed * 1103515245 + 12345) & 0x7fffffff; w.push(words[seed % words.length]); }
+    texts.push(w.join(i % 3 === 0 ? "\n" : " "));
+  }
+  texts.push("", "   ", "\ud800 lone read");
+  const ref = new DatabaseSync(":memory:");
+  applyMigrations(ref, 0);
+  const ins = ref.prepare("INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (0, '', '', '', ?, ?)");
+  texts.forEach((t, i) => ins.run(i, t));
+  for (const q of ["read", "the output", "cafe", "PRIVET привет", "naive", "a", "x_y 42", "missing"]) {
+    const want = texts.map(() => 0);
+    for (const r of ref.prepare("SELECT ord, bm25(chunks) AS bm FROM chunks WHERE chunks MATCH ?").all(toMatchForTest(q))) want[Number(r.ord)] = -r.bm;
+    assert.deepEqual(rankTexts(texts, q), want, q);
+  }
+  ref.close();
+});
+
+function toMatchForTest(q) {
+  return q.split(/\s+/).filter((w) => w !== "").map((w) => '"' + w.replaceAll('"', '""') + '"*').join(" ");
+}
+
 // ---- M2-R6 (#1163) ----
 test("[M2] GP5/snippet-code-point-safe", () => {
   // An emoji (a surrogate pair, 4 UTF-8 bytes) at every position across the clip edge.
