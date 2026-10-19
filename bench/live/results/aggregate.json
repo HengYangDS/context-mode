@@ -4,37 +4,37 @@
   "model": "claude-sonnet-5-5",
   "effort": "low",
   "budgetUsd": "0.25",
-  "sessionsDone": 20,
+  "sessionsDone": 30,
   "arms": {
     "on": {
-      "sessions": 10,
-      "pass": 10,
-      "costUsd": 0.2474,
-      "medianSessionInput": 38602,
-      "medianFreshInput": 4995,
-      "mcpCallSessions": 4
+      "sessions": 15,
+      "pass": 15,
+      "costUsd": 0.3626,
+      "medianSessionInput": 38583,
+      "medianFreshInput": 4993,
+      "mcpCallSessions": 5
     },
     "off": {
-      "sessions": 10,
-      "pass": 10,
-      "costUsd": 0.2349,
-      "medianSessionInput": 36160.5,
-      "medianFreshInput": 4330,
+      "sessions": 15,
+      "pass": 15,
+      "costUsd": 0.3342,
+      "medianSessionInput": 36159,
+      "medianFreshInput": 4315,
       "mcpCallSessions": 0
     }
   },
   "savingTotal": {
-    "median": -0.0656,
+    "median": -0.067,
     "min": -0.1077,
     "max": 0.2973,
-    "tasks": 10
+    "tasks": 15
   },
   "savingFresh": {
-    "median": -0.1536,
+    "median": -0.1754,
     "min": -0.3661,
     "max": -0.0426
   },
-  "totalCostUsd": 0.4823,
+  "totalCostUsd": 0.6968,
   "perTask": [
     {
       "task": "log-1",
@@ -135,6 +135,56 @@
       "savingTotal": -0.068,
       "savingFresh": -0.1754,
       "savingTotalOk": -0.068
+    },
+    {
+      "task": "tests-2",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0688,
+      "savingFresh": -0.2135,
+      "savingTotalOk": -0.0688
+    },
+    {
+      "task": "tests-3",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0689,
+      "savingFresh": -0.2148,
+      "savingTotalOk": -0.0689
+    },
+    {
+      "task": "tests-4",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0682,
+      "savingFresh": -0.2068,
+      "savingTotalOk": -0.0682
+    },
+    {
+      "task": "file-1",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.067,
+      "savingFresh": -0.1654,
+      "savingTotalOk": -0.067
+    },
+    {
+      "task": "file-2",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0684,
+      "savingFresh": -0.1783,
+      "savingTotalOk": -0.0684
     }
   ]
 }
