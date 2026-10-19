@@ -1,0 +1,3 @@
+PASS keep-pass 131/131 files green
+PASS v2-unit node --test tests/v2/: pass 1061, fail 0, skip 2, todo 0 of 1063; not run: GP3 copilot-cli MCP-firing sub-case # SKIP SKIPPED until S-NAMES closes (impl/10 §6, TECH-SPEC §3.8) | check on Windows: 10 runs, 0 grandchildren alive # SKIP runs on win32 only (impl/03 §4, DECISIONS-r9 F5)
+PASS ci-checks scripts/gen-keep-pass.mjs --check; scripts/ci-gs4-lint.mjs; build/check-readme.mjs: exit 0

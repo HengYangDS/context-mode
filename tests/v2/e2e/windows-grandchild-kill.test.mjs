@@ -25,7 +25,7 @@ test("check on non-Windows: SKIPPED JSON, exit 0", { skip: process.platform === 
   assert.equal(j.ok, true);
 });
 
-test("check on Windows: 10 runs, 0 grandchildren alive", { skip: process.platform !== "win32" }, () => {
+test("check on Windows: 10 runs, 0 grandchildren alive", { skip: process.platform !== "win32" ? "runs on win32 only (impl/03 §4, DECISIONS-r9 F5)" : false }, () => {
   const r = spawnSync(process.execPath, [root + caseJson.run[1]], { cwd: root, encoding: "utf8" });
   assert.equal(r.status, 0);
   const j = JSON.parse(r.stdout.trim().split("\n").pop());
