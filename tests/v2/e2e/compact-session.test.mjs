@@ -30,7 +30,7 @@ process.stdin.on("data", (d) => {
   }
 });
 process.stdin.on("end", () => {
-  fs.writeFileSync(${JSON.stringify(rec)}, JSON.stringify({ argv: process.argv.slice(2), envKeys: Object.keys(process.env).sort(), stdin: lines }));
+  fs.writeFileSync(${JSON.stringify(rec)}, JSON.stringify({ argv: process.argv.slice(2), envKeys: Object.keys(process.env).sort(), iso: { ENABLE_CLAUDEAI_MCP_SERVERS: process.env.ENABLE_CLAUDEAI_MCP_SERVERS, CLAUDE_CODE_DISABLE_AUTO_MEMORY: process.env.CLAUDE_CODE_DISABLE_AUTO_MEMORY, CLAUDE_CODE_DISABLE_CLAUDE_MDS: process.env.CLAUDE_CODE_DISABLE_CLAUDE_MDS }, stdin: lines }));
 });
 `);
   chmodSync(bin, 0o755);
@@ -49,16 +49,20 @@ test("argv: stream-json in and out, model, effort, budget", { skip: !posix }, as
   assert.equal(val("--max-budget-usd"), "0.25");
 });
 
-test("env: only PATH HOME USER TMPDIR", { skip: !posix }, async (t) => {
+// DEVIATIONS D-M7-CL-3: the 4 pass-through keys plus the 3 host-isolation keys, nothing else.
+const ISOLATION = { ENABLE_CLAUDEAI_MCP_SERVERS: "false", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1", CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1" };
+
+test("env: only PATH HOME USER TMPDIR plus the host-isolation keys", { skip: !posix }, async (t) => {
   const s = stub(t);
   await runSession({ bin: s.bin, turns: ["one"], nextRequest: "two", budgetUsd: "0.25", cwd: s.dir });
-  const { envKeys } = JSON.parse(readFileSync(s.rec, "utf8"));
-  for (const k of envKeys) assert.ok(["PATH", "HOME", "USER", "TMPDIR", "PWD", "SHLVL", "_", "__CF_USER_TEXT_ENCODING"].includes(k) || k.startsWith("LC_") === false, k);
+  const { envKeys, iso } = JSON.parse(readFileSync(s.rec, "utf8"));
+  for (const k of envKeys) assert.ok(["PATH", "HOME", "USER", "TMPDIR", ...Object.keys(ISOLATION), "PWD", "SHLVL", "_", "__CF_USER_TEXT_ENCODING"].includes(k) || k.startsWith("LC_") === false, k);
   assert.ok(!envKeys.includes("ANTHROPIC_API_KEY"));
-  for (const k of ["PATH", "HOME", "USER", "TMPDIR"]) assert.ok(envKeys.includes(k), k);
-  // macOS CoreFoundation adds __CF_USER_TEXT_ENCODING to every process; the driver passes only the 4 keys
+  for (const k of ["PATH", "HOME", "USER", "TMPDIR", ...Object.keys(ISOLATION)]) assert.ok(envKeys.includes(k), k);
+  assert.deepEqual(iso, ISOLATION);
+  // macOS CoreFoundation adds __CF_USER_TEXT_ENCODING to every process; the driver passes only these keys
   const osAdded = ["PWD", "SHLVL", "_", "__CF_USER_TEXT_ENCODING"];
-  assert.deepEqual(envKeys.filter((k) => !["PATH", "HOME", "USER", "TMPDIR", ...osAdded].includes(k)), []);
+  assert.deepEqual(envKeys.filter((k) => !["PATH", "HOME", "USER", "TMPDIR", ...Object.keys(ISOLATION), ...osAdded].includes(k)), []);
 });
 
 test("a /compact turn comes after the earlier turns and before the next request", { skip: !posix }, async (t) => {
