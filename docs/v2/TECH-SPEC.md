@@ -43,25 +43,25 @@ v2.0.0 is released only when **all** of these hold. Each one is checked by a mac
 | GS11 | Every implementation step has a green E2E case (ADR-0017) | CI + harness report |
 | GS8 | Every item in `tickets/v2-not-closed.md` has an outcome: decided, closed as covered, or closed as won't-fix | review |
 
-### 1.1 M7 sign-off status (2026-10-19, M7-S2)
+### 1.1 M7 sign-off status (2026-10-19, M7-S3)
 
-Measured on `origin/v2-design` d1accdd4 merged into `impl/M7-M7-S2` (macOS, Node 24). `gate.mjs --milestone M7`: every layer PASS (keep-pass 131/131, v2-unit 1059/1061 with 2 skips and 0 fail, ci-checks, gp-cases, prompt-lint, check-removed, live step mode 1/31). `e2e/live/run.mjs --all` (keyless, Sonnet 5, effort low, `--max-budget-usd 0.25` per call): 27/31 PASS, 4 FAIL (T-F1, ci-config, T-GS6, T-CMP). CI on `v2-design` d1accdd4 (run 39254594458): 6/6 jobs green.
+Measured on `origin/v2-design` with the follow-up results of routing, ci-config, hookperf and T-CMP (macOS, Node 26, machine load avg 5.6 to 11.9 on 10 cores). `gate.mjs --milestone M7`: 3 of 3 runs PASS in every layer (keep-pass 131/131, v2-unit 1061/1063 in all 3 runs, ci-checks, gp-cases, prompt-lint, check-removed). The gate live step ran 0/31 cases (no changed file matched a case), so it checked no live case. v2-unit: 2 tests do not pass in all 3 runs, yet the gate reports PASS (open item O3). Live cases ran once through `e2e/live/run.mjs`: `ci-config` PASS, `T-GS6` FAIL, `T-F1` FAIL, `T-CMP` FAIL.
 
 | ID | Status | Evidence |
 |---|---|---|
-| GS1 | PASS | gp-cases layer, `e2e/cases/run.mjs --milestone M7` exit 0 (macOS); CI run 39254594458 6/6 green (macOS, Linux, Windows; Node 24.15.0 and 26) |
-| GS2 | PENDING release | RC job, not part of the M7 gate |
-| GS3 | PENDING release | live `g25-mcp-hooks` PASS, prints SKIPPED (release job) |
-| GS4 | PASS | keep-pass 131/131; `ci-gs4-lint.mjs` exit 0; live `keep-pass-131` PASS |
-| GS5 | PASS | prompt-lint PASS (PR1-12, GS5, GS9); `check-removed.mjs` exit 0; live `repo-cleanup-gate`, `repo-github-files` PASS |
-| GS6 | FAIL | live `T-GS6`: Claude Code p95 46 ms > `HOOK_P95_MS` 40; command hooks (codex) wall p95 51 ms ≤ 60, CPU over Node 20 ms ≤ 20 PASS. Live `T-F1`: Case B 16384 B PostToolUse wall p95 291 ms > `HOOK_COMBINED_P95_MS` 60. GP3 bench in gp-cases PASS |
-| GS7 | PASS | GP1 in gp-cases; live `release-staging-smoke` PASS |
+| GS1 | PASS | gp-cases layer exit 0 (macOS); last CI run 39254594458 6/6 green |
+| GS2 | PENDING release | RC job. GP-LIVE-ROUTING new rule (D-M7-RT-1), live run 4, 20 large + 20 small per model: under 0, over 0 on opus-5-5 and sonnet-5-5, over 1 on haiku-5-5, correct 40/40 on all three; largest native bytes in a large run 1521 (limit 2048) |
+| GS3 | PENDING release | live `g25-mcp-hooks` prints SKIPPED (release job) |
+| GS4 | PASS | keep-pass 131/131; `ci-gs4-lint.mjs` exit 0 |
+| GS5 | PASS | prompt-lint PASS; `check-removed.mjs` exit 0 |
+| GS6 | FAIL | `T-GS6`: Claude Code hook p95 41 ms > `HOOK_P95_MS` 40 (n=200); command hooks wall p95 48 ms ok, CPU over Node 20 ms ok. Earlier hookperf runs: cc p95 57 / 47 / 52 ms under load. `T-F1`: Case B 1048576 B PostToolUse wall p95 166 ms > `HOOK_COMBINED_P95_MS` 60; 64 KB p95 65 to 95 ms. Bare `node -e 0` p95 is 34 to 50 ms on this machine under load. D-M7-HP-1 |
+| GS7 | PASS | GP1 in gp-cases |
 | GS9 | PASS | GP1/GP2 in gp-cases; prompt-lint GS9 OK |
-| GS10 | R1, R2: PENDING owner (D-M7-arch-5); R3–R8: PASS | `check-removed.mjs` exit 0; live `v1-migration-{claude-code,codex,copilot-cli,gemini,kiro,vscode}` 6/6 PASS; R7 rollback rehearsal runs in `/release` (D-M7-arch-5) |
-| GS11 | FAIL | live `ci-config` FAIL: `e2e/checks/ci-config.mjs` asks `timeout-minutes: 10`, `ci.yml` has 20 (D-M7-CI-2). T-CMP: this run FAIL (exit 1, 50 sessions, about 55 min; `run.mjs` keeps only the first stderr line, so per-arm numbers of this run are not kept). Last recorded per-arm numbers (D-M7-CL-1: arm a correct 0.70 < 0.80, call rate 0/10 < 0.70; arm d 0.50 < 0.70) |
-| GS8 | not measured in this run | review |
+| GS10 | R1, R2: PENDING owner (D-M7-arch-5); R3 to R8: PASS | `check-removed.mjs` exit 0; 6/6 v1-migration live cases (last full run) |
+| GS11 | FAIL | `ci-config` now PASS (D-M7-CI-3, `timeout-minutes: 20`). `T-CMP` FAIL on Sonnet 5.5 low (10 sessions per arm a to e): arm a correct 7/10 < 0.80, call rate 0/10 < 0.70; Opus 5.5 low arm a correct 4/10, call rate 0/10. 0 bytes returned from `ctx_resume`/`ctx_search` in all 60 sessions. Arm d 7/10 < 0.70 gate is not met either. Cost 8.1365 USD. claude-code `compactSummary` stays `none` (D-M7-CL-1, D-M7-CL-2) |
+| GS8 | not measured | review |
 
-M7 is not done: GS6 (T-GS6, T-F1) and GS11 (ci-config, T-CMP) fail; their owners are the hook (`src/hooks/`), `e2e/checks/ci-config.mjs` and compaction (`src/core/compaction/`) modules, not this task. R1, R2 stay PENDING owner.
+M7 is not done. Open items are listed in `.impl/BLOCKED-M7.md`. R1, R2 stay PENDING owner.
 
 ## 2. Scope
 
