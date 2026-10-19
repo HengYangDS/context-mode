@@ -9,32 +9,32 @@
     "on": {
       "sessions": 1,
       "pass": 1,
-      "costUsd": 0.08,
-      "medianSessionInput": 38534,
-      "medianFreshInput": 19373,
+      "costUsd": 0.0216,
+      "medianSessionInput": 38532,
+      "medianFreshInput": 4393,
       "mcpCallSessions": 0
     },
     "off": {
       "sessions": 1,
       "pass": 1,
-      "costUsd": 0.0263,
+      "costUsd": 0.0197,
       "medianSessionInput": 36162,
-      "medianFreshInput": 5437,
+      "medianFreshInput": 3730,
       "mcpCallSessions": 0
     }
   },
   "savingTotal": {
-    "median": -0.0656,
-    "min": -0.0656,
-    "max": -0.0656,
+    "median": -0.0655,
+    "min": -0.0655,
+    "max": -0.0655,
     "tasks": 1
   },
   "savingFresh": {
-    "median": -2.5632,
-    "min": -2.5632,
-    "max": -2.5632
+    "median": -0.1777,
+    "min": -0.1777,
+    "max": -0.1777
   },
-  "totalCostUsd": 0.1063,
+  "totalCostUsd": 0.0413,
   "perTask": [
     {
       "task": "log-1",
@@ -42,9 +42,9 @@
       "nOff": 1,
       "passOn": 1,
       "passOff": 1,
-      "savingTotal": -0.0656,
-      "savingFresh": -2.5632,
-      "savingTotalOk": -0.0656
+      "savingTotal": -0.0655,
+      "savingFresh": -0.1777,
+      "savingTotalOk": -0.0655
     }
   ]
 }
