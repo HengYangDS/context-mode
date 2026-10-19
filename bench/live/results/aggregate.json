@@ -4,37 +4,37 @@
   "model": "claude-sonnet-5-5",
   "effort": "low",
   "budgetUsd": "0.25",
-  "sessionsDone": 2,
+  "sessionsDone": 10,
   "arms": {
     "on": {
-      "sessions": 1,
-      "pass": 1,
-      "costUsd": 0.0216,
-      "medianSessionInput": 38532,
-      "medianFreshInput": 4393,
+      "sessions": 5,
+      "pass": 5,
+      "costUsd": 0.1197,
+      "medianSessionInput": 38533,
+      "medianFreshInput": 4997,
       "mcpCallSessions": 0
     },
     "off": {
-      "sessions": 1,
-      "pass": 1,
-      "costUsd": 0.0197,
-      "medianSessionInput": 36162,
-      "medianFreshInput": 3730,
+      "sessions": 5,
+      "pass": 5,
+      "costUsd": 0.1084,
+      "medianSessionInput": 36159,
+      "medianFreshInput": 4331,
       "mcpCallSessions": 0
     }
   },
   "savingTotal": {
-    "median": -0.0655,
-    "min": -0.0655,
+    "median": -0.0657,
+    "min": -0.0685,
     "max": -0.0655,
-    "tasks": 1
+    "tasks": 5
   },
   "savingFresh": {
-    "median": -0.1777,
-    "min": -0.1777,
-    "max": -0.1777
+    "median": -0.154,
+    "min": -0.1923,
+    "max": -0.1529
   },
-  "totalCostUsd": 0.0413,
+  "totalCostUsd": 0.2281,
   "perTask": [
     {
       "task": "log-1",
@@ -42,9 +42,49 @@
       "nOff": 1,
       "passOn": 1,
       "passOff": 1,
+      "savingTotal": -0.067,
+      "savingFresh": -0.1923,
+      "savingTotalOk": -0.067
+    },
+    {
+      "task": "log-2",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
       "savingTotal": -0.0655,
-      "savingFresh": -0.1777,
+      "savingFresh": -0.1532,
       "savingTotalOk": -0.0655
+    },
+    {
+      "task": "log-3",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0685,
+      "savingFresh": -0.1776,
+      "savingTotalOk": -0.0685
+    },
+    {
+      "task": "log-4",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0655,
+      "savingFresh": -0.1529,
+      "savingTotalOk": -0.0655
+    },
+    {
+      "task": "log-5",
+      "nOn": 1,
+      "nOff": 1,
+      "passOn": 1,
+      "passOff": 1,
+      "savingTotal": -0.0657,
+      "savingFresh": -0.154,
+      "savingTotalOk": -0.0657
     }
   ]
 }
