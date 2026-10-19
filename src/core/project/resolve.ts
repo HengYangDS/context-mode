@@ -1,7 +1,6 @@
 // impl/02 §2, impl/00 §3.1 ProjectContext + §4, PRD-v2 §5, ADR-0007 decision 4,
 // DEVIATIONS D-M1-1, D-M1-5, D-M1-T3-2, D-M1-T3-3, D-M1-T3-5.
 // One project source per host, no fallback chain; a missing source is never guessed.
-import { createHash } from "node:crypto";
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import type { AgentId } from "../contracts/agents.ts";
@@ -13,6 +12,7 @@ import { CtxError } from "../contracts/errors.ts";
 import type { ProjectContext, ProjectSourceKind } from "../contracts/types.ts";
 import { resolveConfigDir } from "./config-dir.ts";
 import { commonRoot } from "./contain.ts";
+import { sha256Hex } from "./sha256.ts";
 
 export interface ProjectSourceInput {
   env: NodeJS.ProcessEnv;
@@ -144,7 +144,8 @@ export function resolveProject(agent: AgentId, src: ProjectSourceInput): Project
   const dir = dirOf(source, src);
   if (dir === undefined) throw new CtxError("NO_PROJECT", { kind: source });
   const { commonDir, worktree } = gitDirs(dir);
-  const projectKey = createHash("sha256").update(commonDir).digest("hex").slice(0, PROJECT_KEY_HEX_LEN);
+  // D-M7-HP-2 (GS6): plain-JS SHA-256, so the hook never loads node:crypto (~3 ms of process start).
+  const projectKey = sha256Hex(commonDir).slice(0, PROJECT_KEY_HEX_LEN);
   // D-M1-T3-5: the config dir comes from the process env, not src.env (src.env picks the project only).
   const projectDir = join(resolveConfigDir(process.env), PROJECTS_DIR_NAME, projectKey);
   // D-M3-F-3 (GS6): `git worktree list` runs on the first read of containmentRoot, not here. Only the
