@@ -47,12 +47,13 @@ function session(p) {
   const t0 = Date.now();
   const r = spawnSync(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
     "--no-session-persistence", "--setting-sources", "project", ...arm], { cwd: dir, env, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 28 });
-  let res = null, calls = 0, mcpCalls = 0;
+  let res = null, calls = 0, mcpCalls = 0, mcpOk = 0, toolNames = [];
   for (const l of (r.stdout || "").split("\n")) {
     if (!l.startsWith("{")) continue;
     let ev; try { ev = JSON.parse(l); } catch { continue; }
     if (ev.type === "result") res = ev;
-    if (ev.type === "assistant") for (const c of ev.message?.content ?? []) if (c.type === "tool_use") { calls++; if (c.name.startsWith("mcp__")) mcpCalls++; }
+    if (ev.type === "system" && ev.subtype === "init") { mcpOk = (ev.mcp_servers ?? []).filter((m) => m.status === "connected").length; }
+    if (ev.type === "assistant") for (const c of ev.message?.content ?? []) if (c.type === "tool_use") { toolNames.push(c.name); calls++; if (c.name.startsWith("mcp__")) mcpCalls++; }
   }
   const u = res?.usage ?? {};
   const text = String(res?.result ?? "");
@@ -61,7 +62,7 @@ function session(p) {
   fs.rmSync(path.join(os.homedir(), ".context-mode", "projects", key), { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
   return { id: p.id, task: p.task.id, run: p.run, arm: p.arm, ok, isError: res?.is_error ?? true, input: u.input_tokens ?? 0, cacheCreate: u.cache_creation_input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0,
-    output: u.output_tokens ?? 0, cost: Number(res?.total_cost_usd ?? 0), calls, mcpCalls, ms: Date.now() - t0, answer: text.slice(0, 200), expect };
+    output: u.output_tokens ?? 0, cost: Number(res?.total_cost_usd ?? 0), calls, mcpCalls, mcpOk, tools: toolNames.join(","), ms: Date.now() - t0, answer: text.slice(0, 200), expect };
 }
 
 function median(a) { const s = [...a].sort((x, y) => x - y), m = s.length >> 1; return s.length ? (s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2) : NaN; }
