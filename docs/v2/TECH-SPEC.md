@@ -43,9 +43,9 @@ v2.0.0 is released only when **all** of these hold. Each one is checked by a mac
 | GS11 | Every implementation step has a green E2E case (ADR-0017) | CI + harness report |
 | GS8 | Every item in `tickets/v2-not-closed.md` has an outcome: decided, closed as covered, or closed as won't-fix | review |
 
-### 1.1 M7 sign-off status (2026-10-19, M7-S3)
+### 1.1 M7 sign-off status (2026-10-20, M7-S4)
 
-Measured on `origin/v2-design` with the follow-up results of routing, ci-config, hookperf and T-CMP (macOS, Node 26, machine load avg 5.6 to 11.9 on 10 cores). `gate.mjs --milestone M7`: 3 of 3 runs PASS in every layer (keep-pass 131/131, v2-unit 1061/1063 in all 3 runs, ci-checks, gp-cases, prompt-lint, check-removed). The gate live step ran 0/31 cases (no changed file matched a case), so it checked no live case. v2-unit: 2 tests do not pass in all 3 runs, yet the gate reports PASS (open item O3). Live cases ran once through `e2e/live/run.mjs`: `ci-config` PASS, `T-GS6` FAIL, `T-F1` FAIL, `T-CMP` FAIL.
+Measured on `origin/v2-design` after D-M7-gate-1, D-M7-gate-2, D-M7-FT-1 and D-M7-FT-2 (macOS, Node 26, one machine, other load not checked). `gate.mjs --milestone M7`: 3 of 3 runs PASS in every layer (keep-pass 131/131, v2-unit pass 1062, fail 0, skip 2, ci-checks, gp-cases, prompt-lint, check-removed). The 2 skips are named: "GP3 copilot-cli MCP-firing sub-case" (waits for S-NAMES) and the win32-only grandchild check; they were skipped, not failed. The gate live step ran 0/31 cases and prints SKIP with a reason, so it checked no live case. Live cases ran once each through `e2e/live/run.mjs --only`: `T-GS6` FAIL, `T-F1` FAIL.
 
 | ID | Status | Evidence |
 |---|---|---|
@@ -54,11 +54,11 @@ Measured on `origin/v2-design` with the follow-up results of routing, ci-config,
 | GS3 | PENDING release | live `g25-mcp-hooks` prints SKIPPED (release job) |
 | GS4 | PASS | keep-pass 131/131; `ci-gs4-lint.mjs` exit 0 |
 | GS5 | PASS | prompt-lint PASS; `check-removed.mjs` exit 0 |
-| GS6 | FAIL | `T-GS6`: Claude Code hook p95 41 ms > `HOOK_P95_MS` 40 (n=200); command hooks wall p95 48 ms ok, CPU over Node 20 ms ok. Earlier hookperf runs: cc p95 57 / 47 / 52 ms under load. `T-F1`: Case B 1048576 B PostToolUse wall p95 166 ms > `HOOK_COMBINED_P95_MS` 60; 64 KB p95 65 to 95 ms. Bare `node -e 0` p95 is 34 to 50 ms on this machine under load. D-M7-HP-1 |
+| GS6 | FAIL | `T-GS6` (n=200): cc p95 41 ms > `HOOK_P95_MS` 40; command hooks wall p95 43 ms ok, CPU over Node 20 ms ok. `T-F1` Case B 65536 B PostToolUse wall p95 62 ms > `HOOK_COMBINED_P95_MS` 60 (live run). `bench/hook-index.mjs` (50 runs x 3, loadavg 4.8 to 5.6): 64 KB p95 50.5 to 55.0 ms (before 58.4 to 82.7); 1 MiB p95 113.8 to 120.8 ms (before 150.0 to 154.7); live 1 MiB check 134 ms. Bare node p95 31 to 33 ms. Every miss is 1 to 2 ms at 64 KB and 41 ms; 1 MiB is 2x over. D-M7-FT-1, D-M7-FT-2 |
 | GS7 | PASS | GP1 in gp-cases |
 | GS9 | PASS | GP1/GP2 in gp-cases; prompt-lint GS9 OK |
 | GS10 | R1, R2: PENDING owner (D-M7-arch-5); R3 to R8: PASS | `check-removed.mjs` exit 0; 6/6 v1-migration live cases (last full run) |
-| GS11 | FAIL | `ci-config` now PASS (D-M7-CI-3, `timeout-minutes: 20`). `T-CMP` FAIL on Sonnet 5.5 low (10 sessions per arm a to e): arm a correct 7/10 < 0.80, call rate 0/10 < 0.70; Opus 5.5 low arm a correct 4/10, call rate 0/10. 0 bytes returned from `ctx_resume`/`ctx_search` in all 60 sessions. Arm d 7/10 < 0.70 gate is not met either. Cost 8.1365 USD. claude-code `compactSummary` stays `none` (D-M7-CL-1, D-M7-CL-2) |
+| GS11 | FAIL | (T-CMP not re-run in M7-S4; numbers from M7-S3) `ci-config` now PASS (D-M7-CI-3, `timeout-minutes: 20`). `T-CMP` FAIL on Sonnet 5.5 low (10 sessions per arm a to e): arm a correct 7/10 < 0.80, call rate 0/10 < 0.70; Opus 5.5 low arm a correct 4/10, call rate 0/10. 0 bytes returned from `ctx_resume`/`ctx_search` in all 60 sessions. Arm d 7/10 < 0.70 gate is not met either. Cost 8.1365 USD. claude-code `compactSummary` stays `none` (D-M7-CL-1, D-M7-CL-2) |
 | GS8 | not measured | review |
 
 M7 is not done. Open items are listed in `.impl/BLOCKED-M7.md`. R1, R2 stay PENDING owner.
