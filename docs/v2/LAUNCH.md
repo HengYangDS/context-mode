@@ -25,7 +25,8 @@ runs, search results, docs.
 
 ## Business value
 
-- Less tool output in context per turn (see "Measured numbers" for the v1 figures).
+- Aims at less tool output in context per turn. Measured so far: no saving on
+  single-task sessions (see "Measured numbers").
 - No text is thrown away: output is indexed, not deleted, so the agent can
   always search back for the exact bytes it needs.
 - One shared store per project, so work survives a context compaction.
@@ -60,26 +61,33 @@ Source: `PRD-v2.md` §3, `docs/v2/TECH-SPEC.md` §2.
 
 ## Measured numbers
 
-The only numbers below are ones a document in this repo states, with the
-source named. v2 has no separate benchmark run yet: `docs/v2/benchmarks.md`
-does not exist at the time of writing, so v2 numbers below are the v1
-measurements, clearly marked as v1.
+Only measured numbers, each with its source, date and agent version. The old
+v1 savings figures (from the removed `BENCHMARK.md`) are gone: no
+file in this repo measures them now.
 
-| Number | Value | Source |
+| Number | Value | Source, date, agent |
 |---|---|---|
-| v1 context savings, structured output path (`ctx_execute_file`) | 315 KB raw → 5.5 KB context, 98% savings, across 14 scenarios | `BENCHMARK.md`, Part 1 |
-| v1 context savings, knowledge retrieval path (`ctx_index`/`ctx_search`) | 60.3 KB raw → 11.0 KB context, 82% savings, across 6 scenarios | `BENCHMARK.md`, Part 2 |
-| v1 code examples preserved | 100% exact, not summarized, in the retrieval path | `BENCHMARK.md`, Overview |
+| Offline replay: bytes v2 would return vs bytes the model got | 1.1% saving; -1.5% with the re-run bound (23175 tool calls, 820 sessions) | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283, Node v26.8.1 |
+| Live A/B, session input saving per task (median, min, max over 20 tasks) | -6.7%, -6.9%, +29.7%; the plugin arm read more | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code 2.1.303, claude-sonnet-5-5 effort low |
+| Live A/B, fresh input saving (median) | -18.6% | same |
+| Live A/B success | on 60/60, off 60/60 | same |
+| Live A/B list-price cost (estimate, not a bill) | on $1.4121, off $1.2744 | same |
+| Live routing, run 4 (new rule) | under 0/20 on all 3 models; over 0/20 opus-5-5, 0/20 sonnet-5-5, 1/20 haiku-5-5; correct 40/40 each | `docs/v2/prompt/results.md`, 2026-10-19, Claude Code 2.1.303 |
+| Claude Code hook p95 (GS6) | 41 ms; budget `HOOK_P95_MS` 40 ms: FAIL | `docs/v2/TECH-SPEC.md` §1.1, 2026-10-20, macOS, Node 26 |
+| 64 KB PostToolUse hook p95 (`T-F1` Case B) | 62 ms; budget `HOOK_COMBINED_P95_MS` 60 ms: FAIL | same |
 | v2 issue backlog resolved | 329 deduplicated rows (from 357 open issues/PRs), one outcome each | `PRD-v2.md` §1, `docs/v2/review/ISSUE-OUTCOMES-r4.md` |
-| v2 unit tests passing at time of writing (ctx_execute/ctx_batch/ctx_search/ctx_index) | 232 of 234 | `docs/v2/impl/DEVIATIONS.md`, D-M2-merge-2 |
 
-No v2 context-savings or latency number is published yet. Do not quote the
-v1 numbers above as v2 results.
+What these runs show: on single-task sessions v2 gives no token saving. The
+three JSON tasks where the model called a ctx tool saved 29.6 to 29.7%
+session input; the other tasks read 6.6 to 6.9% more. Full caveats are in
+`docs/v2/benchmarks.md`. More hook numbers: `docs/performance.md`.
 
 ## Claims we do not make
 
-- We do not claim v2 has been benchmarked yet. `docs/v2/benchmarks.md` does
-  not exist; the only numbers available are from the v1 benchmark run.
+- We do not claim v2 saves tokens. The measured runs above show no saving
+  on single-task sessions (`docs/v2/benchmarks.md`).
+- We do not claim v2 meets its hook latency budget. GS6 is FAIL
+  (`docs/v2/TECH-SPEC.md` §1.1).
 - We do not claim v2 has confirmed that Copilot CLI's MCP `instructions` field
   reaches the model. ADR-0004 records a live probe on Copilot CLI 1.0.60 with
   v1; no v2 build has run that check yet.

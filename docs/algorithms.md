@@ -1,7 +1,7 @@
 # Algorithms
 
 Each entry: what it does, why we chose it, source, measured result, constants, code location.
-Numbers come from `BENCHMARK.md` and the `docs/v2/review/DECISIONS-r*.md` files (see per-row source).
+Numbers come from `docs/v2/benchmarks.md`, `docs/v2/prompt/results.md` and the `docs/v2/review/DECISIONS-r*.md` files (see per-row source).
 `docs/v2/benchmarks.md`, named in the design docs as the number source, does not exist in this repo —
 recorded as a deviation in `docs/v2/impl/DEVIATIONS.md`.
 
@@ -177,16 +177,16 @@ Not yet run at this commit — see `DEVIATIONS.md`.
 
 **Code:** `src/core/sandbox/` (`killTree`, `spawn.ts`).
 
-## Context-saving numbers (whole system, from `BENCHMARK.md`)
+## Context-saving numbers (whole system)
 
-| Metric | Value | Source |
+The old v1 savings numbers (from the removed `BENCHMARK.md`) are gone: no file in this repo measures them now.
+
+| Metric | Value | Source, date, agent |
 |---|---|---|
-| Total raw data processed in the 21-scenario run | 376 KB | `BENCHMARK.md` Overview |
-| Total context consumed | 16.5 KB | `BENCHMARK.md` Overview |
-| Overall context saving | 96% | `BENCHMARK.md` Overview |
-| `ctx_execute_file` subtotal | 315 KB raw to 5.5 KB context (98%) | `BENCHMARK.md` Part 1 |
-| `ctx_index`/`ctx_search` subtotal | 60.3 KB raw to 11.0 KB context (82%) | `BENCHMARK.md` Part 2 |
-| Test suite total | 125 tests, all pass | `BENCHMARK.md` Test Suite |
+| Offline replay, corpus byte saving (23175 tool calls, 820 sessions) | 1.1%; -1.5% with the re-run bound | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
+| Offline replay, Read byte saving (28 denies of large unranged reads) | 21.2%; 10.4% with the re-run bound | same |
+| Offline replay, Bash byte saving | -2.9%; -4.3% with the re-run bound | same |
+| Live A/B, session input saving per task (median, min, max) | -6.7%, -6.9%, +29.7% | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code 2.1.303, claude-sonnet-5-5 low |
+| Live routing, run 4, under / over (new rule, `ROUTE_BYTES` 2048) | under 0/20 all models; over 0, 0, 1 of 20 | `docs/v2/prompt/results.md`, 2026-10-19, Claude Code 2.1.303 |
 
-These numbers are from the v1/root-level `BENCHMARK.md`, run against `tests/benchmark.ts` and
-`tests/ecosystem-benchmark.ts`. They are not yet re-run against the v2 build described above.
+Hook latency against the GS6 budgets is in `docs/performance.md`.
