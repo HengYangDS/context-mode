@@ -16,6 +16,9 @@ function childEnv() {
   for (const k of ENV_KEYS) if (process.env[k] !== undefined) env[k] = process.env[k];
   // DEVIATIONS D-M7-CI-1: Linux and Windows runners do not set TMPDIR; the child always gets one.
   if (env.TMPDIR === undefined) env.TMPDIR = tmpdir();
+  // DEVIATIONS D-M7-CL-3: same isolation as e2e/live/run.mjs and harness/live/claude-code.mjs. Without it
+  // the host auto-memory, claude.ai MCP servers and the home CLAUDE.md leak into every arm.
+  Object.assign(env, { ENABLE_CLAUDEAI_MCP_SERVERS: "false", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1", CLAUDE_CODE_DISABLE_CLAUDE_MDS: "1" });
   return env;
 }
 
