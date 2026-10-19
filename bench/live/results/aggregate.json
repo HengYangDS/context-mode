@@ -4,37 +4,37 @@
   "model": "claude-sonnet-5-5",
   "effort": "low",
   "budgetUsd": "0.25",
-  "sessionsDone": 60,
+  "sessionsDone": 70,
   "arms": {
     "on": {
-      "sessions": 30,
-      "pass": 30,
-      "costUsd": 0.7159,
-      "medianSessionInput": 38609.5,
-      "medianFreshInput": 4725,
+      "sessions": 35,
+      "pass": 35,
+      "costUsd": 0.8267,
+      "medianSessionInput": 38606,
+      "medianFreshInput": 4498,
       "mcpCallSessions": 10
     },
     "off": {
-      "sessions": 30,
-      "pass": 30,
-      "costUsd": 0.6628,
-      "medianSessionInput": 36162,
-      "medianFreshInput": 4294.5,
+      "sessions": 35,
+      "pass": 35,
+      "costUsd": 0.7573,
+      "medianSessionInput": 36159,
+      "medianFreshInput": 4248,
       "mcpCallSessions": 0
     }
   },
   "savingTotal": {
-    "median": -0.0672,
+    "median": -0.0675,
     "min": -0.0871,
     "max": 0.298,
     "tasks": 20
   },
   "savingFresh": {
-    "median": -0.1771,
+    "median": -0.1782,
     "min": -0.261,
     "max": -0.0291
   },
-  "totalCostUsd": 1.3787,
+  "totalCostUsd": 1.584,
   "perTask": [
     {
       "task": "log-1",
@@ -138,52 +138,52 @@
     },
     {
       "task": "tests-2",
-      "nOn": 1,
-      "nOff": 1,
-      "passOn": 1,
-      "passOff": 1,
+      "nOn": 2,
+      "nOff": 2,
+      "passOn": 2,
+      "passOff": 2,
       "savingTotal": -0.0688,
       "savingFresh": -0.2135,
       "savingTotalOk": -0.0688
     },
     {
       "task": "tests-3",
-      "nOn": 1,
-      "nOff": 1,
-      "passOn": 1,
-      "passOff": 1,
+      "nOn": 2,
+      "nOff": 2,
+      "passOn": 2,
+      "passOff": 2,
       "savingTotal": -0.0689,
-      "savingFresh": -0.2148,
+      "savingFresh": -0.2149,
       "savingTotalOk": -0.0689
     },
     {
       "task": "tests-4",
-      "nOn": 1,
-      "nOff": 1,
-      "passOn": 1,
-      "passOff": 1,
-      "savingTotal": -0.0682,
-      "savingFresh": -0.2068,
-      "savingTotalOk": -0.0682
+      "nOn": 2,
+      "nOff": 2,
+      "passOn": 2,
+      "passOff": 2,
+      "savingTotal": -0.0685,
+      "savingFresh": -0.2102,
+      "savingTotalOk": -0.0685
     },
     {
       "task": "file-1",
-      "nOn": 1,
-      "nOff": 1,
-      "passOn": 1,
-      "passOff": 1,
-      "savingTotal": -0.067,
-      "savingFresh": -0.1654,
-      "savingTotalOk": -0.067
+      "nOn": 2,
+      "nOff": 2,
+      "passOn": 2,
+      "passOff": 2,
+      "savingTotal": -0.0677,
+      "savingFresh": -0.1838,
+      "savingTotalOk": -0.0677
     },
     {
       "task": "file-2",
-      "nOn": 1,
-      "nOff": 1,
-      "passOn": 1,
-      "passOff": 1,
+      "nOn": 2,
+      "nOff": 2,
+      "passOn": 2,
+      "passOff": 2,
       "savingTotal": -0.0684,
-      "savingFresh": -0.1783,
+      "savingFresh": -0.1923,
       "savingTotalOk": -0.0684
     },
     {
