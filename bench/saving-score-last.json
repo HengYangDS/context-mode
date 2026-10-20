@@ -1,7 +1,7 @@
 {
   "date": "2026-10-20",
   "m1": 90.88,
-  "m2": 82.49,
+  "m2": 79.65,
   "guards": {
     "success": true,
     "small1k": true,
@@ -116,7 +116,7 @@
         "calls": 23237,
         "lastTs": "2026-10-20T11:10:42.638Z"
       },
-      "seconds": 40
+      "seconds": 48
     },
     "live": {
       "agent": "2.1.303 (Claude Code)",
@@ -129,9 +129,9 @@
           "task": "json-1",
           "inScore": true,
           "small": true,
-          "offBytes": 863.5,
+          "offBytes": 675.5,
           "v2Bytes": 142,
-          "savingPct": 83.56,
+          "savingPct": 78.98,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -142,12 +142,12 @@
           "inScore": true,
           "small": false,
           "offBytes": 6828,
-          "v2Bytes": 1268.5,
-          "savingPct": 81.42,
+          "v2Bytes": 1344,
+          "savingPct": 80.32,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 4
+          "v2CtxCalls": 0
         },
         {
           "task": "big-tests",
@@ -165,13 +165,13 @@
           "task": "big-json",
           "inScore": true,
           "small": false,
-          "offBytes": 2482.5,
-          "v2Bytes": 592.5,
-          "savingPct": 76.13,
+          "offBytes": 2434.5,
+          "v2Bytes": 565,
+          "savingPct": 76.79,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 3
+          "v2CtxCalls": 2
         },
         {
           "task": "log-1",
@@ -190,12 +190,12 @@
           "inScore": false,
           "small": true,
           "offBytes": 2,
-          "v2Bytes": 9.5,
-          "savingPct": -375,
+          "v2Bytes": 17,
+          "savingPct": -750,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 1
+          "v2CtxCalls": 2
         },
         {
           "task": "file-1",
@@ -213,9 +213,9 @@
           "task": "git-1",
           "inScore": false,
           "small": true,
-          "offBytes": 20.5,
-          "v2Bytes": 8,
-          "savingPct": 60.98,
+          "offBytes": 8,
+          "v2Bytes": 20.5,
+          "savingPct": -156.25,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -223,8 +223,8 @@
         }
       ],
       "medianSessionTokens": {
-        "off": 36160.5,
-        "v2": 38183,
+        "off": 36171.5,
+        "v2": 38200,
         "tasks": [
           "log-1",
           "json-1",
@@ -239,10 +239,10 @@
         "sessionsPerArm": 16
       },
       "costUsd": {
-        "off": 0.5611,
-        "v2": 0.4458
+        "off": 0.5426,
+        "v2": 0.4069
       },
-      "seconds": 50
+      "seconds": 62
     }
   }
 }
