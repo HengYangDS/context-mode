@@ -341,6 +341,28 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   assert.ok(r.text.includes(src[0].label + " #" + gone.ord + ":"), "ctx_search finds the dropped chunk");
 });
 
+test("D-M7-RR-3: no Bash description: the intent is the command text, never an empty query", async () => {
+  const p = mainBashPost(bigText(40000), undefined);
+  delete p.tool_input.description;
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = out.updatedToolOutput;
+  const more = replaced.slice(replaced.lastIndexOf("\nctx_search("));
+  assert.ok(!more.includes('[""]'), "the more line has no empty query: " + more);
+  assert.ok(more.includes("cat big.log"), "the more line queries the command text: " + more);
+});
+
+test("D-M7-RR-3: no description on Read, Grep, WebFetch: file path, pattern, URL are the intent", async () => {
+  for (const [tool, input, want] of [["Read", { file_path: "/tmp/big.log" }, "/tmp/big.log"], ["Grep", { pattern: "needle target" }, "needle target"], ["WebFetch", { url: "https://example.com/x" }, "https://example.com/x"]]) {
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: tool, tool_input: input, tool_use_id: "toolu_" + tool, tool_response: bigText(40000) });
+    const out = parsed(await handleHook("claude-code", p, env));
+    if (typeof out.updatedToolOutput !== "string") continue; // row has no replace channel for this tool
+    const replaced = out.updatedToolOutput;
+    const more = replaced.slice(replaced.lastIndexOf("\nctx_search("));
+    assert.ok(!more.includes('[""]'), tool + ": no empty query: " + more);
+    assert.ok(more.includes(want), tool + ": the more line queries " + want + ": " + more);
+  }
+});
+
 test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {
   const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
   const p = mainBashPost(text);
