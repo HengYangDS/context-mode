@@ -97,13 +97,13 @@ test("codex: the project is the spawn cwd; a Codex session log naming another cw
   assert.equal(ctx.worktree, realpathSync.native(repo));
 });
 
-test("a plugin install path as the cwd is not guessed around: no git repo there is NO_GIT_DIR, never a fallback to another dir", () => {
+test("a plugin install path as the cwd is not guessed around: with no git repo there it is its own project (D-M7-NG-1), never a fallback to PWD or CLAUDE_PROJECT_DIR", () => {
   const poisoned = join(root, ".claude", "plugins", "cache", "context-mode");
   mkdirSync(poisoned, { recursive: true });
-  assert.throws(
-    () => resolveProject("codex", { env: { PWD: repo, CLAUDE_PROJECT_DIR: repo }, argv: ["--agent", "codex"], cwd: poisoned }),
-    (e) => e instanceof CtxError && e.code === "NO_GIT_DIR",
-  );
+  const ctx = resolveProject("codex", { env: { PWD: repo, CLAUDE_PROJECT_DIR: repo }, argv: ["--agent", "codex"], cwd: poisoned });
+  assert.equal(ctx.worktree, realpathSync.native(poisoned));
+  assert.notEqual(ctx.worktree, realpathSync.native(repo));
+  assert.notEqual(ctx.projectKey, resolveProject("codex", { env: {}, argv: [], cwd: repo }).projectKey);
 });
 
 test("a cwd below the repo root resolves to the repo; the Claude transcript dir is never consulted", () => {
