@@ -470,3 +470,26 @@ test("D-M7-SV-3: return budget 96 and chunk cap 48; two whole chunks fit; a 16K 
   const log = bigText(8000) + fail + bigText(2000);
   assert.ok(chunkText(log, "text", REPLACE_CHUNK_BYTES).some((c) => c.text.includes("FAIL suite/gamma/case_1234_abc123")), "a test id stays in one chunk");
 });
+
+// D-M7-SV-5: the replace ranks chunks by the tool intent OR the words of the session's last user prompt,
+// so a cat whose command names no content term still returns the line the user asked for.
+test("D-M7-SV-5: the replace selection also ranks by the last user prompt; budget, more line and indexing unchanged", async () => {
+  const p = cc({ hook_event_name: "UserPromptSubmit", prompt: 'Run cat on data/part1.txt. Find the line starting with SECRET-1 and read the value after "value=".' });
+  await handleHook("claude-code", p, env);
+  await waitRows("SELECT 1 FROM events WHERE session_id = ? AND kind = 'prompt'", [p.session_id], 1);
+  const text = bigText(8000) + "SECRET-1 value=qz7k2m9x\n" + bigText(8000);
+  const post = { ...mainBashPost(text, ""), session_id: p.session_id };
+  post.tool_input = { command: "cat data/part1.txt" };
+  const out = parsed(await handleHook("claude-code", post, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
+  assert.ok(replaced.includes("SECRET-1 value=qz7k2m9x"), "the prompt term selects the asked-for line");
+  assert.ok(replaced.slice(more).includes(JSON.stringify("cat data/part1.txt")), "the more line keeps the tool intent");
+  // No prompt in the session: the selection is the tool intent alone, as before.
+  const q = mainBashPost(text, "");
+  q.tool_input = { command: "cat data/part1.txt" };
+  const alone = replacedText(parsed(await handleHook("claude-code", q, env)).updatedToolOutput);
+  assert.equal(alone.includes("SECRET-1 value=qz7k2m9x"), false, "without a prompt the newest chunks win, as before");
+});
