@@ -56,7 +56,7 @@ if (A.pending) {
   log(`round ${p.round} (resumed): M1 ${s && s.m1}%, M2 ${s && s.m2}% -> ${better ? "merge" : "no merge"}`)
   if (better) { await agent(`${base("sv-merge-" + p.round)}\n\nRole: merger. Merge origin/${p.branch} into v2-design (no-ff, rebase-free; resolve conflicts by keeping both sides' intent), build, run gate --milestone M7 --quick, push. Verify with git merge-base --is-ancestor. If the gate fails, do not push; report.`, { label: `sv-merge-${p.round}`, phase: "Loop", ...SNL }); best = s }
 }
-for (let r = (A.pending ? A.pending.round + 1 : 1); r <= (A.maxRound || 12) && best && !(best.m1 >= TARGET && best.m2 >= TARGET && best.guardsOk) && dry < MAX_DRY; r++) {
+for (let r = (A.pending ? A.pending.round + 1 : (A.startRound || 1)); r <= (A.maxRound || 12) && best && !(best.m1 >= TARGET && best.m2 >= TARGET && best.guardsOk) && dry < MAX_DRY; r++) {
   const br = `impl/saving-r${r}`
   const opt = await agent(`${base('sv-opt-' + r)}\n\nRole: optimizer, round ${r}. ${SCORE_DEF}
 Current best on v2-design: ${JSON.stringify(best)}. Known blockers for M2 from earlier rounds: json-1 off output is under REPLACE_TRIGGER_BYTES 4096 so no replace happens; multi-1 model re-runs grep after each replace. r4 failed gate gp-cases. Earlier rounds (tried, numbers, merged or not): ${JSON.stringify(history)}. Prep results: ${JSON.stringify(prep.map((x, i) => ({ id: PREP[i].id, numbers: x && x.numbers, summary: x && x.summary })))}.
