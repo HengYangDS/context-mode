@@ -68,7 +68,8 @@ function dirOf(kind: ProjectSourceKind, src: ProjectSourceInput): string | undef
 // dir with a HEAD: a .git dir is the git dir; a .git file holds "gitdir: <path>" (linked worktree,
 // submodule). The common dir is <gitdir>/commondir when that file exists (linked worktree), else the
 // git dir. worktree = <d>. Same answers as `git rev-parse --git-common-dir --show-toplevel`.
-function gitDirs(dir: string): { commonDir: string; worktree: string } {
+// D-M7-NG-1: no .git up to the filesystem root -> null; the caller keys the project by realpath(dir).
+function gitDirs(dir: string): { commonDir: string; worktree: string } | null {
   let cur: string;
   try {
     // .native: one canonical letter case, so one repo always hashes to one projectKey (review-M1 #1).
@@ -83,7 +84,7 @@ function gitDirs(dir: string): { commonDir: string; worktree: string } {
       return { commonDir: realpathSync.native(common === null ? gitDir : resolve(gitDir, common)), worktree: cur };
     }
     const up = dirname(cur);
-    if (up === cur) throw new CtxError("NO_GIT_DIR", { path: dir });
+    if (up === cur) return null;
     cur = up;
   }
 }
@@ -143,7 +144,13 @@ export function resolveProject(agent: AgentId, src: ProjectSourceInput): Project
   const source = sourceOf(agent);
   const dir = dirOf(source, src);
   if (dir === undefined) throw new CtxError("NO_PROJECT", { kind: source });
-  const { commonDir, worktree } = gitDirs(dir);
+  // D-M7-NG-1, impl/02 §2: one fixed rule. A .git found walking up -> the project is its git common
+  // dir and worktree is the dir that holds the .git. None -> the project is realpath(dir) itself:
+  // worktree and containmentRoot are that dir, and no git process runs.
+  const repo = gitDirs(dir);
+  const plain = repo === null ? realpathSync.native(dir) : undefined;
+  const commonDir = repo?.commonDir ?? (plain as string);
+  const worktree = repo?.worktree ?? (plain as string);
   // D-M7-HP-2 (GS6): plain-JS SHA-256, so the hook never loads node:crypto (~3 ms of process start).
   const projectKey = sha256Hex(commonDir).slice(0, PROJECT_KEY_HEX_LEN);
   // D-M1-T3-5: the config dir comes from the process env, not src.env (src.env picks the project only).
@@ -157,7 +164,7 @@ export function resolveProject(agent: AgentId, src: ProjectSourceInput): Project
     dbPath: join(projectDir, DB_FILE_NAME),
     worktree,
     get containmentRoot(): string {
-      root ??= containmentRootOf(dir, commonDir);
+      root ??= plain ?? containmentRootOf(dir, commonDir);
       return root;
     },
     agent,

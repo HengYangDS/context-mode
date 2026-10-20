@@ -2,7 +2,8 @@
 // resolveProject(agent, { env, argv, cwd, piCwd? }): ProjectContext.
 // Dir picked per AdapterRow.projectSource: env:CLAUDE_PROJECT_DIR, arg:--agent+cwd,
 // spawn-cwd cwd, arg:workspaceFolder (--workspace-folder <path>), pi:ctx.cwd (piCwd).
-// Missing -> NO_PROJECT with <kind>; not a git repo -> NO_GIT_DIR.
+// Missing -> NO_PROJECT with <kind>; not a git repo -> realpath(dir) is the project (D-M7-NG-1);
+// a project dir that does not exist -> NO_GIT_DIR.
 // containmentRoot = parent of gitCommonDir. GP7: identity shared per repo (2 worktrees -> same projectKey).
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -81,11 +82,26 @@ test("resolveProject throws NO_PROJECT with the missing source kind when the pro
   );
 });
 
-test("resolveProject throws NO_GIT_DIR when cwd is not inside a git repository", () => {
+// D-M7-NG-1 (owner decision 2026-10-21): a dir outside any git repo is a project keyed by its
+// realpath; it used to throw NO_GIT_DIR, which left every hook in that dir without a project.
+test("resolveProject keys a dir outside any git repository by its realpath (D-M7-NG-1)", () => {
   const notRepo = mkdtempSync(join(tmpdir(), "cm-notrepo-"));
   try {
+    const ctx = resolveProject("codex", { env: {}, argv: ["--agent", "codex"], cwd: notRepo });
+    assert.equal(ctx.worktree, realpathSync.native(notRepo));
+    assert.equal(ctx.containmentRoot, realpathSync.native(notRepo));
+    assert.match(ctx.projectKey, /^[0-9a-f]{16}$/);
+  } finally {
+    rmSync(notRepo, { recursive: true, force: true });
+  }
+});
+
+test("resolveProject throws NO_GIT_DIR when the project dir does not exist", () => {
+  const base = mkdtempSync(join(tmpdir(), "cm-gone-"));
+  const gone = join(base, "gone");
+  try {
     assert.throws(
-      () => resolveProject("codex", { env: {}, argv: ["--agent", "codex"], cwd: notRepo }),
+      () => resolveProject("codex", { env: {}, argv: ["--agent", "codex"], cwd: gone }),
       (err) => {
         assert.ok(err instanceof CtxError);
         assert.equal(err.code, "NO_GIT_DIR");
@@ -93,7 +109,7 @@ test("resolveProject throws NO_GIT_DIR when cwd is not inside a git repository",
       }
     );
   } finally {
-    rmSync(notRepo, { recursive: true, force: true });
+    rmSync(base, { recursive: true, force: true });
   }
 });
 
