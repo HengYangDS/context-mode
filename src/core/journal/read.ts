@@ -23,3 +23,12 @@ export function readEventBySeq(db: DbHandle, seq: number): JournalRow | null {
   const row = db.raw.prepare("SELECT * FROM events WHERE seq = ?").get(seq);
   return row === undefined ? null : (row as unknown as JournalRow);
 }
+
+/** D-M7-SV-5: body of the newest prompt row of one session, or "" when there is none. */
+export function readLastPrompt(db: DbHandle, sessionId: string): string {
+  if (sessionId === "") return "";
+  const row = db.raw
+    .prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq DESC LIMIT 1")
+    .get(sessionId) as { body: string } | undefined;
+  return row === undefined ? "" : row.body;
+}

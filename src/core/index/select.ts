@@ -27,14 +27,17 @@ export function selectChunks(db: DbHandle, sourceId: number, intent: string, bud
  * In-memory form (DECISIONS-r9 F1): same scoring, selection, `more` rule and shape, no DB access.
  * `source` is the label the caller will store the chunks under; it goes into the `more` line.
  */
-export function selectChunksInMemory(chunks: Chunk[], intent: string, budget: number, source?: string): Selection {
-  return select(chunks, intent, budget, source);
+// `rankQuery` (D-M7-SV-5): when given, chunks rank by any word of it instead of all words of `intent`;
+// the `more` line still names `intent`.
+export function selectChunksInMemory(chunks: Chunk[], intent: string, budget: number, source?: string, rankQuery?: string): Selection {
+  return select(chunks, intent, budget, source, rankQuery);
 }
 
-function select(chunks: Chunk[], intent: string, budget: number, label: string | undefined): Selection {
+function select(chunks: Chunk[], intent: string, budget: number, label: string | undefined, rankQuery?: string): Selection {
   if (chunks.length === 0) return { text: "", more: null };
   // Step 2: one BM25 for both forms, the store's own (same tokenizer as the chunks table).
-  const scores = rankTexts(chunks.map((c) => c.text), intent);
+  const texts = chunks.map((c) => c.text);
+  const scores = rankQuery === undefined ? rankTexts(texts, intent) : rankTexts(texts, rankQuery, "any");
   // Step 3: score descending; equal score -> later chunk first (ADR-0016 "newest first").
   const order = chunks.map((_, i) => i).sort((a, b) => scores[b] - scores[a] || chunks[b].ord - chunks[a].ord);
   const picked: Chunk[] = [];

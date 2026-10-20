@@ -115,6 +115,12 @@ function toMatch(q: string): string {
   return words.map((w) => `"${w}"*`).join(" ");
 }
 
+// D-M7-SV-5: any-word form for ranking only (each distinct word a quoted prefix term, joined by OR).
+function toMatchAny(q: string): string {
+  const terms = new Set(toMatch(q).split(" ").filter((t) => t !== ""));
+  return [...terms].join(" OR ");
+}
+
 interface QueryRow { source_id: number; label: string; ord: number; body: string; score: number; }
 
 // impl/02 §9.2 + impl/05 steps 5, 7, 8 (D-M1-T8-2, D-M1-T8-4). Zero hits -> [], never throws for
@@ -353,9 +359,10 @@ const RANK_QUERY = "SELECT rowid AS id, bm25(r) AS bm FROM r WHERE r MATCH ?";
 
 // Scores a plain text set with the same tokenizer and BM25 as ftsQuery, in a private in-memory DB.
 // Returns one score per input text, same index: -bm25 (> 0) for a match, 0 for no match.
-export function rankTexts(texts: string[], q: string): number[] {
+// mode "any" (D-M7-SV-5): a text matches when it holds any word of q; BM25 IDF weighs rare words up.
+export function rankTexts(texts: string[], q: string, mode: "all" | "any" = "all"): number[] {
   const scores = texts.map(() => 0);
-  const match = toMatch(q);
+  const match = mode === "any" ? toMatchAny(q) : toMatch(q);
   if (match === "" || texts.length === 0) return scores;
   const sqlite = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite") | undefined;
   if (sqlite === undefined) throw new CtxError("NO_SQLITE");
