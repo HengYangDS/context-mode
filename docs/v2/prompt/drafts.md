@@ -8,17 +8,13 @@ Each text sits between an `id` marker and a ```text fence, so a script can extra
 
 <!-- id: instructions -->
 ```text
-context-mode keeps large command, file and web output out of the conversation: work runs in a sandbox, and only what your code prints comes back.
+context-mode keeps large output out of the conversation by running work in a sandbox.
 
-Use these tools for the first step of any task that counts, sums, filters or finds something in data that may be longer than about 20 lines: logs, test or build output, large JSON or CSV, long files, web pages, or many files at once. Start with ctx_execute and print only the answer, because a raw Bash or Read result of that size fills the conversation and the answer is a few words. Search for the tool by name if it is not loaded yet.
-- ctx_execute: run a command or code over the data and print only the answer.
-- ctx_batch: several commands plus questions about their output, in one call.
-- ctx_index and ctx_search: store docs, files or URLs once, then query them instead of reading them again. ctx_search also covers earlier sandbox output in this project.
-- ctx_resume: a short summary of this session, after the conversation was compacted or resumed.
+For the first step of any task that counts, sums, filters or finds something in data over about 20 lines (logs, test or build output, big JSON or CSV, long files, web pages), use ctx_execute and print only the answer. A raw Bash or Read result that long fills the conversation. Search for the tool by name if it is not loaded yet.
 
-For small output of known size, such as git status, ls or a short file, and for editing files, use your normal tools: they are faster there.
+A large tool result is indexed and replaced by its best-matching parts; ctx_search finds the rest.
 
-A large file's Read is denied. Use Read with offset/limit, or ctx_execute with file set.
+Use normal tools for small output and edits. A large file's Read is denied: use offset and limit, or ctx_execute with file set.
 ```
 
 <!-- id: ctx_execute -->
@@ -164,6 +160,10 @@ Run the command on the line above with Bash instead. It runs the same command in
 ```
 
 ## Changes
+
+r10 (owner decision 2026-10-20): `instructions` cut from 1,238 to 646 chars. No hint text. It says a large tool result is indexed and replaced by its best-matching parts, and ctx_search finds the rest. The tool list moved to the tool descriptions. The routing sentence is kept (GP-LIVE-ROUTING). The hint-* blocks are removed by a separate task.
+
+r10 (owner decision 2026-10-20): `instructions` cut from 1,238 to 658 chars: no hint text, states that a large tool result is indexed and replaced by its best-matching parts, ctx_search finds the rest; tool list moved to the tool descriptions. Routing sentence kept (GP-LIVE-ROUTING). Hint blocks (hint-*) are removed by a separate task.
 
 r3: added the `seq` param to `ctx_resume` (PRD §7, decision A35), bumped status to r3.
 r4 fix pass: checked decisions A35 and B71 — `seq` is already in the `ctx_resume` text above, and B71 found no doc fix needed here (it is a process note about round-1's own notes field). No text changed.
