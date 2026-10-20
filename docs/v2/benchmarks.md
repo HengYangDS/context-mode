@@ -118,7 +118,7 @@ Per task (tokens; ctx calls; cost USD):
 
 What this says, and what it does not:
 - v2 is 5.7% worse than off at the median and 11.8 points better than v1. On every task with a small output (log, json, tests, file, git) the fixed cost of the plugin is larger than any saving: about +1.9 K tokens over off.
-- Only `multi-1`, the task with three large outputs in a row, shows a saving: v2 -24.3% vs off (82354 vs 108250); v1 -30.8% (74866). v1 is lower on this one task. One run each, so this is not a statistical result.
+- Only `multi-1`, the task with three large outputs in a row, shows a saving: v2 saves 23.9% vs off (82354 vs 108250); v1 saves 30.8% (74866). v1 is lower on this one task. One run each, so this is not a statistical result.
 - v2 costs more in USD than off on 5 of 6 tasks (total $0.3883 vs $0.1910). Four v2 sessions cost about $0.08, twice the other arms; this is not explained here and one run each cannot say if it is noise or cache-write cost of the plugin prompt.
 - The log, file and tests outputs here are below or near the point where Claude Code itself persists large results, so the hook may not see the full text (see the live check in the code results). This run does not prove the replace reaches the model.
 - 1 run per cell, 6 tasks, 1 model. Treat all deltas as direction only.
