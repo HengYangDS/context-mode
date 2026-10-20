@@ -17,7 +17,7 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 // replies and the Read deny threshold). A result over REPLACE_TRIGGER_BYTES is indexed whole and the model gets
 // whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
 export const REPLACE_TRIGGER_BYTES = 4096;
-export const REPLACE_RETURN_BYTES = 1024;
+export const REPLACE_RETURN_BYTES = 512; // D-M7-SV-2: was 1024; offline sweep 256/384/512/768 in DEVIATIONS
 export const REPLACE_CHUNK_BYTES = 256;
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
