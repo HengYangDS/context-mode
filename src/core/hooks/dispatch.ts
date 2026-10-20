@@ -318,7 +318,9 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
     if (!hasReplace(row)) return ALLOW; // ADR-0001: one path per row, no runtime fallback
     label = mainLabel(tool, ev);
   }
-  const intent = str(tool.input.description);
+  // D-M7-RR-3: no description -> the command text, file path, pattern or URL, never an empty query.
+  const intent = [tool.input.description, tool.input.command, tool.input.file_path, tool.input.pattern, tool.input.url]
+    .map(str).find((v) => v.trim() !== "") ?? "";
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
   const chunks = chunkText(text, "text");
