@@ -470,3 +470,23 @@ test("D-M7-SV-3: return budget 96 and chunk cap 48; two whole chunks fit; a 16K 
   const log = bigText(8000) + fail + bigText(2000);
   assert.ok(chunkText(log, "text", REPLACE_CHUNK_BYTES).some((c) => c.text.includes("FAIL suite/gamma/case_1234_abc123")), "a test id stays in one chunk");
 });
+
+test("D-M7-SV-4: main-agent replace label is <tool>#<8 hex of the call id>; the more line holds no call id and no command copy", async () => {
+  const labels = [];
+  for (const id of ["toolu_01AQGoUz9vicosbmyhxzw1e7", "toolu_01QVnPrRSLqDnLNrk3jb4aX9", "toolu_01AQGoUz9vicosbmyhxzw1e7"]) {
+    const p = mainBashPost(bigText(16000), undefined);
+    delete p.tool_input.description;
+    p.tool_use_id = id;
+    const out = parsed(await handleHook("claude-code", p, env));
+    const replaced = replacedText(out.updatedToolOutput);
+    const more = replaced.slice(replaced.lastIndexOf("\nctx_search(") + 1);
+    const src = query("SELECT label FROM sources WHERE session_id = ?", p.session_id);
+    assert.equal(src.length, 1);
+    assert.match(src[0].label, /^Bash#[0-9a-f]{8}$/);
+    assert.equal(more, 'ctx_search({queries:["cat big.log"], source:' + JSON.stringify(src[0].label) + "})");
+    assert.ok(!more.includes(id), "no call id in the more line");
+    labels.push(src[0].label);
+  }
+  assert.notEqual(labels[0], labels[1], "two calls stay two sources");
+  assert.equal(labels[0], labels[2], "one call id is one label");
+});
