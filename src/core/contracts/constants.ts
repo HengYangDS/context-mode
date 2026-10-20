@@ -127,6 +127,7 @@ export const MCP_NAME_JOIN = "__"; // Claude-shape join between server and tool 
 export const GEMINI_MCP_PREFIX = "mcp_"; // generateValidName(): "mcp_" + server + "_" + tool (ADR-0016 Gemini row)
 export const GEMINI_NAME_EXTRA_CHARS = "_-.:"; // kept besides A-Z a-z 0-9; any other char becomes "_"
 
+// D-M7-RR-2: no caller since the hints are retired; kept because tests/v2/contracts pins it.
 // MCP_HINT_EVERY: 10, or env CTX_MCP_HINT_EVERY when it is a positive safe integer (Q1, A-C4).
 // Read once at process start (impl/09 A20).
 const MCP_HINT_EVERY_DEFAULT = 10;
@@ -178,7 +179,8 @@ export const USER_DENY_REASON_PREFIX = "Blocked by security policy: matches deny
 export const POLICY_UNREADABLE_LINE = "context-mode: your deny rules could not be read. Fix: run ctx_doctor."; // DECISIONS-r9 E2
 export const PARSE_ERROR_DENY_LINE = "context-mode: could not parse this command; it may be blocked by your own rules. Run it through ctx_execute instead."; // impl/08 §6.1 step 5b, Q4
 
-// impl/08 §6.1 step 5d, DECISIONS-r9 E4: "structurally bounded" (no op/io tokens at all) -> allow, no hint.
+// impl/08 §6.1 step 5d, DECISIONS-r9 E4. D-M7-RR-2: step 5d (bounded -> no hint) is retired with the hints; the
+// set stays only because tests/v2/contracts pins it (not owned by this change).
 // E3: CONTEXT_MODE_BASH_NUDGE_MIN_COMMAND_BYTES is not ported.
 export const BOUNDED_COMMANDS = Object.freeze(["pwd", "whoami", "uname", "id", "realpath", "ln"] as const);
 export const BOUNDED_GIT_SUBCOMMANDS = Object.freeze(["status"] as const); // `git status`
@@ -192,18 +194,9 @@ export const VERBOSE_FLAGS = Object.freeze(["-v", "--verbose"] as const); // any
 export const JQ_WHITELIST: Readonly<{ identity: "."; length: "length"; pipeLength: "| length"; fieldSep: "." }> =
   Object.freeze({ identity: ".", length: "length", pipeLength: "| length", fieldSep: "." });
 
-// impl/08 §6.1 steps 5d, 6, 7, 8 (DEVIATIONS D-M3-E4-5). Hint templates: TOOL_PREFIX_SLOT is replaced by
-// row.toolNamePrefix. Same text as the drafts.md hint-* id blocks (tests/v2/policy/decide.test.mjs compares them).
+// TOOL_PREFIX_SLOT is replaced by row.toolNamePrefix in deny and resume texts. The PreToolUse hint texts
+// (BASH/GREP/READ/MCP_HINT, HINT_KEY) are retired: D-M7-RR-2, DECISIONS-r10 (2).
 export const TOOL_PREFIX_SLOT = "{prefix}";
-export const BASH_HINT = "context-mode: when this command's output may be long, or you need only part of it, run it with {prefix}ctx_execute and print just what you need. Short fixed output and file changes are fine here.";
-export const GREP_HINT = "context-mode: grep output can be larger than you expect. To count, filter or group matches, run the search with {prefix}ctx_execute and print the result.";
-export const READ_HINT = "context-mode: to analyze this file rather than edit it, run code on it with {prefix}ctx_execute and file set to its path; what your code prints comes back, nothing else.";
-export const MCP_HINT = "context-mode: tools of other MCP servers can return large payloads in full. For a page or API you can reach directly, fetch it in {prefix}ctx_execute and print what you need, or store it with {prefix}ctx_index and query it with {prefix}ctx_search.";
-// onceKey families (impl/08 §6.1): key = family + ev.sessionId. hooks/throttle.ts applies MCP_HINT_EVERY to "mcp:" only.
-export const HINT_KEY = Object.freeze({ bash: "bash:", read: "read:", grep: "grep:", mcp: "mcp:" } as const);
-export const CANONICAL_MCP_PREFIX = "mcp:"; // impl/01 §2: another server's tool is "mcp:<server>:<tool>"
-export const CANONICAL_MCP_SEP = ":";
-export const SHELL_HINT_ONLY_TOOLS = Object.freeze(["PowerShell"] as const); // #1265/#1212: same hint as Bash, no POSIX parse (D-M3-E4-6)
 export const DENY_WEBFETCH_JOIN = ", then "; // "Tool: <p>ctx_index, then <p>ctx_search"
 export const POLICY_UNREADABLE_WARNING = "context-mode: your deny rules could not be read, so they are not applied. Fix: run ctx_doctor."; // E2, flag unset (stderr)
 // ADR-0008 item 6, #1006/#945: WebFetch to these hosts (or a subdomain) is never denied (claude.ai artifacts).
@@ -217,7 +210,6 @@ export const CURL_SILENT_FLAGS: Readonly<Record<"curl" | "wget", { short: string
   Object.freeze({ curl: { short: "s", long: "--silent" }, wget: { short: "q", long: "--quiet" } });
 export const CURL_VERBOSE_FLAGS = Object.freeze(["-v", "--verbose", "--trace", "--trace-ascii"] as const);
 export const CURL_DUMP_HEADER_FLAG = "-D"; // "-D -": headers to stdout
-export const BOUNDED_GIT_COMMAND = "git"; // with BOUNDED_GIT_SUBCOMMANDS
 export const BUILD_COMMANDS = Object.freeze(["gradlew", "gradle", "mvnw", "mvn", "sbt"] as const);
 // Inline HTTP: FETCH_CALL + one of FETCH_QUOTES + HTTP_SCHEME, or any INLINE_HTTP_CALLS substring, in a command's raw text.
 export const FETCH_CALL = "fetch(";
