@@ -1,7 +1,0 @@
-{
-  "agent": "claude-code",
-  "event": "PostToolUse",
-  "exitCode": 0,
-  "stdout": "",
-  "stderr": ""
-}

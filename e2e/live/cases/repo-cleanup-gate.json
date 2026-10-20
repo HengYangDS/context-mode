@@ -1,7 +1,0 @@
-{
-  "id": "repo-cleanup-gate",
-  "kind": "local",
-  "covers": ["build/check-removed.mjs"],
-  "run": ["node", "build/check-removed.mjs"],
-  "expect": {}
-}
