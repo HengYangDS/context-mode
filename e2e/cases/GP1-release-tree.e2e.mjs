@@ -66,3 +66,26 @@ test("[M6] GP1/stable-interpreter-path: every written hook command starts with t
     }
   }
 });
+
+// #511 (ported from tests/util/no-dynamic-require.test.ts, cleanup-plan W1-ops). v1 asserted the SOURCE
+// pattern; v2 asserts the built artifact, because the bundles are ESM (build/build.mjs format "esm") and an
+// esbuild `__require` shim throws `Dynamic require of "node:..." is not supported` at run time under Node ESM.
+// A bare `require("node:...")` is allowed only inside a string literal (the detached-child CJS source), which
+// is spawned as its own CJS process and never loaded as part of the bundle.
+const BUNDLES = ["hook.mjs", "run.mjs", "search.mjs", "server.mjs", "pi/index.js", "opencode/plugin.js"];
+const jsFiles = (dir) => readdirSync(path.join(OUT, dir)).filter((f) => /\.(m?js)$/.test(f)).map((f) => (dir === "" ? f : dir + "/" + f));
+
+test("[M7] GP1/no-dynamic-require: no bundle holds an esbuild __require shim, and a bare require(\"node:...\") sits only inside a string literal (#511)", () => {
+  assert.ok(existsSync(path.join(OUT, "SHA256SUMS")), "release-out missing (run build/build.mjs first)");
+  const files = new Set([...BUNDLES, ...jsFiles("hooks"), ...jsFiles("pi"), ...jsFiles("opencode")]);
+  for (const f of files) {
+    const src = readFileSync(path.join(OUT, f), "utf8");
+    assert.ok(!/\b__require\b/.test(src), `${f}: esbuild __require shim`);
+    assert.ok(!src.includes("Dynamic require of"), `${f}: Dynamic require shim text`);
+    for (const [i, line] of src.split("\n").entries()) {
+      if (!/\brequire\(["']node:/.test(line)) continue;
+      const t = line.trim();
+      assert.ok(t.startsWith("'") || t.startsWith('"') || t.startsWith("`"), `${f}:${i + 1}: bare require("node:...") outside a string literal: ${t.slice(0, 100)}`);
+    }
+  }
+});
