@@ -3,6 +3,8 @@
 - Status: Accepted (2026-10-15). Owner: "v1'deki gibi olsun ama issue'lar da fixlensin." Owner accepted `DECISIONS-r3.md` in full and delegated the r4 fixes in `DECISIONS-r4.md`. This replaces r2's generic size-prediction deny on every Bash call. The GS6 hook-budget number (see "Open" below) is still unratified and stays open.
 - Sources: v1 `hooks/core/routing.mjs` @ `5869f4fa` (lines 670–900); issue titles from `tickets/data/isall.json`; round-4 evidence `tickets/round4-evidence.json` (parser timing, `mcp_tool` hook, live deny on Haiku).
 
+> **Amended 2026-10-20 (DECISIONS-r10).** On agents whose adapter row supports replace, the main agent runs the call first. If the result is larger than `OUTPUT_CAP`, `PostToolUse` indexes it and returns BM25-selected chunks plus the "more" line through `updatedToolOutput` (same path as ADR-0016 case C). The Bash deny and rewrite rows in the table below (curl/wget, inline HTTP, build tools) were size guesses; they are removed on those agents. Kept: WebFetch deny, user `permissions.deny`, the Read deny, and subagent rules. All hints (the Grep, other Bash and ranged-Read hint rows, and change #7 "once per session" hint keys) are removed. Agents with no replace keep their current single path (ADR-0001).
+
 ## Same scope as v1
 
 | Tool / case | v1 | v2 |
@@ -143,6 +145,7 @@ ADR-0016's adapter table cell for Claude Code Case B is "`updatedInput` + `allow
 
 ## Changes
 
+- 2026-10-20 (DECISIONS-r10): main agent gets post-run replace; size-guess Bash deny/rewrite removed where replace is supported; all hints removed.
 - 2026-10-16 (DECISIONS-r9): parser scope narrowed to five `ParseError` codes (P1/P2), `[[`/`((`/`case`/function
   now parsed not rejected (P1, P4 golden cases); GS6 hook budget decided (V14: `HOOK_P95_MS`/`HOOK_CPU_OVER_NODE_MS`/`HOOK_COMBINED_P95_MS` from `00-architecture.md` §3.2, no longer "Proposal"); A3/A7 route-hint ordering closed by `T-ROUTE` (V6); A5/A6 parallel-batch and subagent-output items closed by `T-PAR`/`T-SUB` (V7).
 - 2026-10-14 (fix-r4, owners.adr-b): Q5 reworded as new scope, not v1 parity, with per-wrapper GP3 cases (A6); Copilot CLI added to the per-adapter deny-row with its `modifiedArgs` support marked unverified (A13); the ADR-0016 selection claim and Case B table cell corrected by cross-reference (A33, B3); GS6 hook budget routed to the owner as an open question (B46); OpenCode 2 G25 gap cross-referenced (B18).

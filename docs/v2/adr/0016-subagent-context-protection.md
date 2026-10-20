@@ -3,6 +3,8 @@
 - Status: Accepted as a requirement (2026-10-14, owner: "subagent'ların context'ine girmemeli … bunu fixle, MUST"). The mechanism is Proposed until live checks LV8–LV10 pass.
 - Related: ADR-0008 r3 (deny scope), ADR-0012 (live harness). Replaces ADR-0008 r3 change #5 ("subagent without ctx tools → allow").
 
+> **Update 2026-10-20 (DECISIONS-r10).** The main agent now uses the same replace as case C: when a result is larger than `OUTPUT_CAP`, `PostToolUse` indexes it and returns BM25-selected chunks plus the "more" line through `updatedToolOutput`. Hints are removed.
+
 ## Problem
 
 A subagent has its own context window. If a big tool output lands there, the subagent fills its token limit, compacts or fails. v1 had two bad options:
@@ -85,3 +87,4 @@ LV1 confirms, rather than decides, that Claude Code ignores `allow` + `updatedIn
 ## Changes
 
 r4 fix pass: split the Per agent table rows for Qwen, Copilot CLI, Pi, OpenCode 2, Gemini, VS Code and ZCode so each names its own source/mechanism and open-verification tag instead of a shared "yes"; fixed the Claude Code case B cell to match Q3 (was self-contradicting); added the deny-pipeline re-check for the `run.mjs` wrapper, the tie-break rule, the worker-thread indexing note, the Kiro no-rewrite-channel note, and the Remote-WSL/OpenCode-2 detection rows.
+- 2026-10-20 (DECISIONS-r10): main agent uses the same replace as case C.

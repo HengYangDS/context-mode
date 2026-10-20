@@ -39,8 +39,8 @@ MCP server process can both read and write it without stepping on each other (`0
 ## The three-step pattern on one tool call
 
 1. **Before the call** (`PreToolUse`): the hook parses the command (`docs/algorithms.md` §1), checks it
-   against deny rules, and checks any `Read` against the byte-size rule (`docs/algorithms.md` §2). A call
-   that is too big to return safely is denied, with a message naming the real size and three ways to get
+   against deny rules, and checks any `Read` against the byte-size rule (`docs/algorithms.md` §2). A `Read`
+   of a file that is too big is denied, with a message naming the real size and three ways to get
    the data without it landing whole in context.
 2. **During the call**: for `ctx_execute`/`ctx_batch`, code runs in a sandboxed child process, inside the
    project directory, with a kill switch on the whole process tree if it times out or is cancelled
@@ -74,7 +74,7 @@ will not fit whole becomes a one-line pointer into `ctx_search` instead (`docs/a
 agent asks for something
         |
         v
-  [PreToolUse hook] --deny/rewrite--> agent gets a message with a safe next step
+  [PreToolUse hook] --deny (Read, policy)--> agent gets a message with a safe next step
         |  allow
         v
   tool call runs (host tool, or an MCP ctx_* tool in its own sandbox)

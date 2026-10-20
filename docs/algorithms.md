@@ -9,7 +9,7 @@ recorded as a deviation in `docs/v2/impl/DEVIATIONS.md`.
 
 **What:** `parseShell(cmd)` splits a shell command string into its parts (pipes, `&&`, `bash -c`, heredocs)
 without running it, so the enforcement layer can check each part. It never throws. The deny step then checks
-each part against `permissions.deny` and the built-in rules (curl/wget, inline HTTP, WebFetch).
+each part against `permissions.deny` and the built-in safety rules (WebFetch). Bash size-guess denies (curl/wget, inline HTTP) are removed where the agent supports post-run replace (DECISIONS-r10).
 
 **Why:** A single regex over the raw string misses a command hidden inside `bash -c "..."` or a heredoc. The
 parser recurses into those forms instead.
@@ -29,7 +29,7 @@ parser recurses into those forms instead.
 denied. The deny message always states the real byte count and offers three ways to get the data: a ranged
 Read, `ctx_execute` with `file`, or `grep`/`tail`. No part of the file is ever truncated and returned.
 
-**Why:** v1 tried a hint-then-allow path; the model often ignored the hint and the full file still landed in
+**Why:** v1 tried a hint-then-allow path (hints are now removed, DECISIONS-r10); the model often ignored the hint and the full file still landed in
 context. A deny with no path around it is the only rule that holds every time.
 
 **Source:** `docs/v2/adr/0008-enforcement-rewrite-and-cap.md`; `docs/v2/impl/00-architecture.md` §3.2.
