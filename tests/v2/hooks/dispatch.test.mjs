@@ -12,7 +12,7 @@ import { handleHook } from "../../../src/core/hooks/dispatch.ts";
 import { ctxSearch } from "../../../src/core/tools/search.ts";
 import { chunkText } from "../../../src/core/index/chunk.ts";
 import {
-  COMPACT_POINTER_LINE, OUTPUT_CAP, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX,
+  COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX,
 } from "../../../src/core/contracts/constants.ts";
 
 // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
@@ -73,6 +73,15 @@ async function waitRows(sql, args, n) {
 
 function cc(fields) {
   return { session_id: "s-" + Math.random().toString(36).slice(2), cwd: repo, ...fields };
+}
+
+// D-M7-SV-1: a Bash replace is the Bash output shape {stdout, stderr, interrupted}; other tools get a string.
+function replacedText(v) {
+  if (typeof v === "string") return v;
+  assert.deepEqual(Object.keys(v).sort(), ["interrupted", "stderr", "stdout"]);
+  assert.equal(v.stderr, "");
+  assert.equal(v.interrupted, false);
+  return v.stdout;
 }
 
 function parsed(out) {
@@ -177,9 +186,9 @@ test("PreToolUse Bash, Grep, Read, other MCP: empty allow, no hint, every call (
   }
 });
 
-test("PostToolUse at or under OUTPUT_CAP: empty allow, zero added bytes (D-M7-RR-1)", async () => {
+test("PostToolUse at or under REPLACE_TRIGGER_BYTES: empty allow, zero added bytes (D-M7-RR-1, D-M7-SV-1)", async () => {
   for (const agent of ["claude-code", "codex"]) {
-    const p = cc({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_response: { stdout: "x".repeat(OUTPUT_CAP - 10), stderr: "" } });
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_response: { stdout: "x".repeat(REPLACE_TRIGGER_BYTES - 10), stderr: "" } });
     assert.deepEqual(await handleHook(agent, p, env), { stdout: "", exitCode: 0 }, agent);
   }
 });
@@ -244,7 +253,7 @@ test("case C, OUTPUT_CAP < bytes <= SYNC_INDEX_MAX_BYTES: indexed inline, whole 
   const p = subagentPost(text, "reader");
   const out = parsed(await handleHook("claude-code", p, env));
   const replaced = out.updatedToolOutput;
-  assert.ok(Buffer.byteLength(replaced) <= OUTPUT_CAP + 512, "within budget plus the more line");
+  assert.ok(Buffer.byteLength(replaced) <= REPLACE_RETURN_BYTES + 512, "within budget plus the more line");
   assert.ok(replaced.includes("needle target"));
   const src = query("SELECT label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
   // bytes_total is the sum of chunk bytes (store rule): the trailing newline is not a chunk byte.
@@ -253,7 +262,7 @@ test("case C, OUTPUT_CAP < bytes <= SYNC_INDEX_MAX_BYTES: indexed inline, whole 
   assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole text is indexed, nothing cut");
   // Whole chunks only: the selected chunks, joined by one "\n", make up the body byte for byte.
   const body = replaced.slice(0, replaced.lastIndexOf("\nctx_search(") < 0 ? replaced.length : replaced.lastIndexOf("\nctx_search("));
-  const whole = chunkText(text, "text").filter((c) => body.includes(c.text));
+  const whole = chunkText(text, "text", REPLACE_CHUNK_BYTES).filter((c) => body.includes(c.text));
   assert.ok(whole.length > 0);
   const joined = whole.reduce((n, c) => n + Buffer.byteLength(c.text), 0) + whole.length - 1;
   assert.equal(joined, Buffer.byteLength(body), "the body is whole chunks, nothing cut");
@@ -263,7 +272,7 @@ test("case C, bytes > SYNC_INDEX_MAX_BYTES: in-memory selection, detached index 
   const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
   const p = subagentPost(text, "reader");
   const out = parsed(await handleHook("claude-code", p, env));
-  assert.ok(Buffer.byteLength(out.updatedToolOutput) <= OUTPUT_CAP + 512);
+  assert.ok(Buffer.byteLength(out.updatedToolOutput) <= REPLACE_RETURN_BYTES + 512);
   assert.ok(out.updatedToolOutput.includes("needle target"));
   const src = await waitRows("SELECT label FROM sources WHERE session_id = ?", [p.session_id], 1);
   assert.equal(src.length, 1);
@@ -313,16 +322,16 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   const text = bigText(40000);
   const p = mainBashPost(text);
   const out = parsed(await handleHook("claude-code", p, env));
-  const replaced = out.updatedToolOutput;
+  const replaced = replacedText(out.updatedToolOutput);
   assert.equal(typeof replaced, "string");
-  assert.ok(Buffer.byteLength(replaced) <= OUTPUT_CAP + 512, "within budget plus the more line");
+  assert.ok(Buffer.byteLength(replaced) <= REPLACE_RETURN_BYTES + 512, "within budget plus the more line");
   assert.ok(Buffer.byteLength(replaced) < Buffer.byteLength(text));
   assert.ok(replaced.includes("needle target"));
   const more = replaced.lastIndexOf("\nctx_search(");
   assert.ok(more > 0, "the more line names ctx_search");
   const body = replaced.slice(0, more);
   // Whole chunks of the plain stdout (not the JSON tool_response): nothing cut, no escaped newlines.
-  const whole = chunkText(text, "text").filter((c) => body.includes(c.text));
+  const whole = chunkText(text, "text", REPLACE_CHUNK_BYTES).filter((c) => body.includes(c.text));
   assert.ok(whole.length > 0);
   const joined = whole.reduce((n, c) => n + Buffer.byteLength(c.text), 0) + whole.length - 1;
   assert.equal(joined, Buffer.byteLength(body), "the body is whole chunks, nothing cut");
@@ -331,21 +340,23 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   assert.ok(replaced.slice(more).includes(JSON.stringify(src[0].label)), "the more line names the source label");
   assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole output is indexed, nothing cut");
   // The full output is findable: a chunk the replace dropped comes back from ctx_search, by a line only it holds.
-  const all = chunkText(text, "text");
-  const gone = all.find((c) => !body.includes(c.text));
+  const all = chunkText(text, "text", REPLACE_CHUNK_BYTES);
+  // D-M7-SV-1: with small chunks the first dropped chunk holds one-digit line numbers, which are not a
+  // distinct query; take the first dropped chunk with a line number of 3+ digits (same assertion below).
+  const gone = all.find((c) => !body.includes(c.text) && /^line \d{3,} filler/m.test(c.text));
   assert.ok(gone !== undefined, "some chunk was not in the replaced text");
-  const inner = gone.text.split("\n").slice(1, -1).find((l) => l.includes("filler"));
+  const inner = gone.text.split("\n").slice(1, -1).find((l) => /^line \d{3,} filler/.test(l));
   const num = inner.split(" ")[1];
   const r = await ctxSearch.handler({ queries: ["line " + num + " filler"], scope: "session", source: src[0].label }, searchCtx(p.session_id));
   assert.equal(r.isError, false, r.text);
-  assert.ok(r.text.includes(src[0].label + " #" + gone.ord + ":"), "ctx_search finds the dropped chunk");
+  assert.ok(r.text.includes(src[0].label + " #" + gone.ord + ":"), "ctx_search finds the dropped chunk: ord " + gone.ord + " num " + num + "\n" + r.text.slice(0, 600));
 });
 
 test("D-M7-RR-3: no Bash description: the intent is the command text, never an empty query", async () => {
   const p = mainBashPost(bigText(40000), undefined);
   delete p.tool_input.description;
   const out = parsed(await handleHook("claude-code", p, env));
-  const replaced = out.updatedToolOutput;
+  const replaced = replacedText(out.updatedToolOutput);
   const more = replaced.slice(replaced.lastIndexOf("\nctx_search("));
   assert.ok(!more.includes('[""]'), "the more line has no empty query: " + more);
   assert.ok(more.includes("cat big.log"), "the more line queries the command text: " + more);
@@ -367,10 +378,30 @@ test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory select
   const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
   const p = mainBashPost(text);
   const out = parsed(await handleHook("claude-code", p, env));
-  assert.ok(Buffer.byteLength(out.updatedToolOutput) <= OUTPUT_CAP + 512);
-  assert.ok(out.updatedToolOutput.includes("needle target"));
+  const replaced = replacedText(out.updatedToolOutput);
+  assert.ok(Buffer.byteLength(replaced) <= REPLACE_RETURN_BYTES + 512);
+  assert.ok(replaced.includes("needle target"));
   const src = await waitRows("SELECT label FROM sources WHERE session_id = ?", [p.session_id], 1);
   assert.equal(src.length, 1);
+});
+
+test("D-M7-SV-1: a 4-16K Bash output is replaced by at most REPLACE_RETURN_BYTES of whole small chunks plus the more line", async () => {
+  const text = bigText(REPLACE_TRIGGER_BYTES * 2);
+  const p = mainBashPost(text);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
+  assert.ok(replaced.includes("needle target"));
+  for (const c of chunkText(text, "text", REPLACE_CHUNK_BYTES)) assert.ok(c.bytes <= REPLACE_CHUNK_BYTES);
+});
+
+test("D-M7-SV-1: small chunks drop no byte: chunk bytes sum to the text bytes; the default chunking is unchanged", () => {
+  const text = bigText(20000);
+  const small = chunkText(text, "text", REPLACE_CHUNK_BYTES);
+  assert.equal(small.reduce((n, c) => n + c.bytes, 0) + 1, Buffer.byteLength(text), "only the final newline is not a chunk byte");
+  assert.deepEqual(chunkText(text, "text", 1 << 30), chunkText(text, "text"));
 });
 
 test("D-M7-RR-1: rows with no replace (codex, qwen) keep their one path: large PostToolUse is the empty allow", async () => {

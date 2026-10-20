@@ -15,11 +15,16 @@ const RAW_TAGS: ReadonlySet<string> = new Set(["script", "style"]);
 
 const encoder = new TextEncoder();
 
-export function chunkText(text: string, kind: "md" | "html" | "text"): Chunk[] {
+// maxBytes (D-M7-SV-1): a smaller chunk cap for the PostToolUse replace path; clamped to MAX_CHUNK_BYTES.
+// Under a smaller cap an over-long block is cut after its last whole line that fits (the chunk keeps that
+// newline), and only a single line over the cap is cut by code point.
+// The default call is unchanged.
+export function chunkText(text: string, kind: "md" | "html" | "text", maxBytes: number = MAX_CHUNK_BYTES): Chunk[] {
   const src = normalize(text);
   if (src.length === 0) return [];
   const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, kind === "md");
-  return merge(src, blocks, kind !== "text");
+  const cap = Math.max(4, Math.min(MAX_CHUNK_BYTES, Math.floor(maxBytes)));
+  return merge(src, blocks, kind !== "text", cap, cap < MAX_CHUNK_BYTES);
 }
 
 // Step 1: "\r\n" -> "\n", leading BOM removed.
@@ -206,7 +211,7 @@ function utf8Bytes(s: string): number {
 // TextEncoder.encodeInto never writes part of a code point; the slice end is moved back one unit
 // when it would split a surrogate pair.
 function cutPoint(src: string, start: number, end: number, scratch: Uint8Array): { end: number; written: number } {
-  let limit = Math.min(end, start + MAX_CHUNK_BYTES);
+  let limit = Math.min(end, start + scratch.length);
   if (limit < end && [...src.slice(limit - 1, limit + 1)].length === 1) limit -= 1;
   const r = encoder.encodeInto(src.slice(start, limit), scratch);
   return { end: start + r.read, written: r.written };
@@ -215,9 +220,9 @@ function cutPoint(src: string, start: number, end: number, scratch: Uint8Array):
 // Steps 3-5: greedy merge of blocks into chunks of at most MAX_CHUNK_BYTES. A merged chunk is the
 // input span from its first block to its last, so the text between blocks stays as written.
 // "text" blocks are not merged: each blank-line block is its own chunk (DEVIATIONS D-M2-T6-1).
-function merge(src: string, blocks: Span[], join: boolean): Chunk[] {
+function merge(src: string, blocks: Span[], join: boolean, cap: number, lineCut: boolean): Chunk[] {
   const out: Chunk[] = [];
-  const scratch = new Uint8Array(MAX_CHUNK_BYTES);
+  const scratch = new Uint8Array(cap);
   let cur: Span | undefined;
   let curBytes = 0;
   const emit = (start: number, end: number, bytes: number): void => {
@@ -230,7 +235,7 @@ function merge(src: string, blocks: Span[], join: boolean): Chunk[] {
     }
     if (cur !== undefined) {
       const add = utf8Bytes(src.slice(cur.end, b.end));
-      if (curBytes + add <= MAX_CHUNK_BYTES) {
+      if (curBytes + add <= cap) {
         cur.end = b.end;
         curBytes += add;
         continue;
@@ -240,8 +245,16 @@ function merge(src: string, blocks: Span[], join: boolean): Chunk[] {
     }
     let start = b.start;
     let bytes = utf8Bytes(src.slice(b.start, b.end));
-    while (bytes > MAX_CHUNK_BYTES) {
+    while (bytes > cap) {
       const cut = cutPoint(src, start, b.end, scratch);
+      const nl = lineCut ? src.lastIndexOf("\n", cut.end - 1) : -1;
+      if (nl > start) { // whole lines: the chunk keeps its last newline, so no byte of the text is dropped
+        const w = utf8Bytes(src.slice(start, nl + 1));
+        emit(start, nl + 1, w);
+        start = nl + 1;
+        bytes -= w;
+        continue;
+      }
       emit(start, cut.end, cut.written);
       start = cut.end;
       bytes -= cut.written;

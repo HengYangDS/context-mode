@@ -226,6 +226,12 @@ test("encode replace writes updatedToolOutput on PostToolUse only", () => {
   assert.deepEqual(encode(pre, { kind: "replace", output: "chunks" }), { stdout: "", exitCode: 0 });
 });
 
+test("D-M7-SV-1: encode replace on Bash writes the Bash output shape {stdout, stderr, interrupted}", () => {
+  const ev = { ...pre, event: "PostToolUse", tool: { name: "Bash", canonicalName: "Bash", input: { command: "ls" } } };
+  const out = encode(ev, { kind: "replace", output: "chunks" });
+  assert.deepEqual(JSON.parse(out.stdout), { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: { stdout: "chunks", stderr: "", interrupted: false } } });
+});
+
 // ---------- src/entries/hook.ts (M0 skeleton, D-M0-7) ----------
 
 function runEntry(args, input) {

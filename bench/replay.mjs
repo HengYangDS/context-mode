@@ -124,9 +124,11 @@ async function replayFile(file) {
             after = bytes(d.reason);
             afterBound = after + bytes(capBytes(text, OUTPUT_CAP).text);
           } else {
-            if (before > OUTPUT_CAP) { // PostToolUse replace: main agent (D-M7-RR-1) and subagent case C
+            // PostToolUse replace: main agent (D-M7-RR-1) and subagent case C, with the replace-path sizes of
+            // src/core/hooks/dispatch.ts (D-M7-SV-1): trigger, chunk cap and return budget, not OUTPUT_CAP.
+            if (before > C.REPLACE_TRIGGER_BYTES) {
               const intent = typeof u.input.description === "string" ? u.input.description : "";
-              const sel = selectChunksInMemory(chunkText(text, "text"), intent, OUTPUT_CAP, "replay:" + canonical);
+              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, "replay:" + canonical);
               after = bytes(sel.text) + (sel.more !== null ? 1 + bytes(sel.more) : 0);
               afterBound = after;
               kind = "replace";

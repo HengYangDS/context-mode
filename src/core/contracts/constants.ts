@@ -13,6 +13,12 @@ export const POINTER_MIN = 640; // ADR-0009 §4
 export const STATE_CLOSE_TAG = "</context_mode_state>"; // impl/06 §3 block close line
 export const INDEX_WRITE_CHUNK = 1048576; // PRD §4
 export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
+// D-M7-SV-1: the PostToolUse replace path has its own sizes, separate from OUTPUT_CAP (which stays the cap for
+// replies and the Read deny threshold). A result over REPLACE_TRIGGER_BYTES is indexed whole and the model gets
+// whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
+export const REPLACE_TRIGGER_BYTES = 4096;
+export const REPLACE_RETURN_BYTES = 1024;
+export const REPLACE_CHUNK_BYTES = 256;
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
 export const SNIPPET_MAX_BYTES = 800; // DECISIONS-r9 M21: under floor(OUTPUT_CAP / SEARCH_PAGE_SIZE) = 819

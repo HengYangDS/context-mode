@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
-  OUTPUT_CAP, OWN_TOOL_PREFIX, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
@@ -308,7 +308,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   }
   // step 5: replace, DECISIONS-r9 F1 split. Subagent case B/C (ADR-0016), and the main agent on a row
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
-  if (result.bytes <= OUTPUT_CAP) return ALLOW;
+  if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
   let label: string;
   if (isSubagentCall(ev)) {
     const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
@@ -323,14 +323,14 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
     .map(str).find((v) => v.trim() !== "") ?? "";
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
-  const chunks = chunkText(text, "text");
+  const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES); // D-M7-SV-1: small chunks, line-aligned cuts
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
     const db = await openDb(project);
     indexText(db, project, ev.sessionId, label, text, "text", chunks);
   } else {
     indexDetached(project, ev.sessionId, label, text, chunks);
   }
-  const selected = selectChunksInMemory(chunks, intent, OUTPUT_CAP, label);
+  const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label);
   return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
 }
 
