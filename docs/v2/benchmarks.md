@@ -249,3 +249,21 @@ Root cause of the two earlier "not replaced" tables:
 - "stream-json showed SessionStart only" is not evidence that PostToolUse did not run. Without `--include-hook-events`, stream-json lists SessionStart hook events only; a session run that way here replaced (seen 187) and still showed SessionStart only.
 
 Regression guard: `tests/v2/hooks/replace-live-golden.test.mjs` runs the real captured payload (`e2e/fixtures/claude-code/2.1.303/PostToolUse-Bash-large.json`) through `src/entries/hook.ts` and checks the Bash shape and a result under 1/10 of the full output. It fails on 3f4a4d0b and passes on this branch.
+
+## Replace live proof (impl/replace-live)
+
+Independent re-run, 2026-10-21. Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--max-budget-usd 0.25`, keyless, same env as above, `--include-hook-events`, `--allowedTools Bash`, `--plugin-dir release-out` built from this branch (a972e852). Task: Bash `seq 1 N`, then the last number. Two runs per size. Cwd is a git repo.
+
+| Full output (bytes) | Runs | tool_result seen (chars) | Answer correct |
+|---:|---:|---|---|
+| 8893 (N 2000) | 2 | 152, 152 | 2 of 2 |
+| 19998 (N 4221) | 2 | 187, 187 | 2 of 2 |
+| 28003 (N 5822) | 2 | 182, 182 | 2 of 2 |
+
+The root cause in the section above is confirmed.
+
+Caveat found: the hook returns nothing when the session cwd is not inside a git repo (hook run by hand with a non-git cwd gives empty stdout; with a git cwd and `CLAUDE_PROJECT_DIR` set it gives the replace). In a non-git cwd the model saw the full output: 8892, 19997, 28002 chars, answers still correct. Not changed here (src/ is out of scope); it needs its own fix and DEVIATIONS row.
+
+Gate fix: `e2e/golden/GP3/fixture-replay-claude-code-PostToolUse-Bash-large.json` was missing, so gp-cases failed on the new fixture and the saving-score gate guard was false (M2 73.71). With the golden added, gp-cases passes (GP3 21 of 21), and `tests/v2/` passes 1079 of 1079.
+
+`node bench/saving-score.mjs` (lock ok, score files match `bench/saving-score.lock`): M1 94.21, M2 86.18, guards success true, small1k true (-0.32), tokens true, gate true. M2 is below the 90 target; it is inside the 2-run noise range noted above.
