@@ -143,7 +143,7 @@ Context Mode has two parts that run inside one agent session:
 Read more: [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](docs/algorithms.md) (search and ranking),
 [docs/tools.md](docs/tools.md) (tool inputs). Size limits and deny rules are in docs/algorithms.md §1, §2 and §7.
 
-**Codex `PreToolUse` matcher.** `configs/codex/hooks.json` wires this matcher to `context-mode hook codex pretooluse`:
+**Codex `PreToolUse` matcher.** `release-out/hooks/codex.json` (built from the adapter table) wires this matcher to `context-mode hook codex pretooluse`:
 
 ```json
 {
