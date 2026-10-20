@@ -1,7 +1,7 @@
 {
   "date": "2026-10-20",
-  "m1": 85.72,
-  "m2": 69.22,
+  "m1": 90.88,
+  "m2": 79.65,
   "guards": {
     "success": true,
     "small1k": true,
@@ -32,20 +32,20 @@
       "population": {
         "calls": 1446,
         "before": 13948587,
-        "after": 1992467,
-        "afterWithoutRerunBound": 1511833,
+        "after": 1271480,
+        "afterWithoutRerunBound": 790846,
         "perTool": {
           "Bash": {
             "calls": 1100,
             "before": 9824415,
-            "after": 1169170,
-            "savingPct": 88.1
+            "after": 610106,
+            "savingPct": 93.79
           },
           "Read": {
             "calls": 240,
             "before": 2560897,
-            "after": 689948,
-            "savingPct": 73.06
+            "after": 581426,
+            "savingPct": 77.3
           },
           "Grep": {
             "calls": 0,
@@ -68,14 +68,14 @@
           "WebSearch": {
             "calls": 2,
             "before": 9451,
-            "after": 2132,
-            "savingPct": 77.44
+            "after": 1104,
+            "savingPct": 88.32
           },
           "mcp:other": {
             "calls": 102,
             "before": 1531942,
-            "after": 108642,
-            "savingPct": 92.91
+            "after": 56269,
+            "savingPct": 96.33
           }
         }
       },
@@ -95,28 +95,28 @@
         "4-16K": {
           "calls": 1412,
           "before": 10488669,
-          "after": 2113290,
-          "savingPct": 79.85
+          "after": 1448534,
+          "savingPct": 86.19
         },
         "16-64K": {
           "calls": 198,
           "before": 4814142,
-          "after": 746722,
-          "savingPct": 84.49
+          "after": 660452,
+          "savingPct": 86.28
         }
       },
       "corpusTotal": {
         "calls": 23237,
-        "savingPct": 41.42,
-        "savingPctWithRerunBound": 39.77
+        "savingPct": 43.83,
+        "savingPctWithRerunBound": 42.18
       },
       "corpus": {
-        "files": 3026,
+        "files": 3034,
         "sessions": 851,
         "calls": 23237,
         "lastTs": "2026-10-20T11:10:42.638Z"
       },
-      "seconds": 55
+      "seconds": 48
     },
     "live": {
       "agent": "2.1.303 (Claude Code)",
@@ -129,9 +129,9 @@
           "task": "json-1",
           "inScore": true,
           "small": true,
-          "offBytes": 887.5,
+          "offBytes": 675.5,
           "v2Bytes": 142,
-          "savingPct": 84,
+          "savingPct": 78.98,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -142,8 +142,8 @@
           "inScore": true,
           "small": false,
           "offBytes": 6828,
-          "v2Bytes": 3338.5,
-          "savingPct": 51.11,
+          "v2Bytes": 1344,
+          "savingPct": 80.32,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -154,8 +154,8 @@
           "inScore": true,
           "small": false,
           "offBytes": 25653,
-          "v2Bytes": 1422,
-          "savingPct": 94.46,
+          "v2Bytes": 733,
+          "savingPct": 97.14,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -165,21 +165,21 @@
           "task": "big-json",
           "inScore": true,
           "small": false,
-          "offBytes": 2429.5,
-          "v2Bytes": 1107,
-          "savingPct": 54.44,
+          "offBytes": 2434.5,
+          "v2Bytes": 565,
+          "savingPct": 76.79,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 0
+          "v2CtxCalls": 2
         },
         {
           "task": "log-1",
           "inScore": false,
           "small": true,
           "offBytes": 62,
-          "v2Bytes": 32,
-          "savingPct": 48.39,
+          "v2Bytes": 2,
+          "savingPct": 96.77,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -190,12 +190,12 @@
           "inScore": false,
           "small": true,
           "offBytes": 2,
-          "v2Bytes": 2,
-          "savingPct": 0,
+          "v2Bytes": 17,
+          "savingPct": -750,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 0
+          "v2CtxCalls": 2
         },
         {
           "task": "file-1",
@@ -213,9 +213,9 @@
           "task": "git-1",
           "inScore": false,
           "small": true,
-          "offBytes": 20.5,
-          "v2Bytes": 8,
-          "savingPct": 60.98,
+          "offBytes": 8,
+          "v2Bytes": 20.5,
+          "savingPct": -156.25,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -223,8 +223,8 @@
         }
       ],
       "medianSessionTokens": {
-        "off": 36156,
-        "v2": 38181,
+        "off": 36171.5,
+        "v2": 38200,
         "tasks": [
           "log-1",
           "json-1",
@@ -239,10 +239,10 @@
         "sessionsPerArm": 16
       },
       "costUsd": {
-        "off": 0.5512,
-        "v2": 0.429
+        "off": 0.5426,
+        "v2": 0.4069
       },
-      "seconds": 61
+      "seconds": 62
     }
   }
 }

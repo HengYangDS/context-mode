@@ -438,3 +438,15 @@ test("D-M7-RR-1: user policy deny and Read deny unchanged on claude-code", async
   const r = parsed(await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: big } }), env));
   assert.equal(r.permissionDecision, "deny");
 });
+
+test("D-M7-SV-2: the replace return budget is 512 bytes, a constant of its own under OUTPUT_CAP; a 16K output keeps the intent chunk", async () => {
+  assert.equal(REPLACE_RETURN_BYTES, 512);
+  assert.ok(REPLACE_RETURN_BYTES < OUTPUT_CAP && REPLACE_RETURN_BYTES >= 2 * REPLACE_CHUNK_BYTES, "at least two whole chunks fit");
+  const text = bigText(16000);
+  const out = parsed(await handleHook("claude-code", mainBashPost(text), env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= 512);
+  assert.ok(replaced.includes("needle target"));
+});
