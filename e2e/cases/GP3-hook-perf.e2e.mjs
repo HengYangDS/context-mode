@@ -9,7 +9,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -74,20 +74,24 @@ test("[M7] GP3/hook-perf-posttool-async: a plain ls PreToolUse spawns nothing an
   for (let i = 0; i < RUNS; i++) {
     const r = f.hook(lsCall(f.repo, "perf-pre", "PreToolUse"));
     assert.equal(r.status, 0, r.stderr);
-    // The Bash hint fires once per session (impl/09 §2 step 3); every later call is the empty allow.
-    if (i === 0) assert.ok(r.stdout.includes("ctx_execute"), "the first Bash call carries the once-per-session hint");
-    if (i > 0) assert.equal(r.stdout, "", "a plain ls is allowed with the native empty answer");
+    // D-M7-RR-2 (DECISIONS-r10 (2)): no PreToolUse hint, so every call is the native empty allow.
+    assert.equal(r.stdout, "", "a plain ls is allowed with the native empty answer");
     assert.deepEqual(r.calls, [], "PreToolUse for ls starts no child process");
     hookCpu.push(r.cpuMs);
     bareCpu.push(f.bareRun().cpuMs);
   }
-  // impl/09 §5.3, P4: PreToolUse touches only the throttle marker in meta, never the journal.
-  const dbPath = path.join(f.projectsDir, readdirSync(f.projectsDir)[0], "context.db");
-  const h = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    assert.equal(h.prepare("SELECT COUNT(*) AS n FROM events").get().n, 0, "PreToolUse writes no journal row");
-  } finally {
-    h.close();
+  // impl/09 §5.3, P4: PreToolUse never writes the journal. With no hint (D-M7-RR-2) it has no throttle
+  // marker either, so it may not open the DB at all; when a DB exists, it holds no event row.
+  const keys = existsSync(f.projectsDir) ? readdirSync(f.projectsDir) : [];
+  for (const k of keys) {
+    const dbPath = path.join(f.projectsDir, k, "context.db");
+    if (!existsSync(dbPath)) continue;
+    const h = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      assert.equal(h.prepare("SELECT COUNT(*) AS n FROM events").get().n, 0, "PreToolUse writes no journal row");
+    } finally {
+      h.close();
+    }
   }
   const over = p95(hookCpu) - p95(bareCpu);
   assert.ok(over <= HOOK_CPU_OVER_NODE_MS, `hook CPU p95 ${p95(hookCpu).toFixed(1)} ms is ${over.toFixed(1)} ms over bare Node ${p95(bareCpu).toFixed(1)} ms; budget ${HOOK_CPU_OVER_NODE_MS} ms`);
