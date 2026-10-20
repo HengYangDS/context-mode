@@ -19,6 +19,7 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 export const REPLACE_TRIGGER_BYTES = 4096;
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
+export const PERSISTED_READ_MAX_BYTES = 4194304; // D-M7-SV-7: largest Claude Code persisted output the hook reads back (4 MiB)
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
 export const SNIPPET_MAX_BYTES = 800; // DECISIONS-r9 M21: under floor(OUTPUT_CAP / SEARCH_PAGE_SIZE) = 819
