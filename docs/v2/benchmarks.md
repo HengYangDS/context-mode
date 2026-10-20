@@ -195,3 +195,32 @@ Build: v2-design, `node build/build.mjs --out release-out`. Live runs: `claude -
 | 28003 (N 5822) | 2 | 28002, 28002 | no | no |
 
 Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The tool used was Bash each time. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared. So the main-agent replace still did not shrink any Bash result after the r1 shape fix. Do not claim a live replace saving for the main agent. Next step: capture a hook log (`scripts/ctx-debug.sh`) to see if the hook runs on the Bash result.
+
+## Saving loop
+
+Score: `bench/saving-score.mjs` (lock `bench/saving-score.lock`). M1 = offline replay saving on the corpus. M2 = median live saving over 4 scored tasks (json-1, multi-1, big-tests, big-json), 2 runs per arm, claude-sonnet-5-5, effort low. Target: 90 for M1 and M2, with guards (success, small outputs, tokens, gate).
+
+Checks made on v2-design:
+- Lock: `bench/saving-score.mjs` (f90cccc1...) and `bench/live/score-tasks.mjs` (80bb6a49...) match the lock. Last change to the lock and both scripts is 5bd44c12, before the baseline commit 1a683ac5. No later commit touches them.
+- Success: 16 of 16 sessions pass in both arms in every committed score file (baseline, r1, r2, r3, r5). The small-output guard stays at -0.32%. Median small-task session tokens: v2 38185 against off 36169.5, inside the 2% token limit.
+- Selection: the replace path ranks whole chunks with BM25 (`src/core/index/select.ts`, `selectChunksInMemory`). Chunks are line-aligned (`chunkText`). The code has no head/tail cut and no regex filter on the returned text. The `slice` calls in `dispatch.ts` apply to the source label only. Not checked: how `chunkText` splits one line longer than 48 bytes.
+- Number mismatches to know: (1) r5 was committed first as M2 87.66 (640dccff), then re-run to 88.9 (1d55d561); the table uses the later file. (2) For r6 and r7 the round log gives M2 89.52 and 89.09, but the round notes give 88.8 and 87.98. Neither round is merged, so v2-design has no score file for them. (3) Only the r5 file is on v2-design; r1, r2 and r3 values are from the earlier commits of `bench/saving-score-last.json`, and show M2 69.22, 79.65 and 86.41 (the log for those rounds matches), but r1 to r3 commit-time files read 67.48, 82.49 and 85.56 in the DEVIATIONS-row commits and were re-run after.
+- This file has no M1/M2 numbers outside this section, so no other table can disagree with the score file.
+
+| Round | Change | M1 | M2 | Merged |
+|---|---|---:|---:|---|
+| Baseline | v2-design before the loop | 12.03 | 2.69 | - |
+| 1 | Bash replace uses Claude Code's Bash shape {stdout, stderr, interrupted}; sizes: trigger 4096, return 1024, chunk 256 | 85.72 | 69.22 | yes |
+| 2 | REPLACE_RETURN_BYTES 1024 to 512 | 90.88 | 79.65 | yes |
+| 3 | REPLACE_RETURN_BYTES 512 to 96, REPLACE_CHUNK_BYTES 256 to 48 | 94.76 | 86.41 | yes |
+| 4 | Shorter more-line label | 94.74 | 85.78 | no (gate gp-cases failed) |
+| 5 | Chunks ranked by intent plus the session's last user prompt | 94.12 | 88.90 | yes |
+| 6 | Label "<tool>#" plus 8 hex of sha256(call id) | 94.10 | 89.52 (notes: 88.8) | no (does not beat best) |
+| 7 | Read the full output from persistedOutputPath when stdout is cut | 94.12 | 89.09 (notes: 87.98) | no (does not beat best) |
+
+Final on v2-design: M1 94.12, M2 88.9 (round 5). Guards pass. The 90 target was reached for M1 and not for M2. Missing: 1.1 points.
+
+Measured ceiling and what blocks it (M2 per task, last merged file): big-tests 99.23, multi-1 90.94, big-json 86.86, json-1 51.7.
+- json-1: the off-arm output is under the 4096-byte trigger, so no replace happens. The task is in the score and cannot rise without a lower trigger, which costs the small-output guard.
+- big-json: the model checks the answer with Read or ctx_execute after the replace. Round 7 showed that Claude Code gives the hook only the first 30000 chars of stdout; reading the full file fixed the missing line but the model still re-checked, and the task fell to 23.62 in that round.
+- Noise: 2 runs per arm. Round 6 moved big-json from 84.19 to 76.41 and multi-1 from 91.12 to 94.2 with no relevant change. A 1 point M2 gap is inside this noise, so "90 reached" cannot be claimed or ruled out for any round.
