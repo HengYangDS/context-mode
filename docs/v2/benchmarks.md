@@ -224,3 +224,27 @@ Measured ceiling and what blocks it (M2 per task, last merged file): big-tests 9
 - json-1: the off-arm output is under the 4096-byte trigger, so no replace happens. The task is in the score and cannot rise without a lower trigger, which costs the small-output guard.
 - big-json: the model checks the answer with Read or ctx_execute after the replace. Round 7 showed that Claude Code gives the hook only the first 30000 chars of stdout; reading the full file fixed the missing line but the model still re-checked, and the task fell to 23.62 in that round.
 - Noise: 2 runs per arm. Round 6 moved big-json from 84.19 to 76.41 and multi-1 from 91.12 to 94.2 with no relevant change. A 1 point M2 gap is inside this noise, so "90 reached" cannot be claimed or ruled out for any round.
+
+## Replace live root cause
+
+Measured 2026-10-21. Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--max-budget-usd 0.25`, keyless, env ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1. Build: v2-design 96caa8a7, `node build/build.mjs --out release-out`, `--plugin-dir release-out`. Task: `seq 1 N` with Bash, then the last line.
+
+Step 1, registration. `release-out/.claude-plugin/plugin.json` points to `hooks/claude-code.json`. PostToolUse is registered: matcher `^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__plugin_context-mode_context-mode__ctx_.*)$`, command `node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent claude-code`, timeout 5 s. The `--debug-file` log shows `Loading hooks from plugin: context-mode`.
+
+Step 2, hook log. A wrapper around the hook command wrote stdin, stdout, exit code and wall time for every event (temporary, not committed). In every session PostToolUse:Bash ran, exit 0, 75 to 96 ms, with `tool_response` keys `stdout, stderr, interrupted, isImage, noOutputExpected`. The hook returned `updatedToolOutput: {stdout, stderr: "", interrupted: false}`. The debug log then says `Hook PostToolUse (...) replaced tool output`.
+
+Step 3, seen by the model (`tool_result` length in stream-json):
+
+| Full output (bytes) | Sessions | tool_result seen (chars) | Replaced |
+|---:|---:|---|---|
+| 8893 (N 2000) | 4 | 152, 152, 152, 152 | yes |
+| 19998 (N 4221) | 8 | 187 in all 8 | yes |
+| 28003 (N 5822) | 4 | 182, 182, 182, 182 | yes |
+
+The 19998 rows include runs with the bench flags (`--setting-sources project`, `--no-session-persistence`, `--allowedTools ...`, minimal env), each alone and all together: all 187. One more N 4221 session is not in the table: the model ran `seq 1 4221 | tail -n 1` (4 bytes, under the trigger).
+
+Root cause of the two earlier "not replaced" tables:
+- The plugin under test returned `updatedToolOutput` as a plain string. A build of 3f4a4d0b (before D-M7-SV-1) reproduces the old result exactly: seen 19997 for N 4221, and the debug log says `PostToolUse hook returned updatedToolOutput that does not match Bash's output shape: reason=schema_invalid issues=invalid_type`. Claude Code then keeps the original output. The code on v2-design since 52b01705 sends the Bash shape and works live, so the "after r1 shape fix" table most likely ran a release-out built before that commit.
+- "stream-json showed SessionStart only" is not evidence that PostToolUse did not run. Without `--include-hook-events`, stream-json lists SessionStart hook events only; a session run that way here replaced (seen 187) and still showed SessionStart only.
+
+Regression guard: `tests/v2/hooks/replace-live-golden.test.mjs` runs the real captured payload (`e2e/fixtures/claude-code/2.1.303/PostToolUse-Bash-large.json`) through `src/entries/hook.ts` and checks the Bash shape and a result under 1/10 of the full output. It fails on 3f4a4d0b and passes on this branch.
