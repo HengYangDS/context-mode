@@ -71,14 +71,25 @@ async function replayFile(file) {
   const seenResult = new Set();
   const sess = {};
   let sessionId = "";
+  let lastPrompt = "";
   let any = false;
   const rl = createInterface({ input: createReadStream(file, { encoding: "utf8" }), crlfDelay: Infinity });
   for await (const line of rl) {
     const hasUse = line.includes('"tool_use"');
     const hasRes = line.includes('"tool_result"');
-    if (!hasUse && !hasRes) continue;
+    const maybePrompt = !hasUse && !hasRes && line.includes('"type":"user"');
+    if (!hasUse && !hasRes && !maybePrompt) continue;
     let o;
     try { o = JSON.parse(line); } catch { continue; }
+    if (maybePrompt) {
+      // D-M7-SV-5: the main agent's last typed prompt, as the UserPromptSubmit hook journals it.
+      if (o.type === "user" && o.isSidechain !== true && o.isMeta !== true && o.message) {
+        const c = o.message.content;
+        const t = typeof c === "string" ? c : Array.isArray(c) ? c.filter((x) => x && x.type === "text" && typeof x.text === "string").map((x) => x.text).join("\n") : "";
+        if (t.trim() !== "") lastPrompt = t;
+      }
+      continue;
+    }
     const content = o.message && o.message.content;
     if (!Array.isArray(content)) continue;
     if (typeof o.sessionId === "string") sessionId = o.sessionId;
@@ -127,8 +138,10 @@ async function replayFile(file) {
             // PostToolUse replace: main agent (D-M7-RR-1) and subagent case C, with the replace-path sizes of
             // src/core/hooks/dispatch.ts (D-M7-SV-1): trigger, chunk cap and return budget, not OUTPUT_CAP.
             if (before > C.REPLACE_TRIGGER_BYTES) {
-              const intent = typeof u.input.description === "string" ? u.input.description : "";
-              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, "replay:" + canonical);
+              // Same intent order as dispatch (D-M7-RR-3) and the last-prompt ranking (D-M7-SV-5).
+              const intent = [u.input.description, u.input.command, u.input.file_path, u.input.pattern, u.input.url].map((v) => (typeof v === "string" ? v : "")).find((v) => v.trim() !== "") ?? "";
+              const rankQuery = lastPrompt.trim() === "" ? undefined : intent + " " + lastPrompt;
+              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, "replay:" + canonical, rankQuery);
               after = bytes(sel.text) + (sel.more !== null ? 1 + bytes(sel.more) : 0);
               afterBound = after;
               kind = "replace";
