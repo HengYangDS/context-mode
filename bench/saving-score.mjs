@@ -189,7 +189,7 @@ async function live(runs) {
 }
 
 // ---------- main ----------
-const runs = Number(arg("runs", 1));
+const runs = Number(arg("runs", 2));
 let g = null, off = null, lv = null;
 if (!has("--skip-gate")) { err("gate"); g = gate(); }
 const offP = has("--skip-offline") ? Promise.resolve(null) : (err("offline replay"), offline());
