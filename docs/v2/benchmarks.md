@@ -224,3 +224,48 @@ Measured ceiling and what blocks it (M2 per task, last merged file): big-tests 9
 - json-1: the off-arm output is under the 4096-byte trigger, so no replace happens. The task is in the score and cannot rise without a lower trigger, which costs the small-output guard.
 - big-json: the model checks the answer with Read or ctx_execute after the replace. Round 7 showed that Claude Code gives the hook only the first 30000 chars of stdout; reading the full file fixed the missing line but the model still re-checked, and the task fell to 23.62 in that round.
 - Noise: 2 runs per arm. Round 6 moved big-json from 84.19 to 76.41 and multi-1 from 91.12 to 94.2 with no relevant change. A 1 point M2 gap is inside this noise, so "90 reached" cannot be claimed or ruled out for any round.
+
+## Memory
+
+Run 2026-10-21 on v2-design (clean clone, `npm run build`, Node v26.8.1). Harness: `node e2e/live/run.mjs --only <id> --model claude-sonnet-5-5`, one case per run, effort low, keyless `claude -p`, `--max-budget-usd 0.25`. Env: `ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`. No assertion was changed and no case was skipped. No code in `src` was changed.
+
+| Case | Kind | Result | List-price $ | What it measured |
+|---|---|---|---|---|
+| memory-r6-eval-local | local | PASS | 0 | Last-request seq in the journal equals ground truth in both fixtures (gp6-open-error, gp6-resume-pointer). No model call. |
+| memory-retrieval-local | local | PASS | 0 | `tickets/memory-retrieval/eval/ci-smoke.mjs`: R2 recall@5 = 1.000 (6 of 6 queries), R2 MRR = 0.653. No model call. |
+| memory-r6-resume-quality | agent | PASS | 0.0075 | Model reply `TESTS` (next action after the compacted state is to run the tests). |
+| decision-q3-applied | model | PASS | 0.0435 | Model read ADR-0016 and replied `PASS` (case B denies with the rewritten command, never allow + updatedInput). |
+
+Total live spend: 0.0510 USD list price for 2 model sessions, well under the 0.25 cap each.
+
+### Numbers
+
+Fixture run (synthetic journals, `ci-smoke.mjs`, N = 6 queries, 2 per type):
+
+| Metric | R2 |
+|---|---|
+| recall@5, all types | 1.000 |
+| recall@5, decision / errorfix / file | 1.000 / 1.000 / 1.000 |
+| MRR | 0.653 |
+| Timeline order-correct | 2/2 |
+| Timeline paging-complete | 2/2 |
+| Decision tag D3 (structural) precision / recall / false positives | 1.000 / 1.000 / 0 |
+
+The fixture set is small. recall@5 = 1.000 on 6 queries is a smoke gate, not an estimate of real recall.
+
+Stored results from the earlier real-data runs (not re-run here; private journals are not in this clone). Source: `tickets/memory-retrieval/eval/results.md`, `tickets/memory-r6/eval/results.md`.
+
+| Metric | Value | Set |
+|---|---|---|
+| R2 recall@5 / MRR | 0.743 / 0.671 | 148 real queries, 7 projects |
+| R2 decision recall@5 | 0.744 | 39 decision queries |
+| R2 errorfix recall@5 | 0.890 | 91 queries |
+| R2 file recall@5 | 0.000 | 18 queries (R7 raises it to 0.111) |
+| Timeline order-correct and paging-complete | 43/47 | first query set, all variants, with the after cursor |
+| Compaction v2 block (2,048 B budget): open-error / last-request / changed-files hit | 11/12, 12/12, 12/12 | 12 real cases, no model |
+
+### Open items
+
+- The 11/12 open-error hit of the compaction block (v2) and the 43/47 timeline figure are known misses from the earlier runs. This run did not reproduce them, because the real journals stay private. They are reported, not decided on.
+- File-type retrieval is near 0 by text search: the later prompt shares few tokens with the earlier edit rows.
+- The local cases are deterministic gates over fixtures. The two model cases (resume-quality, decision-q3) are one-shot checks at effort low, so one PASS is not a pass rate.
