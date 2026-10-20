@@ -1,7 +1,7 @@
 {
   "date": "2026-10-20",
   "m1": 94.76,
-  "m2": 85.56,
+  "m2": 86.41,
   "guards": {
     "success": true,
     "small1k": true,
@@ -116,7 +116,7 @@
         "calls": 23237,
         "lastTs": "2026-10-20T11:10:42.638Z"
       },
-      "seconds": 46
+      "seconds": 41
     },
     "live": {
       "agent": "2.1.303 (Claude Code)",
@@ -129,9 +129,9 @@
           "task": "json-1",
           "inScore": true,
           "small": true,
-          "offBytes": 765.5,
-          "v2Bytes": 142,
-          "savingPct": 81.45,
+          "offBytes": 732,
+          "v2Bytes": 210,
+          "savingPct": 71.31,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -141,13 +141,13 @@
           "task": "multi-1",
           "inScore": true,
           "small": false,
-          "offBytes": 4573,
-          "v2Bytes": 932,
-          "savingPct": 79.62,
+          "offBytes": 6870.5,
+          "v2Bytes": 809.5,
+          "savingPct": 88.22,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 9
+          "v2CtxCalls": 5
         },
         {
           "task": "big-tests",
@@ -165,13 +165,13 @@
           "task": "big-json",
           "inScore": true,
           "small": false,
-          "offBytes": 2400,
-          "v2Bytes": 248,
-          "savingPct": 89.67,
+          "offBytes": 2429.5,
+          "v2Bytes": 374.5,
+          "savingPct": 84.59,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 2
+          "v2CtxCalls": 1
         },
         {
           "task": "log-1",
@@ -190,12 +190,12 @@
           "inScore": false,
           "small": true,
           "offBytes": 2,
-          "v2Bytes": 9.5,
-          "savingPct": -375,
+          "v2Bytes": 2,
+          "savingPct": 0,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 1
+          "v2CtxCalls": 0
         },
         {
           "task": "file-1",
@@ -223,8 +223,8 @@
         }
       ],
       "medianSessionTokens": {
-        "off": 36170,
-        "v2": 38192,
+        "off": 36171.5,
+        "v2": 38182.5,
         "tasks": [
           "log-1",
           "json-1",
@@ -239,10 +239,10 @@
         "sessionsPerArm": 16
       },
       "costUsd": {
-        "off": 0.5255,
-        "v2": 0.4412
+        "off": 0.5451,
+        "v2": 0.4243
       },
-      "seconds": 57
+      "seconds": 53
     }
   }
 }
