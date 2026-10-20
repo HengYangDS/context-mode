@@ -269,3 +269,36 @@ Stored results from the earlier real-data runs (not re-run here; private journal
 - The 11/12 open-error hit of the compaction block (v2) and the 43/47 timeline figure are known misses from the earlier runs. This run did not reproduce them, because the real journals stay private. They are reported, not decided on.
 - File-type retrieval is near 0 by text search: the later prompt shares few tokens with the earlier edit rows.
 - The local cases are deterministic gates over fixtures. The two model cases (resume-quality, decision-q3) are one-shot checks at effort low, so one PASS is not a pass rate.
+
+## Final A/B: off, v1, v2
+
+Date 2026-10-21. Agent: real `claude` binary, keyless `-p`. Model claude-sonnet-5-5, effort low, `--max-budget-usd 0.25` per session. 3 runs x 6 tasks x 3 arms = 54 sessions, all in parallel (wall 123 s). Arm off = `--strict-mcp-config`. Arm v1 = branch main (1.0.169) as a plugin from a local dir, `npm install --omit=dev`. Arm v2 = `release-out` of v2-design. Tasks: log-1 json-1 tests-1 file-1 git-1 multi-1 (from `bench/live/score-tasks.mjs`). Harness: `node bench/live/ab-quick.mjs --v1 <dir> --runs 3 --out ab-final`. Aggregate: `bench/live/results/ab-final.json`. Raw rows stay private.
+
+Session tokens = input + cache creation + cache read. Per task: median over 3 runs. Saving % = 1 - arm / baseline per task, then median, min, max over the 6 tasks.
+
+| Arm | Pass | Median session tokens | Saving vs off (median / min / max) | v2 vs v1 (median / min / max) | Median tool_result bytes | ctx calls | Cost (USD) |
+|---|---|---|---|---|---|---|---|
+| off | 18/18 | 36,217 | - | - | 46.5 | 0 | 0.534 |
+| v1 | 18/18 | 42,557 | -17.5 / -61.3 / -15.1 | - | 46.5 | 2 | 0.747 |
+| v2 | 18/18 | 38,252 | -5.5 / -5.7 / +30.4 | +10.2 / +10.0 / +56.9 | 31 | 3 | 0.687 |
+
+Total cost 1.97 USD (limit 8).
+
+Per task, median session tokens (off / v1 / v2):
+
+| Task | off | v1 | v2 |
+|---|---|---|---|
+| log-1 | 36,184 | 42,476 | 38,116 |
+| json-1 | 55,048 | 88,808 | 38,294 |
+| tests-1 | 36,121 | 42,491 | 38,162 |
+| file-1 | 36,161 | 42,451 | 38,203 |
+| git-1 | 36,246 | 42,623 | 38,307 |
+| multi-1 | 108,284 | 124,653 | 97,552 |
+
+Reading:
+- Success is equal in all arms (18/18).
+- The plugin adds a fixed prompt cost: about +6.3k tokens for v1 and about +2.0k for v2 on tasks where the model made no ctx call (log-1, tests-1, file-1, git-1). Median saving is therefore negative for both.
+- v2 saves tokens where the output is large: json-1 -30.4% vs off (v1 -61.3%, worse), multi-1 -9.9% vs off, and tool_result bytes drop 6,819 to 583 on multi-1.
+- v2 uses fewer tokens than v1 on every task (min +10.0%).
+- The model called ctx tools rarely (v1 2, v2 3 of 18 sessions). Task results are small on 4 of 6 tasks: Claude Code already shortens large Bash output, so the tool_result byte medians are small (a few bytes on several tasks).
+- Caveat: n=3 per cell, one date, list-price cost estimate. No number is a target. No owner decision (hook budget, T-F1, compaction) is made here.
