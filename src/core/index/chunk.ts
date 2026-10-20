@@ -16,8 +16,8 @@ const RAW_TAGS: ReadonlySet<string> = new Set(["script", "style"]);
 const encoder = new TextEncoder();
 
 // maxBytes (D-M7-SV-1): a smaller chunk cap for the PostToolUse replace path; clamped to MAX_CHUNK_BYTES.
-// Under a smaller cap an over-long block is cut after its last whole line that fits (the newline itself
-// is the separator the selection puts back), and only a single line over the cap is cut by code point.
+// Under a smaller cap an over-long block is cut after its last whole line that fits (the chunk keeps that
+// newline), and only a single line over the cap is cut by code point.
 // The default call is unchanged.
 export function chunkText(text: string, kind: "md" | "html" | "text", maxBytes: number = MAX_CHUNK_BYTES): Chunk[] {
   const src = normalize(text);
@@ -248,11 +248,11 @@ function merge(src: string, blocks: Span[], join: boolean, cap: number, lineCut:
     while (bytes > cap) {
       const cut = cutPoint(src, start, b.end, scratch);
       const nl = lineCut ? src.lastIndexOf("\n", cut.end - 1) : -1;
-      if (nl > start) { // whole lines: the chunk ends before the newline, the next starts after it
-        const w = utf8Bytes(src.slice(start, nl));
-        emit(start, nl, w);
+      if (nl > start) { // whole lines: the chunk keeps its last newline, so no byte of the text is dropped
+        const w = utf8Bytes(src.slice(start, nl + 1));
+        emit(start, nl + 1, w);
         start = nl + 1;
-        bytes -= w + 1;
+        bytes -= w;
         continue;
       }
       emit(start, cut.end, cut.written);
