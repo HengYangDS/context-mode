@@ -21,7 +21,7 @@ import { readUserDeny } from "../policy/user-deny.ts";
 import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
-import { readSessionEvents } from "../journal/read.ts";
+import { readLastPrompt, readSessionEvents } from "../journal/read.ts";
 import { renderState } from "../compaction/render.ts";
 import { chunkText } from "../index/chunk.ts";
 import { selectChunksInMemory } from "../index/select.ts";
@@ -330,8 +330,21 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   } else {
     indexDetached(project, ev.sessionId, label, text, chunks);
   }
-  const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label);
+  // D-M7-SV-5: rank by the intent and the session's last user prompt (any word), so a bare cat still
+  // returns the line the user asked for. The more line keeps the intent. No prompt -> intent alone.
+  const prompt = await lastPrompt(project, ev.sessionId);
+  const rankQuery = prompt.trim() === "" ? undefined : intent + " " + prompt;
+  const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
   return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
+}
+
+// D-M7-SV-5: best effort; a store that cannot open gives "" and the selection uses the intent alone.
+async function lastPrompt(project: ProjectContext, sessionId: string): Promise<string> {
+  try {
+    return readLastPrompt(await openDb(project), sessionId);
+  } catch {
+    return "";
+  }
 }
 
 // D-M7-RR-1: "<tool>:" + the first line of the command (or the tool name), at most SOURCE_LABEL_MAX_CHARS,

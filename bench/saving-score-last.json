@@ -1,7 +1,7 @@
 {
   "date": "2026-10-20",
-  "m1": 94.76,
-  "m2": 86.41,
+  "m1": 94.12,
+  "m2": 88.9,
   "guards": {
     "success": true,
     "small1k": true,
@@ -30,22 +30,22 @@
     },
     "offline": {
       "population": {
-        "calls": 1446,
-        "before": 13948587,
-        "after": 730224,
-        "afterWithoutRerunBound": 249590,
+        "calls": 1447,
+        "before": 13952965,
+        "after": 820914,
+        "afterWithoutRerunBound": 340280,
         "perTool": {
           "Bash": {
-            "calls": 1100,
-            "before": 9824415,
-            "after": 188621,
-            "savingPct": 98.08
+            "calls": 1101,
+            "before": 9828793,
+            "after": 259816,
+            "savingPct": 97.36
           },
           "Read": {
             "calls": 240,
             "before": 2560897,
-            "after": 502613,
-            "savingPct": 80.37
+            "after": 522087,
+            "savingPct": 79.61
           },
           "Grep": {
             "calls": 0,
@@ -68,55 +68,55 @@
           "WebSearch": {
             "calls": 2,
             "before": 9451,
-            "after": 287,
-            "savingPct": 96.96
+            "after": 295,
+            "savingPct": 96.88
           },
           "mcp:other": {
             "calls": 102,
             "before": 1531942,
-            "after": 16128,
+            "after": 16141,
             "savingPct": 98.95
           }
         }
       },
       "perBucket": {
         "<=1K": {
-          "calls": 16516,
-          "before": 5425645,
-          "after": 5443021,
+          "calls": 16540,
+          "before": 5437403,
+          "after": 5454779,
           "savingPct": -0.32
         },
         "1-4K": {
-          "calls": 5111,
-          "before": 10503663,
-          "after": 10507934,
+          "calls": 5122,
+          "before": 10529058,
+          "after": 10533329,
           "savingPct": -0.04
         },
         "4-16K": {
-          "calls": 1412,
-          "before": 10488669,
-          "after": 944151,
-          "savingPct": 91
+          "calls": 1413,
+          "before": 10493047,
+          "after": 1025692,
+          "savingPct": 90.23
         },
         "16-64K": {
           "calls": 198,
           "before": 4814142,
-          "after": 599429,
-          "savingPct": 87.55
+          "after": 608611,
+          "savingPct": 87.36
         }
       },
       "corpusTotal": {
-        "calls": 23237,
-        "savingPct": 45.64,
-        "savingPctWithRerunBound": 43.99
+        "calls": 23273,
+        "savingPct": 45.3,
+        "savingPctWithRerunBound": 43.65
       },
       "corpus": {
         "files": 3034,
         "sessions": 851,
-        "calls": 23237,
-        "lastTs": "2026-10-20T11:10:42.638Z"
+        "calls": 23273,
+        "lastTs": "2026-10-20T17:53:57.887Z"
       },
-      "seconds": 41
+      "seconds": 43
     },
     "live": {
       "agent": "2.1.303 (Claude Code)",
@@ -129,9 +129,9 @@
           "task": "json-1",
           "inScore": true,
           "small": true,
-          "offBytes": 732,
-          "v2Bytes": 210,
-          "savingPct": 71.31,
+          "offBytes": 721.5,
+          "v2Bytes": 348.5,
+          "savingPct": 51.7,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -141,37 +141,37 @@
           "task": "multi-1",
           "inScore": true,
           "small": false,
-          "offBytes": 6870.5,
-          "v2Bytes": 809.5,
-          "savingPct": 88.22,
+          "offBytes": 6828,
+          "v2Bytes": 618.5,
+          "savingPct": 90.94,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 5
+          "v2CtxCalls": 1
         },
         {
           "task": "big-tests",
           "inScore": true,
           "small": false,
           "offBytes": 25653,
-          "v2Bytes": 313,
-          "savingPct": 98.78,
+          "v2Bytes": 197,
+          "savingPct": 99.23,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 2
+          "v2CtxCalls": 0
         },
         {
           "task": "big-json",
           "inScore": true,
           "small": false,
-          "offBytes": 2429.5,
-          "v2Bytes": 374.5,
-          "savingPct": 84.59,
+          "offBytes": 2405.5,
+          "v2Bytes": 316,
+          "savingPct": 86.86,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 1
+          "v2CtxCalls": 5
         },
         {
           "task": "log-1",
@@ -213,9 +213,9 @@
           "task": "git-1",
           "inScore": false,
           "small": true,
-          "offBytes": 20.5,
+          "offBytes": 8,
           "v2Bytes": 8,
-          "savingPct": 60.98,
+          "savingPct": 0,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -223,8 +223,8 @@
         }
       ],
       "medianSessionTokens": {
-        "off": 36171.5,
-        "v2": 38182.5,
+        "off": 36169.5,
+        "v2": 38185,
         "tasks": [
           "log-1",
           "json-1",
@@ -239,10 +239,10 @@
         "sessionsPerArm": 16
       },
       "costUsd": {
-        "off": 0.5451,
-        "v2": 0.4243
+        "off": 0.5818,
+        "v2": 0.8334
       },
-      "seconds": 53
+      "seconds": 57
     }
   }
 }
