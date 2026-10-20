@@ -57,6 +57,7 @@ function resultText(content) {
 
 // Per-tool, per-session accumulators.
 const toolTotals = new Map(); // tool -> {calls, before, after, afterBound, deny, hint, replace}
+const buckets = {}; // tool|ALL -> bucket -> sums
 const perSession = []; // {id, tools: {tool: [calls, before, after, afterBound]}}
 const meta = { files: 0, skippedBig: 0, sessions: 0, calls: 0, images: 0, decideErrors: 0, unpaired: 0, versions: {}, models: {}, firstTs: null, lastTs: null };
 const tot = (t) => {
@@ -68,7 +69,6 @@ const tot = (t) => {
 async function replayFile(file) {
   const uses = new Map(); // id -> {name, input, side, cwd}
   const seenResult = new Set();
-  const hintCount = new Map(); // onceKey -> count (in-memory throttle, same rules as throttle.ts)
   const sess = {};
   let sessionId = "";
   let any = false;
@@ -124,18 +124,10 @@ async function replayFile(file) {
             after = bytes(d.reason);
             afterBound = after + bytes(capBytes(text, OUTPUT_CAP).text);
           } else {
-            if (d.kind === "hint") {
-              const n = (hintCount.get(d.onceKey) || 0) + 1;
-              hintCount.set(d.onceKey, n);
-              const every = d.onceKey.startsWith(C.HINT_KEY.mcp) ? C.MCP_HINT_EVERY : 0;
-              const fires = every ? (n - 1) % every === 0 : n === 1;
-              if (fires) { kind = "hint"; after = before + bytes(d.text); afterBound = after; }
-            }
-            if (u.side && before > OUTPUT_CAP) { // PostToolUse case C replace
+            if (before > OUTPUT_CAP) { // PostToolUse replace: main agent (D-M7-RR-1) and subagent case C
               const intent = typeof u.input.description === "string" ? u.input.description : "";
-              const sel = selectChunksInMemory(chunkText(text, "text"), intent, OUTPUT_CAP, "subagent:" + canonical);
-              const rep = bytes(sel.text) + (sel.more !== null ? 1 + bytes(sel.more) : 0);
-              after = rep + (kind === "hint" ? after - before : 0);
+              const sel = selectChunksInMemory(chunkText(text, "text"), intent, OUTPUT_CAP, "replay:" + canonical);
+              after = bytes(sel.text) + (sel.more !== null ? 1 + bytes(sel.more) : 0);
               afterBound = after;
               kind = "replace";
             }
@@ -144,6 +136,8 @@ async function replayFile(file) {
         const t = tot(g);
         t.calls++; t.before += before; t.after += after; t.afterBound += afterBound;
         if (kind === "deny") t.deny++; else if (kind === "hint") t.hint++; else if (kind === "replace") t.replace++;
+        const bk = before <= 1024 ? "<=1K" : before <= 4096 ? "1-4K" : before <= 16384 ? "4-16K" : before <= 65536 ? "16-64K" : ">64K";
+        for (const key of [g, "ALL"]) { const bb = ((buckets[key] ||= {})[bk] ||= { calls: 0, before: 0, after: 0, afterBound: 0, deny: 0, replace: 0 }); bb.calls++; bb.before += before; bb.after += after; bb.afterBound += afterBound; if (kind === "deny") bb.deny++; else if (kind === "replace") bb.replace++; }
         const s = (sess[g] ||= [0, 0, 0, 0]);
         s[0]++; s[1] += before; s[2] += after; s[3] += afterBound;
         meta.calls++;
@@ -201,7 +195,7 @@ const topN = (o, k) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, k)
 const agg = {
   date: new Date().toISOString().slice(0, 10), node: process.version, outputCap: OUTPUT_CAP, mcpHintEvery: C.MCP_HINT_EVERY,
   corpus: { files: meta.files, skippedOver200MB: meta.skippedBig, sessions: meta.sessions, calls: meta.calls, imageBlocksNotCounted: meta.images, unpairedResults: meta.unpaired, decideErrors: meta.decideErrors, firstTs: meta.firstTs, lastTs: meta.lastTs, claudeCodeVersions: topN(meta.versions, 8), modelsOnToolUseTurns: topN(meta.models, 8) },
-  total, tools,
+  total, tools, buckets,
 };
 writeFileSync(OUT, JSON.stringify(agg, null, 2) + "\n");
 mkdirSync(PRIVATE, { recursive: true });
