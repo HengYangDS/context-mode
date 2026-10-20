@@ -9,6 +9,7 @@ import { join, sep } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 import { handleHook } from "../../../src/core/hooks/dispatch.ts";
+import { ctxSearch } from "../../../src/core/tools/search.ts";
 import { chunkText } from "../../../src/core/index/chunk.ts";
 import {
   COMPACT_POINTER_LINE, OUTPUT_CAP, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX,
@@ -163,22 +164,28 @@ test("PreToolUse ctx_execute: empty stdout, no fields (GP3/no-empty-fields)", as
   assert.deepEqual(out, { stdout: "", exitCode: 0 });
 });
 
-test("PreToolUse Bash hint fires once per session", async () => {
-  const p = cc({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } });
-  const first = parsed(await handleHook("claude-code", p, env));
-  assert.ok(first.additionalContext.includes("mcp__plugin_context-mode_context-mode__ctx_execute"));
-  assert.equal((await handleHook("claude-code", p, env)).stdout, "");
+// D-M7-RR-2 (owner decision 2026-10-20): no PreToolUse/PostToolUse hint on any row; these were hint tests.
+test("PreToolUse Bash, Grep, Read, other MCP: empty allow, no hint, every call (D-M7-RR-2)", async () => {
+  const calls = [
+    ["Bash", { command: "ls" }], ["Bash", { command: "npm test" }], ["Grep", { pattern: "x" }],
+    ["Read", { file_path: join(repo, "nope.txt") }], ["mcp__foo__bar", {}],
+  ];
+  for (const [tool_name, tool_input] of calls) {
+    const p = cc({ hook_event_name: "PreToolUse", tool_name, tool_input });
+    for (let i = 0; i < 3; i++) assert.deepEqual(await handleHook("claude-code", p, env), { stdout: "", exitCode: 0 }, tool_name);
+  }
 });
 
-test("GP3/external-mcp-tool-routing-hint: mcp__foo__bar gets the MCP hint", async () => {
-  const out = parsed(await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", tool_name: "mcp__foo__bar", tool_input: {} }), env));
-  assert.ok(out.additionalContext.includes("other MCP servers"));
+test("PostToolUse at or under OUTPUT_CAP: empty allow, zero added bytes (D-M7-RR-1)", async () => {
+  for (const agent of ["claude-code", "codex"]) {
+    const p = cc({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "ls" }, tool_response: { stdout: "x".repeat(OUTPUT_CAP - 10), stderr: "" } });
+    assert.deepEqual(await handleHook(agent, p, env), { stdout: "", exitCode: 0 }, agent);
+  }
 });
 
-test("GP3/tool-prefix-standalone-mcp: Qwen (standalone MCP) hint names mcp__context-mode__", async () => {
-  const out = parsed(await handleHook("qwen", cc({ hook_event_name: "PreToolUse", tool_name: "run_shell_command", tool_input: { command: "ls" } }), { ...env }));
-  if (out === null) return; // qwen resolves from spawn cwd; covered end to end in hook-entry.test.mjs
-  assert.ok(out.additionalContext.includes("mcp__context-mode__ctx_execute"));
+test("GP3/tool-prefix-standalone-mcp: Qwen PreToolUse shell gets no hint (D-M7-RR-2)", async () => {
+  const out = await handleHook("qwen", cc({ hook_event_name: "PreToolUse", tool_name: "run_shell_command", tool_input: { command: "ls" } }), { ...env });
+  assert.equal(out.stdout, "");
 });
 
 test("GP6/no-false-shell-error-capture: Bash exit 0 with 'Error' text is a cmd row, ok 1", async () => {
@@ -283,4 +290,96 @@ test("case A subagent (no agent file, inherits ctx tools): same deny as the main
   const out = parsed(await handleHook("claude-code", p, env));
   assert.equal(out.permissionDecision, "deny");
   assert.equal(out.permissionDecisionReason.startsWith("node "), false);
+});
+
+// ---------- D-M7-RR-1: main agent "run, then replace" (owner decision 2026-10-20) ----------
+
+function mainBashPost(stdout, description = "needle target") {
+  return cc({ hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "cat big.log", description }, tool_use_id: "toolu_" + Math.random().toString(36).slice(2), tool_response: { stdout, stderr: "", interrupted: false, isImage: false } });
+}
+
+function searchCtx(sessionId) {
+  const f = dbFile();
+  const projectDir = join(f, "..");
+  const projectKey = projectDir.split(sep).pop();
+  return {
+    project: { projectKey, projectDir, dbPath: f, worktree: repo, containmentRoot: root, agent: "claude-code", source: "env:CLAUDE_PROJECT_DIR" },
+    sessionId, turn: 1, signal: new AbortController().signal,
+  };
+}
+
+test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole chunks + more line, full output indexed", async () => {
+  const text = bigText(40000);
+  const p = mainBashPost(text);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = out.updatedToolOutput;
+  assert.equal(typeof replaced, "string");
+  assert.ok(Buffer.byteLength(replaced) <= OUTPUT_CAP + 512, "within budget plus the more line");
+  assert.ok(Buffer.byteLength(replaced) < Buffer.byteLength(text));
+  assert.ok(replaced.includes("needle target"));
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  const body = replaced.slice(0, more);
+  // Whole chunks of the plain stdout (not the JSON tool_response): nothing cut, no escaped newlines.
+  const whole = chunkText(text, "text").filter((c) => body.includes(c.text));
+  assert.ok(whole.length > 0);
+  const joined = whole.reduce((n, c) => n + Buffer.byteLength(c.text), 0) + whole.length - 1;
+  assert.equal(joined, Buffer.byteLength(body), "the body is whole chunks, nothing cut");
+  const src = query("SELECT label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
+  assert.equal(src.length, 1);
+  assert.ok(replaced.slice(more).includes(JSON.stringify(src[0].label)), "the more line names the source label");
+  assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole output is indexed, nothing cut");
+  // The full output is findable: a line the replace dropped comes back from ctx_search.
+  const lines = text.split("\n");
+  const dropped = lines.find((l) => l.includes("filler") && !body.includes(l + "\n") && !body.endsWith(l));
+  assert.ok(dropped !== undefined, "some line was not in the replaced text");
+  const num = dropped.split(" ")[1];
+  const r = await ctxSearch.handler({ queries: ["line " + num + " filler"], scope: "session", source: src[0].label }, searchCtx(p.session_id));
+  assert.equal(r.isError, false, r.text);
+  assert.ok(r.text.includes(dropped), "ctx_search finds the dropped line");
+});
+
+test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {
+  const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
+  const p = mainBashPost(text);
+  const out = parsed(await handleHook("claude-code", p, env));
+  assert.ok(Buffer.byteLength(out.updatedToolOutput) <= OUTPUT_CAP + 512);
+  assert.ok(out.updatedToolOutput.includes("needle target"));
+  const src = await waitRows("SELECT label FROM sources WHERE session_id = ?", [p.session_id], 1);
+  assert.equal(src.length, 1);
+});
+
+test("D-M7-RR-1: rows with no replace (codex, qwen) keep their one path: large PostToolUse is the empty allow", async () => {
+  for (const agent of ["codex", "qwen"]) {
+    const p = mainBashPost(bigText(40000));
+    const out = await handleHook(agent, p, env);
+    assert.deepEqual(out, { stdout: "", exitCode: 0 }, agent);
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(query("SELECT 1 FROM sources WHERE session_id = ?", p.session_id).length, 0, agent + ": nothing indexed");
+  }
+});
+
+test("D-M7-RR-1: main-agent PreToolUse curl on claude-code is allowed (replace takes over); codex still denies", async () => {
+  const p = cc({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "curl -s https://x.io/a.json" } });
+  assert.deepEqual(await handleHook("claude-code", p, env), { stdout: "", exitCode: 0 });
+  const c = parsed(await handleHook("codex", p, env));
+  assert.equal(c.permissionDecision, "deny");
+});
+
+test("D-M7-RR-1: user policy deny and Read deny unchanged on claude-code", async () => {
+  mkdirSync(join(repo, ".claude"), { recursive: true });
+  const settings = join(repo, ".claude", "settings.json");
+  const had = existsSync(settings) ? readFileSync(settings, "utf8") : null;
+  writeFileSync(settings, JSON.stringify({ permissions: { deny: ["Bash(rm -rf:*)"] } }));
+  try {
+    const d = parsed(await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "rm -rf build" } }), env));
+    assert.equal(d.permissionDecision, "deny");
+    assert.ok(d.permissionDecisionReason.includes("Bash(rm -rf:*)"));
+  } finally {
+    if (had === null) rmSync(settings); else writeFileSync(settings, had);
+  }
+  const big = join(repo, "big-read.log");
+  writeFileSync(big, "x".repeat(OUTPUT_CAP * 4));
+  const r = parsed(await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", tool_name: "Read", tool_input: { file_path: big } }), env));
+  assert.equal(r.permissionDecision, "deny");
 });
