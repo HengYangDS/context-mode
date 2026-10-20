@@ -45,8 +45,9 @@ test("malformed JSON on stdin: empty stdout, exit 0", () => {
   assert.equal(r.stdout, "");
 });
 
-test("claude-code curl PreToolUse: native deny on stdout, exit 0", () => {
-  const p = { session_id: "e1", cwd: repo, hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "curl https://example.com" } };
+// D-M7-RR-1: curl is no longer denied on claude-code (run, then replace); WebFetch deny is kept.
+test("claude-code WebFetch PreToolUse: native deny on stdout, exit 0", () => {
+  const p = { session_id: "e1", cwd: repo, hook_event_name: "PreToolUse", tool_name: "WebFetch", tool_input: { url: "https://example.com/a" } };
   const r = run(["--agent", "claude-code"], JSON.stringify(p));
   assert.equal(r.status, 0);
   assert.equal(JSON.parse(r.stdout).hookSpecificOutput.permissionDecision, "deny");

@@ -133,7 +133,8 @@ test("decode UserPromptSubmit reads prompt", () => {
 test("decode PreToolUse native Bash keeps the name as canonical", () => {
   const ev = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls -la", description: "list" }, tool_use_id: "toolu_1" });
   assert.equal(ev.event, "PreToolUse");
-  assert.deepEqual(ev.tool, { name: "Bash", canonicalName: "Bash", input: { command: "ls -la", description: "list" } });
+  // D-M7-RR-1: tool_use_id is kept as callId (main-agent replace source label).
+  assert.deepEqual(ev.tool, { name: "Bash", canonicalName: "Bash", input: { command: "ls -la", description: "list" }, callId: "toolu_1" });
   assert.equal(ev.agentId, undefined);
   assert.equal(ev.agentType, undefined);
 });
@@ -164,7 +165,15 @@ test("decode PostToolUse reads tool_response size and is_error", () => {
   const resp = { stdout: "hello\n", stderr: "", interrupted: false, isImage: false };
   const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "echo hello" }, tool_response: resp });
   assert.equal(ev.event, "PostToolUse");
-  assert.deepEqual(ev.result, { isError: false, bytes: Buffer.byteLength(JSON.stringify(resp)), text: JSON.stringify(resp) });
+  // D-M7-RR-1: a Bash {stdout, stderr} response is read as the plain output the model sees.
+  assert.deepEqual(ev.result, { isError: false, bytes: Buffer.byteLength("hello\n"), text: "hello\n" });
+  const both = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { stdout: "out", stderr: "err" } });
+  assert.equal(both.result.text, "out\nerr");
+  const errOnly = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { stdout: "", stderr: "err" } });
+  assert.equal(errOnly.result.text, "err");
+  const other = { file: { content: "x" } };
+  const obj = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Read", tool_input: {}, tool_response: other });
+  assert.equal(obj.result.text, JSON.stringify(other));
 
   const failed = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { is_error: true } });
   assert.equal(failed.result.isError, true);

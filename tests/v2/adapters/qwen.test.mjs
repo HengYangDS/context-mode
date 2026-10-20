@@ -87,7 +87,7 @@ test("decode PostToolUseFailure variant: canonical PostToolUse, isError, error t
   const ev = decode({ ...base, hook_event_name: "PostToolUseFailure", tool_name: "run_shell_command", tool_input: { command: "false" }, tool_use_id: "t1", error: "Exit code 1" });
   assert.deepEqual(ev, {
     event: "PostToolUse", agent: "qwen", sessionId: "q-1", cwd: "/tmp/proj",
-    tool: { name: "run_shell_command", canonicalName: "Bash", input: { command: "false" } },
+    tool: { name: "run_shell_command", canonicalName: "Bash", input: { command: "false" }, callId: "t1" }, // D-M7-RR-1
     result: { isError: true, bytes: 11, text: "Exit code 1" },
   });
 });

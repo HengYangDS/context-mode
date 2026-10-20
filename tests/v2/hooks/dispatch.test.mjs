@@ -153,8 +153,9 @@ test("PreCompact (gemini PreCompress, pending-flag): sets pending_compact:<sid> 
   assert.deepEqual(rows.map((r) => r.value), ["1"]);
 });
 
+// D-M7-RR-1: claude-code now allows curl (run, then replace); codex (no replace) keeps the deny.
 test("PreToolUse curl: deny, never updatedInput (GP3/no-updated-input-rewrite)", async () => {
-  const out = parsed(await handleHook("claude-code", cc({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "curl https://example.com" } }), env));
+  const out = parsed(await handleHook("codex", cc({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "curl https://example.com" } }), env));
   assert.equal(out.permissionDecision, "deny");
   assert.equal("updatedInput" in out, false);
 });
