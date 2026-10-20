@@ -17,6 +17,7 @@ import { canonicalKey } from "../journal/append.ts";
 import { isInside } from "../project/contain.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { buildChildEnv } from "../sandbox/env.ts";
+import { rewriteWindowsBuildTools } from "../sandbox/win-build.ts";
 import { findRuntime } from "../sandbox/runtimes.ts";
 import { runProcess, type RunResult } from "../sandbox/spawn.ts";
 import { closeDb, openDb } from "../store/db.ts";
@@ -187,7 +188,7 @@ async function handler(raw: ExecuteInput, ctx: ToolContext): Promise<ToolReply> 
     // Step 5: argv only, never a parent shell; temp files live outside the project and are removed.
     let argv: string[];
     if (takesDashC(input.language, runtime)) {
-      argv = [runtime, "-c", input.code];
+      argv = [runtime, "-c", input.language === "shell" ? rewriteWindowsBuildTools(input.code, process.platform) : input.code];
     } else {
       tmpDir = mkdtempSync(join(tmpdir(), TMP_PREFIX));
       const file = join(tmpDir, SCRIPT_NAME + (SCRIPT_EXT[input.language] ?? ""));

@@ -226,20 +226,20 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/core/auto-memory-adapter.test.ts` | yes | - | COVERED | tests/v2/index/auto-memory.test.mjs | W1-core |
 | `tests/core/auto-memory-config-dir.test.ts` | yes | - | COVERED | tests/v2/index/auto-memory.test.mjs | W1-core |
 | `tests/core/cache-plugin-root.test.ts` |  | - | COVERED | tests/v2/ops/plugin-root.test.mjs | W1-core |
-| `tests/core/cli.test.ts` |  | - | PORT | triage P (see TEST-TRIAGE-r2 row); check tests/v2/policy/* and GP4-execute first | W1-core |
-| `tests/core/deny-policy.test.ts` |  | - | PORT | triage P (see TEST-TRIAGE-r2 row); check tests/v2/policy/* and GP4-execute first | W1-core |
-| `tests/core/echo-commands.test.ts` |  | - | PORT | triage P (see TEST-TRIAGE-r2 row); check tests/v2/policy/* and GP4-execute first | W1-core |
+| `tests/core/cli.test.ts` |  | - | COVERED | unknown-platform fail-open: tests/v2/hooks/hook-entry + dispatch "unknown agent id"; npm/bundle/.mcp.json/ABI rows RETIRE per ADR-0011 (no npm, no bundle) and D2 (no ensure-deps) | W1-core |
+| `tests/core/deny-policy.test.ts` |  | - | COVERED | ported: tests/v2/policy/security-ported.test.mjs (Windows glob rows); src-text guards RETIRE (v1 server.ts gone) | W1-core |
+| `tests/core/echo-commands.test.ts` |  | - | COVERED | ported: tests/v2/tools/index-ported.test.mjs #717/#736 | W1-core |
 | `tests/core/executor.test.ts` | yes | - | COVERED | tests/v2/tools/execute + tests/v2/sandbox/spawn + e2e GP4-execute | W1-core |
 | `tests/core/fetch-cleanup.test.ts` | yes | - | COVERED | tests/v2/sandbox/fetch.test.mjs | W1-core |
-| `tests/core/routing.test.ts` |  | - | PORT | triage P (see TEST-TRIAGE-r2 row); check tests/v2/policy/* and GP4-execute first | W1-core |
+| `tests/core/routing.test.ts` |  | - | RETIRE | D-M7-RR-2 (no PreToolUse hint, owner decision DECISIONS-r10 (2)); deny cases in tests/v2/policy/decide.test.mjs | W1-core |
 | `tests/core/search-flood-guard.test.ts` | yes | - | RETIRE | ADR-0015 (flood-guard dropped, not replaced; readme-upgrading row) | W1-core |
 | `tests/core/search-project-filter.test.ts` |  | - | RETIRE | triage R no-fallback-chains (ADR-0016); ctx_search covered by tests/v2/tools/search + GP5 | W1-core |
 | `tests/core/search.test.ts` |  | - | RETIRE | triage R no-fallback-chains (ADR-0016); ctx_search covered by tests/v2/tools/search + GP5 | W1-core |
-| `tests/core/server-timeline-adapter.test.ts` | yes | - | PORT | no ctx_timeline in v2 TOOL_ORDER; confirm against ADR/registry, then RETIRE or port to tests/v2/tools/stats | W1-core |
-| `tests/core/server.test.ts` |  | - | PORT | triage P (see TEST-TRIAGE-r2 row); check tests/v2/policy/* and GP4-execute first | W1-core |
+| `tests/core/server-timeline-adapter.test.ts` | yes | - | PORT | RETIRE-pending W2: no ctx_timeline in v2 TOOL_ORDER (PRD 8); timeline is ctx_search sort:"timeline", tests/v2/tools/search-decision | W1-core |
+| `tests/core/server.test.ts` |  | - | COVERED | exit class ported: tests/v2/tools/index-ported.test.mjs; caps: tests/v2/sandbox/cap + spawn; storage path: tests/v2/store/config-dir; cap-kill rows RETIRE ADR-0016 | W1-core |
 | `tests/executor.test.ts` | yes | - | COVERED | tests/v2/tools/execute + tests/v2/sandbox/spawn + GP4-execute | W1-core |
 | `tests/executor/cwd-override.test.ts` | yes | - | COVERED | tests/v2/tools/execute + tests/v2/sandbox/spawn + GP4-execute | W1-core |
-| `tests/executor/win-sandbox-782-788.test.ts` | yes | - | PORT | Windows #782/#788: check e2e/checks/windows-grandchild-kill + tests/v2/sandbox/kill first | W1-core |
+| `tests/executor/win-sandbox-782-788.test.ts` | yes | - | PORT | ported: tests/v2/sandbox/win-build-ported.test.mjs (#782, D-M7-CLN-4) + index-ported (#788); W2 deletes | W1-core |
 | `tests/formatters.test.ts` | yes | - | COVERED | tests/v2/adapters/*.test.mjs (encode) + GP3-hooks | W1-hooks |
 | `tests/guidance-throttle.test.ts` | yes | - | RETIRE | ADR-0008 amendment 2026-10-20 (DECISIONS-r10: all hints removed) | W1-hooks |
 | `tests/hook-runtime-resolution.test.ts` | yes | - | COVERED | e2e GP1-absolute-node-path | W1-hooks |
@@ -276,10 +276,10 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/hooks/tool-naming.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
 | `tests/hooks/vscode-hooks.test.ts` |  | PORT | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
 | `tests/hooks/windows-hooks-normalization.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
-| `tests/integration/commit-message-symmetry.test.ts` | yes | - | PORT | v1 rollup forward (bridge.maybeForward) has no v2 code path; find the ADR that drops it, else port | W1-core |
+| `tests/integration/commit-message-symmetry.test.ts` | yes | - | PORT | see plan note: platform rollup forward (bridge.maybeForward) has no v2 code; no ADR drops it yet; OWNER DECISION, W2 does not delete until decided | W1-core |
 | `tests/integration/cross-project-attribution.test.ts` | yes | - | COVERED | e2e GP7-scope + tests/v2/store/resolve | W1-core |
 | `tests/integration/project-dir-strict.test.ts` |  | - | COVERED | e2e GP7-scope + tests/v2/store/resolve | W1-core |
-| `tests/integration/seed-parity-coverage.test.ts` | yes | - | PORT | v1 rollup forward (bridge.maybeForward) has no v2 code path; find the ADR that drops it, else port | W1-core |
+| `tests/integration/seed-parity-coverage.test.ts` | yes | - | PORT | see plan note: platform rollup forward (bridge.maybeForward) has no v2 code; no ADR drops it yet; OWNER DECISION, W2 does not delete until decided | W1-core |
 | `tests/lifecycle.test.ts` | yes | - | COVERED | tests/v2/lifecycle/exit.test.mjs + e2e GP9-lifecycle | W1-core |
 | `tests/opencode-plugin.test.ts` |  | - | PORT | triage P: check tests/v2/plugins/opencode + tests/v2/hooks/usage first | W1-ops |
 | `tests/pi-extension.test.ts` |  | - | PORT | triage P: check tests/v2/plugins/pi + GP11-pi-agy first | W1-ops |
@@ -292,8 +292,8 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/scripts/start-mjs-reexec-teardown-862.test.ts` |  | - | RETIRE | ADR-0011 (no npm, no start.mjs in v2) | W1-ops |
 | `tests/scripts/start-mjs-win-install-861.test.ts` |  | - | RETIRE | ADR-0011 (no npm, no start.mjs in v2) | W1-ops |
 | `tests/scripts/version-sync.test.ts` |  | - | RETIRE | ADR-0011 (no npm, no start.mjs in v2) | W1-ops |
-| `tests/security.test.ts` |  | - | PORT | triage P (ADR-0008 r3): check tests/v2/policy/* + GP4 first | W1-core |
-| `tests/security/project-boundary-852.test.ts` |  | - | PORT | triage P (ADR-0008 r3): check tests/v2/policy/* + GP4 first | W1-core |
+| `tests/security.test.ts` |  | - | COVERED | ported: tests/v2/policy/security-ported.test.mjs; lexer fix D-M7-CLN-2 | W1-core |
+| `tests/security/project-boundary-852.test.ts` |  | - | COVERED | ported: tests/v2/policy/security-ported.test.mjs #852 + tests/v2/store/contain | W1-core |
 | `tests/server-stdin-eof-exit.test.ts` | yes | - | COVERED | tests/v2/lifecycle/exit.test.mjs + e2e GP9-lifecycle | W1-core |
 | `tests/session-hooks-smoke.test.ts` | yes | - | COVERED | e2e GP3-hooks | W1-hooks |
 | `tests/session/classifier.test.ts` | yes | KEEP-PASS | RETIRE | ADR-0009 (role/intent classifier and keyword rule detection removed, #856) | W1-session-journal |
@@ -347,7 +347,7 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/session/session-snapshot.test.ts` | yes | KEEP-PASS | RETIRE | ADR-0009 / D9 (no injected snapshot) | W1-session-store |
 | `tests/session/stats-output-format.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/tools/stats.test.mjs + e2e GP10-stats | W1-session-stats |
 | `tests/session/tool-calls-persistence.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/store/journal + tests/v2/hooks/dispatch + tests/v2/compaction/candidates + e2e GP6-journal-resume | W1-session-journal |
-| `tests/stale-detection.test.ts` | yes | - | PORT | no v2 case for changed-file re-index named yet (tests/v2/tools/index) | W1-core |
+| `tests/stale-detection.test.ts` | yes | - | PORT | ported: tests/v2/tools/index-ported.test.mjs (D-M7-CLN-3); W2 deletes | W1-core |
 | `tests/statusline-sqlite.test.ts` | yes | - | RETIRE | ADR-0015 README row 5 (statusline removed; readme-upgrading) | W1-ops |
 | `tests/statusline.test.ts` | yes | - | RETIRE | ADR-0015 README row 5 (statusline removed; readme-upgrading) | W1-ops |
 | `tests/store-bytecap.test.ts` |  | - | RETIRE | triage R, ADR-0016 (no truncation; BM25 selection only) | W1-core |

@@ -391,8 +391,8 @@ export function substitutions(text: string): Substitution[] {
     if ((c === "$" && next === "(") || (!inDouble && (procIn || text.startsWith(PROC_OUT, i)))) {
       const open = i + 1;
       if (c === "$" && text.startsWith(ARITH_OPEN, open)) {
-        const a = arithEnd(text, open);
-        if (a > 0) { i = a; continue; }
+        // D-M7-CLN-2: `$(( ))` is not a command, but a `$( )` or backtick inside it runs. Keep scanning its body.
+        if (arithEnd(text, open) > 0) { i = open + ARITH_OPEN.length; continue; }
       }
       const e = lexSpan(st, open + 1, true, 1, null, null);
       const bodyEnd = e > open + 1 && text.charAt(e - 1) === ")" ? e - 1 : e;
