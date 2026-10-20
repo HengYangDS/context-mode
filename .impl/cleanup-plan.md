@@ -426,3 +426,7 @@ PORT rows say "check X first": the task opens X; if X already asserts the same b
 | `tests/util/isolated-env-state.ts` | DELETE | W2-keep-pass | v1 test support, used only by v1 tests or v1 npm scripts (`benchmark`, `test:use-cases`, ...) |
 | `tests/util/isolated-env.ts` | DELETE | W2-keep-pass | v1 test support, used only by v1 tests or v1 npm scripts (`benchmark`, `test:use-cases`, ...) |
 | `tests/vitest.config.ts` | DELETE | W2-keep-pass | KEEP-PASS runner input (gen-keep-pass, gate, ci.yml); goes when the list is empty |
+
+## W3-v1-src-hooks status (2026-10-21)
+
+Done: 156 v1 src files, hooks/ (85), scripts/heal-*.mjs, vitest.config.ts deleted; tsconfig.json is v2-only noEmit. 4 tests (platform-bridge-wire, stdin-idle-timeout, commit-message-symmetry, seed-parity-coverage) deleted with their code; each is an OPEN PORT row in tickets/port/W3-v1-src-hooks.md (DEVIATIONS D-M7-CLN-W3-v1-src-hooks).
