@@ -1,6 +1,7 @@
 // impl/10 §2 + shared decode/encode pseudocode; ADR-0001 (Claude Code is the reference contract).
 // Also exports the Claude-shape decode/encode that codex.ts instantiates with its own fields (impl/10 §3).
 import type { AgentId } from "../core/contracts/agents.ts";
+import { PERSISTED_READ_MAX_BYTES } from "../core/contracts/constants.ts";
 import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, ToolCall, ToolResultInfo } from "../core/contracts/types.ts";
 
 export const TOOL_NAME_PREFIX = "mcp__plugin_context-mode_context-mode__"; // impl/10 §1.3, TECH-SPEC §3.8 (plugin install)
@@ -39,8 +40,26 @@ function outputOf(resp: unknown): string {
   return JSON.stringify(resp);
 }
 
+// D-M7-SV-7: over its persist threshold (about 30000 chars) Claude Code gives the hook only the head of
+// stdout and writes the whole output to persistedOutputPath (persistedOutputSize bytes). The replace must
+// select from the whole output, or a line past the head can never be returned. The file is read only when
+// its size equals persistedOutputSize and is at most PERSISTED_READ_MAX_BYTES; else the stdout as received.
+function persistedOf(resp: unknown): string | null {
+  if (typeof resp !== "object" || resp === null) return null;
+  const r = resp as { persistedOutputPath?: unknown; persistedOutputSize?: unknown };
+  if (typeof r.persistedOutputPath !== "string" || typeof r.persistedOutputSize !== "number") return null;
+  if (r.persistedOutputSize > PERSISTED_READ_MAX_BYTES) return null;
+  try {
+    const fs = process.getBuiltinModule("node:fs") as typeof import("node:fs");
+    const buf = fs.readFileSync(r.persistedOutputPath);
+    return buf.length === r.persistedOutputSize ? buf.toString("utf8") : null;
+  } catch {
+    return null;
+  }
+}
+
 function readResult(resp: unknown): ToolResultInfo {
-  const text = outputOf(resp);
+  const text = persistedOf(resp) ?? outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && (resp as { is_error?: unknown }).is_error === true;
   return { isError, bytes: Buffer.byteLength(text), text };
 }
