@@ -123,6 +123,27 @@ What this says, and what it does not:
 - The log, file and tests outputs here are below or near the point where Claude Code itself persists large results, so the hook may not see the full text (see the live check in the code results). This run does not prove the replace reaches the model.
 - 1 run per cell, 6 tasks, 1 model. Treat all deltas as direction only.
 
+## Cost per session
+
+Measured 2026-10-20, same setup as Quick A/B (claude-sonnet-5-5, effort low, keyless, isolation env, sessions in parallel). 2 tasks (log-1, file-1) x 2 arms (off, v2) = 4 sessions. Usage read from the stream-json `result` event; per-call rows from the `assistant` events. Raw stream files stay outside the repo.
+
+| Session | Cost USD | input | cache_creation | cache_read | output | turns | model calls | tools in init |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| log-1 off | 0.0197 | 4 | 3726 | 32458 | 153 | 2 | 2 | 27 |
+| log-1 v2 | 0.0216 | 4 | 4390 | 34166 | 63 | 2 | 2 | 36 |
+| file-1 off | 0.0199 | 4 | 3731 | 32480 | 170 | 2 | 2 | 27 |
+| file-1 v2 | 0.0249 | 4 | 5077 | 33560 | 120 | 2 | 2 | 36 |
+
+First model call, cache_creation + cache_read (= the prompt prefix): off 17976 and 17987; v2 19175 and 19185. So v2 adds about 1200 tokens to the prefix. The cause is the 9 context-mode tools (36 vs 27 tools in init): their names, descriptions and schemas. The SessionStart hook adds only one 210-byte line ("This session may have run before. Call ... ctx_resume ..."), about 35 tokens, and it is the same text in both v2 sessions.
+
+Finding:
+- Warm cache: v2 costs +$0.002 (log-1) to +$0.005 (file-1) per session, +10% to +25%. Turns and model calls are equal (2 and 2), output tokens are not higher. The extra cost is cache_creation: +664 and +1346 tokens, billed at the write rate (higher than the read rate).
+- How much of the prefix is a cache write depends on what other sessions wrote first. v2 first call wrote 4184 (log) and 4810 (file) tokens, off wrote 3494 both times. The difference between the two v2 runs (626 tokens) is the part of the prefix that was not yet cached when that session started (parallel start, shared cache).
+- Cold cache: in Quick A/B the v2 build was new, so no session had written its tool-list prefix before. Writing a whole ~19 K prefix at the write rate costs about $0.07, which matches the four v2 sessions at about $0.08 (off: $0.026). This is an inference from the prices and the numbers above; the Quick A/B raw rows have no per-call split, so it is not measured there. The 2 runs here (warm) do not reproduce the $0.08.
+- Tokens only +6% in Quick A/B because token counts treat a cache write and a cache read the same; USD does not.
+
+Per-session byte in our output: none found. The SessionStart text and the tool list are the same in both v2 sessions (hook output 210 bytes each, 9 plugin tools each). The tool list differs from off by design, so the first session after a plugin build or tool-description change pays the cache write once. No change to `src/` was made. Not tested: a third run after a longer pause, and cache TTL effects; one run per cell, so treat the warm numbers as direction only.
+
 ## Method check
 
 Checked 2026-10-20 by a second reader (no new model runs). Result: no number was changed. Findings:
