@@ -154,3 +154,32 @@ Checked 2026-10-20 by a second reader (no new model runs). Result: no number was
 - Cherry-picking: none found. All 120 sessions are in the aggregate, the `on` arm costs more ($1.4121 vs $1.2744) and reads more input, and the text says so. The claim "15 of 60 `on` sessions used a context-mode tool (10 of 12 json, 5 of 12 tests, 0 elsewhere)" matches the private rows.
 - Private data: in the measurement files (`bench/`, `docs/v2/benchmarks.md`, `docs/v2/prompt/`, `e2e/live/routing/`) no home path, e-mail (other than the noreply commit identity and fixture addresses on `example.*`) or prompt text was found. Raw rows stay in the private dir. Outside this scope, `git grep` finds a home path in `docs/v2/impl/07-tools-ops.md`, `docs/v2/impl/11-server.md`, `docs/v2/review/*` and `e2e/live/compact/results/*` (the last use a masked user name). They are not benchmark data and were not edited here; the owner should decide whether to scrub them.
 - Weak points to keep in mind: (1) the routing verdict in `docs/v2/prompt/results.md` changed from FAIL to PASS because the scoring rule was changed after the first runs; the owner approved that on 2026-10-19, and both rule results are in the table, so read the PASS as "under the new rule". (2) Run 4 uses different model ids (sonnet-5-5, haiku-5-5) than runs 1-3, so it is not a like-for-like comparison. (3) Routing raw rows are not in the repo, so those tables cannot be recomputed from committed files; only the scorer and its tests are. (4) The offline replay "before" bytes already contain v1 effects (README, approximation 3). (5) Live A/B is one model, one agent version, small fixtures.
+
+## Replace live proof
+
+Measured 2026-10-20. Agent: Claude Code 2.1.303. Model: claude-sonnet-5-5, effort low, `--max-budget-usd 0.25` per session, keyless, isolation env keys from D-M7-CL-3. Raw stream-json stays outside the repo. No `src/` change.
+
+Question: when the main agent runs a Bash command with a large output, does the replaced (shorter) result reach the model?
+
+Step 1, Claude Code's own persisted-output threshold. No plugin. Task: run `seq 1 N` once. Bytes = size of the full output; "seen" = length of the `tool_result` string in stream-json.
+
+| Full output (bytes) | tool_result seen (chars) | `<persisted-output>` |
+|---:|---:|---|
+| 8893 to 28893 (N 2000 to 6000) | full size minus 1 | no |
+| 29893 (N 6200) | 29892 | no |
+| 30893 (N 6400) | 2249 | yes |
+| 31893, 32893, 33893, 35893 | 2249 | yes |
+| 38893 and above (N 8000 to 20000) | 2249 to 2250 | yes |
+
+The threshold is between 29893 and 30893 bytes, which fits a 30000 character limit. Three runs at N 7200, 7600, 7800 gave a 51 character result: the model mistyped the command and `seq` failed. Those are model noise, not a threshold effect.
+
+Step 2, plugin arm. `--plugin-dir release-out` (built with `node build/build.mjs --out release-out`, plugin loaded as `context-mode@inline`). Outputs of 19998 bytes (N 4221) and 28003 bytes (N 5822), both below the threshold. 3 runs each, 6 sessions, in parallel. The first try had a prompt typo in 4 of 6 sessions (`seq 1 N .`); those are discarded and rerun with a clean prompt.
+
+| Full output (bytes) | Runs | tool_result seen by model (chars) | Persisted preview | Replaced |
+|---:|---:|---:|---|---|
+| 19998 | 3 | 19997 | no | no |
+| 28003 | 3 | 28002 | no | no |
+
+Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The main-agent replace did NOT reach the model at these sizes. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared in the stream, and the model used Bash, not a context-mode tool. This run does not say if the hook ran and chose not to replace, or if it did not run on the Bash result. That needs a hook log (`scripts/ctx-debug.sh`) in a follow-up.
+
+Consequence: the Quick A/B claim that v2 may be hidden by the persist threshold is not the cause for outputs of 20 to 28 KB. The plugin does not shrink them. Do not claim a live replace saving for the main agent until a session shows a shorter `tool_result` than the full output.
