@@ -1,5 +1,5 @@
 // build/check-removed.mjs — GS5 repo-cleanup gate (impl/15 §2, TECH-SPEC §1 GS5 + §3.10,
-// DEVIATIONS D-M7-arch-3, D-M7-arch-4). Each case runs the real script in a throwaway git repo.
+// DEVIATIONS D-M7-arch-4, D-M7-CLN-W3c). Each case runs the real script in a throwaway git repo.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
@@ -105,33 +105,86 @@ test("reads the tracked tree only: untracked files are not reported (D-M7-arch-4
   assert.deepEqual(r.lines, ["check-removed: clean"]);
 });
 
-test("KEPT_FOR_KEEP_PASS paths are skipped by both checks (D-M7-arch-3)", () => {
-  const r = run(fixture({
-    ...ALLOWED,
-    "vitest.config.ts": "x",
-    "src/cli.ts": "ctx_fetch_and_index\n",
-    "configs/codex/hooks.json": "{}",
-    "hooks/kimi/platform.mjs": "x",
-  }));
+const OUT = "check-removed: outside target tree: ";
+
+// Every file class the allow-list names (cleanup-plan W3-check-removed): the full target tree passes.
+const TARGET_TREE = {
+  ...ALLOWED,
+  "src/core/contracts/a.ts": "x", "src/prompt/instructions.md": "x", "src/entries/run.ts": "x",
+  "src/adapters/table.ts": "x", "src/adapters/claude-code.ts": "x", "src/adapters/codex.ts": "x",
+  "src/adapters/gemini.ts": "x", "src/adapters/qwen.ts": "x", "src/adapters/copilot-cli.ts": "x",
+  "src/adapters/vscode.ts": "x", "src/adapters/kiro.ts": "x", "src/adapters/zcode.ts": "x",
+  "src/adapters/pi.ts": "x", "src/adapters/opencode.ts": "x",
+  "tests/v2/repo/a.test.mjs": "x", "e2e/cases/a.mjs": "x", "build/build.mjs": "x", "bench/a.mjs": "x",
+  "docs/v2/TECH-SPEC.md": "x", "docs/install/README.md": "x", "docs/tools.md": "x", "docs/UPSTREAM-CREDITS.md": "x",
+  "scripts/gate.mjs": "x", "scripts/ci-gs4-lint.mjs": "x", "scripts/record-fixtures.mjs": "x", "scripts/release/plan.mjs": "x",
+  ".github/workflows/ci.yml": "x", ".impl/progress.json": "{}", "tickets/v2-test-ledger.md": "x", "metrics/traffic.json": "{}",
+  ".claude/settings.json": "{}", ".claude-plugin/plugin.json": "{}", ".codex-plugin/mcp.json": "{}",
+  ".agents/plugins/marketplace.json": "{}",
+  "README.md": "x", "CONTRIBUTING.md": "x", "LICENSE": "x", "tsconfig.json": "{}", ".gitignore": "x", ".gitattributes": "x",
+};
+
+test("allow-list: the whole target tree passes (every allowed class)", () => {
+  const r = run(fixture(TARGET_TREE));
   assert.equal(r.status, 0);
   assert.deepEqual(r.lines, ["check-removed: clean"]);
 });
 
-// The literal KEPT_FOR_KEEP_PASS map, read from the script source (it has no exports).
-function keptMap() {
-  const open = "const KEPT_FOR_KEEP_PASS = {";
-  const start = SOURCE.indexOf(open);
-  assert.notEqual(start, -1);
-  const body = SOURCE.slice(start + open.length, SOURCE.indexOf("\n};", start)).trim();
-  return JSON.parse(`{${body.endsWith(",") ? body.slice(0, -1) : body}}`);
-}
+test("allow-list: a stray v1 path outside the target tree fails, one line per path", () => {
+  const r = run(fixture({
+    ...TARGET_TREE,
+    "hooks/pretooluse.mjs": "x",
+    "src/store.ts": "x",
+    "src/adapters/base.ts": "x",
+    "src/adapters/claude-code/index.ts": "x",
+    "tests/adapters/a.test.ts": "x",
+    "scripts/heal-installed-plugins.mjs": "x",
+    "docs/platform-support.md": "x",
+    "stray.txt": "x",
+  }));
+  assert.equal(r.status, 1);
+  assert.deepEqual(r.lines.slice().sort(), [
+    "docs/platform-support.md", "hooks/pretooluse.mjs", "scripts/heal-installed-plugins.mjs", "src/adapters/base.ts",
+    "src/adapters/claude-code/index.ts", "src/store.ts", "stray.txt", "tests/adapters/a.test.ts",
+  ].map((p) => OUT + p));
+});
 
-test("every KEPT_FOR_KEEP_PASS value is a v1 test path under tests/ (list file removed, D-M7-CLN-5)", () => {
-  const kept = keptMap();
-  assert.ok(Object.keys(kept).length > 0);
-  for (const [p, t] of Object.entries(kept)) {
-    assert.ok(t.startsWith("tests/") && (t.endsWith(".test.ts") || t === "tests/vitest.config.ts"), `${p} -> ${t} is not a v1 test path`);
-  }
+test("allow-list: near-miss prefixes are not allowed (src/core-v1/, tests/v2x/, scripts/gate.mjs.bak)", () => {
+  const r = run(fixture({ ...ALLOWED, "src/core-v1/a.ts": "x", "tests/v2x/a.mjs": "x", "scripts/gate.mjs.bak": "x" }));
+  assert.equal(r.status, 1);
+  assert.deepEqual(r.lines.slice().sort(), ["scripts/gate.mjs.bak", "src/core-v1/a.ts", "tests/v2x/a.mjs"].map((p) => OUT + p));
+});
+
+test("allow-list: a path on the removed list prints one 'still present' line, not a second 'outside' line", () => {
+  const r = run(fixture({ ...ALLOWED, "web/a.html": "x", "src/cli.ts": "x" }));
+  assert.equal(r.status, 1);
+  assert.deepEqual(r.lines.slice().sort(), ["check-removed: still present: src/cli.ts", "check-removed: still present: web/a.html"]);
+});
+
+test("allow-list: untracked stray files are not reported (tracked tree only)", () => {
+  const r = run(fixture({ ...ALLOWED, "hooks/a.mjs": "x" }, ["hooks/a.mjs"]));
+  assert.equal(r.status, 0);
+  assert.deepEqual(r.lines, ["check-removed: clean"]);
+});
+
+test("HELD_FOR_OWNER: the four open-decision v1 tests are skipped (cleanup-plan §3, D-M7-CLN-2)", () => {
+  const held = {
+    "tests/hooks/platform-bridge-wire.test.ts": "x",
+    "tests/hooks/stdin-idle-timeout.test.ts": "x",
+    "tests/integration/commit-message-symmetry.test.ts": "x",
+    "tests/integration/seed-parity-coverage.test.ts": "x",
+  };
+  assert.deepEqual(run(fixture({ ...ALLOWED, ...held })).lines, ["check-removed: clean"]);
+  const r = run(fixture({ ...ALLOWED, ...held, "tests/hooks/other.test.ts": "x" }));
+  assert.equal(r.status, 1);
+  assert.deepEqual(r.lines, [OUT + "tests/hooks/other.test.ts"]);
+});
+
+test("no KEPT_FOR_KEEP_PASS list remains: the KEEP-PASS layer is gone (D-M7-CLN-5)", () => {
+  assert.ok(!SOURCE.includes("KEPT_FOR_KEEP_PASS"));
+  const r = run(fixture({ ...ALLOWED, "vitest.config.ts": "x", "src/cli.ts": "ctx_fetch_and_index\n", "configs/codex/hooks.json": "{}" }));
+  assert.equal(r.status, 1);
+  assert.deepEqual(r.lines.slice().sort(), ["check-removed: still present: configs/codex/hooks.json", "check-removed: still present: src/cli.ts", "check-removed: still present: vitest.config.ts"]);
 });
 
 test("no regex in the script: literal compares only (impl/15 §2.3 step 2, 4)", () => {
