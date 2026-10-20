@@ -183,3 +183,15 @@ Step 2, plugin arm. `--plugin-dir release-out` (built with `node build/build.mjs
 Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The main-agent replace did NOT reach the model at these sizes. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared in the stream, and the model used Bash, not a context-mode tool. This run does not say if the hook ran and chose not to replace, or if it did not run on the Bash result. That needs a hook log (`scripts/ctx-debug.sh`) in a follow-up.
 
 Consequence: the Quick A/B claim that v2 may be hidden by the persist threshold is not the cause for outputs of 20 to 28 KB. The plugin does not shrink them. Do not claim a live replace saving for the main agent until a session shows a shorter `tool_result` than the full output.
+
+## Replace live proof (after r1 shape fix)
+
+Build: v2-design, `node build/build.mjs --out release-out`. Live runs: `claude -p`, model claude-sonnet-5-5, effort low, `--plugin-dir release-out`, Bash `seq 1 N`, 2 runs per size, 6 sessions in parallel. Raw transcripts stay in the private bench folder.
+
+| Full output (bytes) | Runs | tool_result seen by model (chars) | Persisted preview | Replaced |
+|---:|---:|---:|---|---|
+| 8893 (N 2000) | 2 | 8892, 8892 | no | no |
+| 19998 (N 4221) | 2 | 19997, 19997 | no | no |
+| 28003 (N 5822) | 2 | 28002, 28002 | no | no |
+
+Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The tool used was Bash each time. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared. So the main-agent replace still did not shrink any Bash result after the r1 shape fix. Do not claim a live replace saving for the main agent. Next step: capture a hook log (`scripts/ctx-debug.sh`) to see if the hook runs on the Bash result.
