@@ -49,22 +49,23 @@ function bigTests(dir) {
   put(dir, "tests/out.txt", lines.join("\n") + "\n");
   put(dir, "run-tests.sh", '#!/bin/sh\ncat "$(dirname "$0")/tests/out.txt"\n');
   fs.chmodSync(path.join(dir, "run-tests.sh"), 0o755);
-  return { prompt: "Run ./run-tests.sh. Exactly one test failed (a line starting with FAIL). Give the case id of that test (the part of its name that starts with case_). Use tools to run it." + ONLY, expect: [id] };
+  return { prompt: "Run ./run-tests.sh as a bare command in one Bash call: no pipe, no grep, no redirect, no other command. Exactly one test in its output failed (a line starting with FAIL). Give the case id of that test (the part of its name that starts with case_)." + ONLY, expect: [id] };
 }
 
-// big-json: a JSON file of at least 200 KB; the answer is a sum over a filtered subset.
+// big-json: a JSON file of at least 200 KB; exactly one order has priority true; the answer is 3 x its amount.
 function bigJson(dir) {
   const r = rng(73); const rows = []; let sum = 0;
   const regions = ["north", "south", "east", "west"], states = ["paid", "refunded", "pending", "void"];
   let n = 0;
   while (JSON.stringify(rows, null, 2).length < 200 * 1024 && n < 100000) {
     const region = pick(r, regions), status = pick(r, states), amount = 1 + Math.floor(r() * 9000);
-    if (status === "refunded" && region === "north") sum += amount;
-    rows.push({ id: "ord-" + tok(r, 8), region, status, amount, items: [pick(r, W), pick(r, W)], note: Array.from({ length: 6 }, () => pick(r, W)).join(" ") });
+    rows.push({ id: "ord-" + tok(r, 8), region, status, amount, priority: false, items: [pick(r, W), pick(r, W)], note: Array.from({ length: 6 }, () => pick(r, W)).join(" ") });
     n++;
   }
+  const at = Math.floor(rows.length * (0.3 + r() * 0.4));
+  rows[at].priority = true; sum = rows[at].amount * 3;
   put(dir, "data/orders.json", JSON.stringify(rows, null, 2));
-  return { prompt: 'data/orders.json holds orders. Compute the total of "amount" over the orders whose status is "refunded" and whose region is "north". Use tools to read and compute it.' + ONLY, expect: [String(sum)] };
+  return { prompt: 'data/orders.json holds orders. First view the file with one bare `cat data/orders.json` Bash call (no pipe, no jq, no script). Exactly one order has "priority": true. Give three times its "amount".' + ONLY, expect: [String(sum)] };
 }
 
 export const SCORE_TASKS = [wrap("json-1"), { id: "multi-1", build: multi }, { id: "big-tests", build: bigTests }, { id: "big-json", build: bigJson }];

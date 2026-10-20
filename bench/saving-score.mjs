@@ -1,7 +1,7 @@
 // bench/saving-score.mjs - the frozen saving score. One command, one JSON line on stdout:
 //   {m1, m2, guards:{...}, guardsOk, detail}
 // Aggregates only go to bench/saving-score-last.json. Private rows go to /private/tmp/cm-v2-impl-private/bench.
-// Usage: node bench/saving-score.mjs [--write-lock] [--runs N] [--skip-gate] [--skip-offline] [--skip-live]
+// Usage: node bench/saving-score.mjs [--write-lock] [--runs N] [--only id,id] [--skip-gate] [--skip-offline] [--skip-live]
 //   --write-lock  write bench/saving-score.lock (sha256 of this file and bench/live/score-tasks.mjs) and exit.
 //   --skip-*      development only: the skipped part is reported as null and guardsOk is false.
 //
@@ -138,6 +138,7 @@ function session(bin, env, task, arm, run) {
     p.on("close", () => {
       clearTimeout(kill);
       const { bytes, results, res, calls, ctxCalls } = toolResultBytes(out);
+      if (!res) { try { fs.mkdirSync(PRIV, { recursive: true }); fs.writeFileSync(path.join(PRIV, `saving-score-nores-${task.id}-${arm}-${run}.txt`), out.slice(-6000)); } catch {} }
       const u = res?.usage ?? {}, text = normalize(res?.result ?? "");
       const ok = !!res && res.is_error !== true && expect.every((e) => text.includes(e));
       const key = createHash("sha256").update(fs.realpathSync.native(path.join(dir, ".git"))).digest("hex").slice(0, 16);
@@ -158,12 +159,13 @@ async function live(runs) {
   if (b.status !== 0) throw new Error("build failed: " + (b.stderr || "").trim().split("\n").pop());
   const t0 = Date.now();
   const jobs = [];
-  for (let r = 1; r <= runs; r++) for (const t of ALL_TASKS) for (const arm of ["off", "v2"]) jobs.push(session(bin, env, t, arm, r));
+  const only = arg("only", null), pickTasks = only ? ALL_TASKS.filter((t) => only.split(",").includes(t.id)) : ALL_TASKS;
+  for (let r = 1; r <= runs; r++) for (const t of pickTasks) for (const arm of ["off", "v2"]) jobs.push(session(bin, env, t, arm, r));
   const rows = await Promise.all(jobs);
   fs.mkdirSync(PRIV, { recursive: true });
   fs.writeFileSync(path.join(PRIV, "saving-score-rows.json"), JSON.stringify(rows));
   const armRows = (id, arm) => rows.filter((x) => x.task === id && x.arm === arm);
-  const perTask = ALL_TASKS.map((t) => {
+  const perTask = pickTasks.map((t) => {
     const off = armRows(t.id, "off"), v2 = armRows(t.id, "v2");
     const offB = median(off.map((x) => x.resultBytes)), v2B = median(v2.map((x) => x.resultBytes));
     return { task: t.id, inScore: SCORE_TASKS.some((s) => s.id === t.id), small: SMALL_TASKS.some((s) => s.id === t.id), offBytes: offB, v2Bytes: v2B,
