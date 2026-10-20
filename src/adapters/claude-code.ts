@@ -68,6 +68,13 @@ export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: strin
 
 // Deny exits 0: the reason travels in the JSON deny field, and Claude-shape hosts ignore stdout JSON on
 // exit 2 (only stderr is read there; HookOutput has no stderr). DEVIATIONS D-M0-T8-1.
+// D-M7-SV-1: Claude Code checks updatedToolOutput against the tool's own output schema and keeps the
+// original output on a mismatch ("does not match Bash's output shape; using original output"). Bash
+// output is an object {stdout, stderr, interrupted}, so a bare string never reached the model.
+function replaceShape(ev: CanonicalHookEvent, output: string): unknown {
+  return ev.tool?.canonicalName === "Bash" ? { stdout: output, stderr: "", interrupted: false } : output;
+}
+
 export function encodeClaudeShape(ev: CanonicalHookEvent, d: Decision, hasReplace: boolean): HookOutput {
   const out = (fields: Record<string, unknown>): HookOutput => ({
     stdout: JSON.stringify({ hookSpecificOutput: { hookEventName: ev.event, ...fields } }),
@@ -81,7 +88,7 @@ export function encodeClaudeShape(ev: CanonicalHookEvent, d: Decision, hasReplac
     case "deny":
       return out({ permissionDecision: "deny", permissionDecisionReason: d.rewritten === undefined ? d.reason : d.rewritten + "\n" + d.reason });
     case "replace":
-      return hasReplace && ev.event === "PostToolUse" ? out({ updatedToolOutput: d.output }) : { stdout: "", exitCode: 0 };
+      return hasReplace && ev.event === "PostToolUse" ? out({ updatedToolOutput: replaceShape(ev, d.output) }) : { stdout: "", exitCode: 0 };
   }
 }
 
