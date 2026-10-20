@@ -161,6 +161,33 @@ test("decode subagent: agent_id marks it, agent_type rides along", () => {
   assert.equal(ev.agentType, "Explore");
 });
 
+// D-M7-SV-7: over its persist threshold Claude Code hands the hook only the first 30000 chars of stdout and
+// writes the whole output to persistedOutputPath; the replace must select from the whole output.
+test("decode PostToolUse reads the persisted output file when Claude Code cut stdout", () => {
+  const { mkdtempSync, writeFileSync, rmSync } = process.getBuiltinModule("node:fs");
+  const { tmpdir } = process.getBuiltinModule("node:os");
+  const dir = mkdtempSync(join(tmpdir(), "cm-persist-"));
+  try {
+    let full = "";
+    for (let i = 0; i < 1500; i++) full += (i === 900 ? "SECRET-9 value=zzzz1234" : "row " + i + " abcdefgh ijklmnop") + "\n";
+    const file = join(dir, "b1.txt");
+    writeFileSync(file, full);
+    const cut = full.slice(0, 30000);
+    const resp = { stdout: cut, stderr: "", interrupted: false, isImage: false, noOutputExpected: false, persistedOutputPath: file, persistedOutputSize: Buffer.byteLength(full) };
+    const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "cat big.txt" }, tool_response: resp });
+    assert.equal(ev.result.text, full);
+    assert.equal(ev.result.bytes, Buffer.byteLength(full));
+    assert.ok(ev.result.text.includes("SECRET-9 value=zzzz1234"));
+    // Missing file or a size that does not match: the stdout the hook got, unchanged.
+    const gone = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { ...resp, persistedOutputPath: join(dir, "nope.txt") } });
+    assert.equal(gone.result.text, cut);
+    const other = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: {}, tool_response: { ...resp, persistedOutputSize: 7 } });
+    assert.equal(other.result.text, cut);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test("decode PostToolUse reads tool_response size and is_error", () => {
   const resp = { stdout: "hello\n", stderr: "", interrupted: false, isImage: false };
   const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "echo hello" }, tool_response: resp });
