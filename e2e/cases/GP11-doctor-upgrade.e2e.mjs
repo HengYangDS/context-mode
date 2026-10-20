@@ -172,3 +172,38 @@ test("[M6] GP11/issue-intake-allowed-keys: issue-intake.mjs ALLOWED_KEYS equal t
     "### Expected", "x", "", "### Steps", "1. x", "", "### Environment", "node: x"].join("\n");
   assert.deepEqual(intake.check(body).findings, []);
 });
+
+// 14a GP11/codex-hooks-default-true (#1152). With no [features].hooks key in config.toml, Codex's
+// own default is hooks=true (07-tools-ops.md §5 D5 Codex-trust sub-case reads this as the live
+// default, not a FAIL); ctx_doctor must report it that way without spawning codex itself.
+test("[M5] GP11/codex-hooks-default-true", async (t) => {
+  const { home, repo, spawn } = fixture(t);
+  const codexDir = path.join(home, ".codex");
+  mkdirSync(codexDir, { recursive: true });
+  writeFileSync(path.join(codexDir, "config.toml"), "model = \"o1\"\n", "utf8"); // no [features].hooks key
+  const c = await spawn();
+  const reply = await call(c, "ctx_doctor", {});
+  await c.close();
+  const t1 = text(reply);
+  assert.ok(!/\| D5 \|[^|]*\| FAIL \|/.test(t1), "no [features].hooks key must never read as a FAIL on D5");
+});
+
+// 14a GP11/hook-matcher-valid-regex (#1222). D-M5-arch-3: src/ never runs regex; this test compiles
+// each written matcher (build/manifests.ts buildMatcher's own rule: nativeTools names +
+
+// 14a GP11/pi-detect-npm-managed-install (#1035). An npm-managed Pi install is found via
+// PI_CODING_AGENT_DIR, not a hardcoded path (07-tools-ops.md §3 pi row).
+test("[M5] GP11/pi-detect-npm-managed-install", async (t) => {
+  const { home, repo, spawn } = fixture(t);
+  const npmPiDir = mkdtempSync(path.join(tmpdir(), "cm-gp11-pi-npm-"));
+  t.after(() => rmSync(npmPiDir, { recursive: true, force: true }));
+  const agentDir = path.join(home, ".pi", "agent");
+  mkdirSync(agentDir, { recursive: true });
+  writeFileSync(path.join(agentDir, "settings.json"), JSON.stringify({ packages: ["npm:context-mode"] }), "utf8");
+  const c = await spawn({ PI_CODING_AGENT_DIR: npmPiDir });
+  const reply = await call(c, "ctx_doctor", {});
+  await c.close();
+  assert.ok(typeof text(reply) === "string" && text(reply).length > 0);
+});
+
+// 14a GP11/pi-discovery-dirs-doctor (#1168). Pi 0.85: doctor reports the actual extension path,
