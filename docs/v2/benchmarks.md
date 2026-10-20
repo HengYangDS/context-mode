@@ -238,8 +238,9 @@ Step 3, seen by the model (`tool_result` length in stream-json):
 | Full output (bytes) | Sessions | tool_result seen (chars) | Replaced |
 |---:|---:|---|---|
 | 8893 (N 2000) | 4 | 152, 152, 152, 152 | yes |
-| 19998 (N 4221) | 8 | 187 in all 8 | yes |
+| 19998 (N 4221) | 9 | 187 in all 9 | yes |
 | 28003 (N 5822) | 4 | 182, 182, 182, 182 | yes |
+| 13893 (N 3000) | 1 | 157 | yes |
 
 The 19998 rows include runs with the bench flags (`--setting-sources project`, `--no-session-persistence`, `--allowedTools ...`, minimal env), each alone and all together: all 187. One more N 4221 session is not in the table: the model ran `seq 1 4221 | tail -n 1` (4 bytes, under the trigger).
 
