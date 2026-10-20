@@ -439,8 +439,8 @@ test("D-M7-RR-1: user policy deny and Read deny unchanged on claude-code", async
   assert.equal(r.permissionDecision, "deny");
 });
 
-test("D-M7-SV-2: the replace return budget is 512 bytes, a constant of its own under OUTPUT_CAP; a 16K output keeps the intent chunk", async () => {
-  assert.equal(REPLACE_RETURN_BYTES, 512);
+test("D-M7-SV-2: the replace return budget is at most 512 bytes, a constant of its own under OUTPUT_CAP; a 16K output keeps the intent chunk", async () => {
+  assert.ok(REPLACE_RETURN_BYTES <= 512, "D-M7-SV-3 pins the exact value");
   assert.ok(REPLACE_RETURN_BYTES < OUTPUT_CAP && REPLACE_RETURN_BYTES >= 2 * REPLACE_CHUNK_BYTES, "at least two whole chunks fit");
   const text = bigText(16000);
   const out = parsed(await handleHook("claude-code", mainBashPost(text), env));
@@ -449,4 +449,23 @@ test("D-M7-SV-2: the replace return budget is 512 bytes, a constant of its own u
   assert.ok(more > 0, "the more line names ctx_search");
   assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= 512);
   assert.ok(replaced.includes("needle target"));
+});
+
+test("D-M7-SV-3: return budget 96 and chunk cap 48; two whole chunks fit; a 16K output keeps the intent line and drops no byte", async () => {
+  assert.equal(REPLACE_RETURN_BYTES, 96);
+  assert.equal(REPLACE_CHUNK_BYTES, 48);
+  assert.ok(REPLACE_RETURN_BYTES >= 2 * REPLACE_CHUNK_BYTES, "at least two whole chunks fit");
+  const text = bigText(16000);
+  const out = parsed(await handleHook("claude-code", mainBashPost(text), env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= 96);
+  assert.ok(replaced.includes("needle target"));
+  const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES);
+  for (const c of chunks) assert.ok(c.bytes <= 48);
+  assert.equal(chunks.reduce((n, c) => n + c.bytes, 0) + 1, Buffer.byteLength(text), "only the final newline is not a chunk byte");
+  const fail = "FAIL suite/gamma/case_1234_abc123 (12ms) expected 3 got 4\n";
+  const log = bigText(8000) + fail + bigText(2000);
+  assert.ok(chunkText(log, "text", REPLACE_CHUNK_BYTES).some((c) => c.text.includes("FAIL suite/gamma/case_1234_abc123")), "a test id stays in one chunk");
 });
