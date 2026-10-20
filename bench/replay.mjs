@@ -17,6 +17,7 @@ const { capBytes } = await lib("src/core/sandbox/cap.ts");
 const { chunkText } = await lib("src/core/index/chunk.ts");
 const { selectChunksInMemory } = await lib("src/core/index/select.ts");
 const C = await lib("src/core/contracts/constants.ts");
+const { sha256Hex } = await lib("src/core/project/sha256.ts");
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg("--out", path.join(ROOT, "bench", "offline-aggregate.json"));
@@ -141,7 +142,7 @@ async function replayFile(file) {
               // Same intent order as dispatch (D-M7-RR-3) and the last-prompt ranking (D-M7-SV-5).
               const intent = [u.input.description, u.input.command, u.input.file_path, u.input.pattern, u.input.url].map((v) => (typeof v === "string" ? v : "")).find((v) => v.trim() !== "") ?? "";
               const rankQuery = lastPrompt.trim() === "" ? undefined : intent + " " + lastPrompt;
-              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, "replay:" + canonical, rankQuery);
+              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, canonical + "#" + sha256Hex(b.tool_use_id).slice(0, C.REPLACE_LABEL_HASH_CHARS), rankQuery); // D-M7-SV-6 label form
               after = bytes(sel.text) + (sel.more !== null ? 1 + bytes(sel.more) : 0);
               afterBound = after;
               kind = "replace";

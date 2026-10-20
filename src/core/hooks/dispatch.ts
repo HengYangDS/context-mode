@@ -7,7 +7,7 @@ import {
   COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
   OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
-  RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
+  REPLACE_LABEL_HASH_CHARS, RUN_WRAPPER_NODE, SHELL_TOOL, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
@@ -26,6 +26,7 @@ import { renderState } from "../compaction/render.ts";
 import { chunkText } from "../index/chunk.ts";
 import { selectChunksInMemory } from "../index/select.ts";
 import { indexText } from "../index/text.ts";
+import { sha256Hex } from "../project/sha256.ts";
 import { appendDetached } from "./detached.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
 import { shouldHint } from "./throttle.ts";
@@ -347,13 +348,12 @@ async function lastPrompt(project: ProjectContext, sessionId: string): Promise<s
   }
 }
 
-// D-M7-RR-1: "<tool>:" + the first line of the command (or the tool name), at most SOURCE_LABEL_MAX_CHARS,
-// + "#" + call id when the host gives one, so two runs of one command stay two sources.
+// D-M7-SV-6 (was D-M7-RR-1 "<tool>:<first line>#<callId>"): "<tool>#" + 8 hex of sha256(call id), so two
+// runs of one command stay two sources and the more line does not repeat the command or the long call id.
+// Plain-JS sha256 (D-M7-HP-2): loading node:crypto on every hook call costs about 3 ms of process start.
 function mainLabel(tool: ToolCall, ev: CanonicalHookEvent): string {
-  const cmd = str(tool.input.command) ?? str(tool.input.file_path) ?? "";
-  const nl = cmd.indexOf("\n");
-  const head = (tool.canonicalName + ":" + (nl < 0 ? cmd : cmd.slice(0, nl))).slice(0, SOURCE_LABEL_MAX_CHARS);
-  return head + "#" + (tool.callId ?? String(ev.turn ?? 0));
+  const id = tool.callId ?? String(ev.turn ?? 0);
+  return tool.canonicalName + "#" + sha256Hex(id).slice(0, REPLACE_LABEL_HASH_CHARS);
 }
 
 // F1: above SYNC_INDEX_MAX_BYTES the FTS5 write never blocks the decision; same rules as appendDetached.

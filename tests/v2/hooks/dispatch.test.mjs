@@ -494,7 +494,7 @@ test("D-M7-SV-5: the replace selection also ranks by the last user prompt; budge
   assert.equal(alone.includes("SECRET-1 value=qz7k2m9x"), false, "without a prompt the newest chunks win, as before");
 });
 
-test("D-M7-SV-4: main-agent replace label is <tool>#<8 hex of the call id>; the more line holds no call id and no command copy", async () => {
+test("D-M7-SV-6: main-agent replace label is <tool>#<8 hex of the call id>; the more line holds no call id and no command copy", async () => {
   const labels = [];
   for (const id of ["toolu_01AQGoUz9vicosbmyhxzw1e7", "toolu_01QVnPrRSLqDnLNrk3jb4aX9", "toolu_01AQGoUz9vicosbmyhxzw1e7"]) {
     const p = mainBashPost(bigText(16000), undefined);

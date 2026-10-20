@@ -19,7 +19,7 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 export const REPLACE_TRIGGER_BYTES = 4096;
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
-export const REPLACE_LABEL_HASH_CHARS = 8; // D-M7-SV-4: main-agent replace label "<tool>#" + this many hex chars of sha256(call id)
+export const REPLACE_LABEL_HASH_CHARS = 8; // D-M7-SV-6: main-agent replace label "<tool>#" + this many hex chars of sha256(call id)
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
 export const SNIPPET_MAX_BYTES = 800; // DECISIONS-r9 M21: under floor(OUTPUT_CAP / SEARCH_PAGE_SIZE) = 819
