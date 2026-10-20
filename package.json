@@ -46,49 +46,11 @@
   "main": "./build/adapters/opencode/plugin.js",
   "exports": {
     ".": "./build/adapters/opencode/plugin.js",
-    "./plugin": "./build/adapters/opencode/plugin.js",
-    "./cli": "./cli.bundle.mjs"
+    "./plugin": "./build/adapters/opencode/plugin.js"
   },
-  "bin": {
-    "context-mode": "./cli.bundle.mjs"
-  },
-  "files": [
-    "build",
-    "hooks",
-    "configs",
-    "server.bundle.mjs",
-    "cli.bundle.mjs",
-    "bin",
-    "skills",
-    ".claude-plugin",
-    ".codex-plugin",
-    "scripts/postinstall.mjs",
-    "scripts/heal-better-sqlite3.mjs",
-    "scripts/heal-installed-plugins.mjs",
-    "scripts/plugin-cache-integrity.mjs",
-    "README.md",
-    "LICENSE"
-  ],
   "scripts": {
-    "build": "tsc && node -e \"if(process.platform!=='win32'){require('fs').chmodSync('build/cli.js',0o755)}\" && npm run bundle && npm run assert-bundle",
-    "assert-bundle": "node scripts/assert-bundle.mjs server.bundle.mjs cli.bundle.mjs hooks/session-extract.bundle.mjs hooks/session-snapshot.bundle.mjs hooks/session-db.bundle.mjs hooks/security.bundle.mjs",
-    "assert-asymmetric-drift": "node scripts/assert-asymmetric-drift.mjs",
-    "bundle": "esbuild src/server.ts --bundle --platform=node --target=node18 --format=esm --outfile=server.bundle.mjs --external:better-sqlite3 --external:turndown --external:turndown-plugin-gfm --external:@mixmark-io/domino --minify && esbuild src/cli.ts --bundle --platform=node --target=node18 --format=esm --outfile=cli.bundle.mjs --external:better-sqlite3 --minify && esbuild src/session/extract.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/session-extract.bundle.mjs --minify && esbuild src/session/snapshot.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/session-snapshot.bundle.mjs --minify && esbuild src/session/db.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/session-db.bundle.mjs --external:better-sqlite3 --minify && esbuild src/security.ts --bundle --platform=node --target=node18 --format=esm --outfile=hooks/security.bundle.mjs --minify",
-    "version-sync": "node scripts/version-sync.mjs",
-    "version": "node scripts/version-sync.mjs && git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json .codex-plugin/plugin.json configs/antigravity-cli/plugin.json configs/copilot-cli/.github/plugin/plugin.json",
-    "prepublishOnly": "npm run build",
-    "dev": "npx tsx src/server.ts",
-    "setup": "npx tsx src/cli.ts setup",
-    "doctor": "npx tsx src/cli.ts doctor",
+    "build": "node build/build.mjs --out release-out",
     "typecheck": "tsc --noEmit",
-    "pretest": "npm run build",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "benchmark": "npx tsx tests/benchmark.ts",
-    "test:use-cases": "npx tsx tests/use-cases.ts",
-    "test:compare": "npx tsx tests/context-comparison.ts",
-    "test:ecosystem": "npx tsx tests/ecosystem-benchmark.ts",
-    "postinstall": "node scripts/postinstall.mjs",
     "gate": "node scripts/gate.mjs",
     "e2e": "node e2e/cases/run.mjs",
     "keep-pass": "vitest run --config tests/vitest.config.ts"
