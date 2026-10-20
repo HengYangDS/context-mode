@@ -1,0 +1,7 @@
+FAIL keep-pass missing tests/vitest.config.ts, tests/keep-pass.list.json, .impl/keep-pass-map.json
+SKIP v2-unit not run: keep-pass failed
+SKIP ci-checks not run: keep-pass failed
+SKIP gp-cases not run: keep-pass failed
+SKIP prompt-lint not run: keep-pass failed
+SKIP check-removed not run: keep-pass failed
+SKIP live not run: keep-pass failed

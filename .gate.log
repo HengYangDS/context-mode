@@ -1,0 +1,12 @@
+---- keep-pass output ----
+JSON report written to /var/folders/df/nbmn_hp51n177rvbz8zh44sh0000gn/T/cm-gate-6xKkRB/vitest.json
+[context-mode] Released an idle MCP helper after 0s of inactivity to free memory; it reconnects automatically on next use. (#854)
+[context-mode] Released an idle MCP helper after 0s of inactivity to free memory; it reconnects automatically on next use. (#854)
+[context-mode] Released an idle MCP helper after 0s of inactivity to free memory; it reconnects automatically on next use. (#854)
+FAIL keep-pass 9/131 files red: tests/adapters/antigravity.test.ts, tests/adapters/claude-code.test.ts, tests/adapters/codex.test.ts, tests/adapters/copilot-cli.test.ts, tests/scripts/assert-bundle.test.ts, tests/server-stdin-eof-exit.test.ts, tests/statusline-sqlite.test.ts, tests/statusline.test.ts, tests/tier2-smoke-assert.test.ts
+SKIP v2-unit not run: keep-pass failed
+SKIP ci-checks not run: keep-pass failed
+SKIP gp-cases not run: keep-pass failed
+SKIP prompt-lint not run: keep-pass failed
+SKIP check-removed not run: keep-pass failed
+SKIP live not run: keep-pass failed
