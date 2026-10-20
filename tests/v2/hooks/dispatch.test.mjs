@@ -345,7 +345,8 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   // distinct query; take the first dropped chunk with a line number of 3+ digits (same assertion below).
   const gone = all.find((c) => !body.includes(c.text) && /^line \d{3,} filler/m.test(c.text));
   assert.ok(gone !== undefined, "some chunk was not in the replaced text");
-  const inner = gone.text.split("\n").slice(1, -1).find((l) => /^line \d{3,} filler/.test(l));
+  // D-M7-SV-3: a 48-byte chunk holds one or two whole lines, so the probe line may be the chunk's first line.
+  const inner = gone.text.split("\n").find((l) => /^line \d{3,} filler/.test(l));
   const num = inner.split(" ")[1];
   const r = await ctxSearch.handler({ queries: ["line " + num + " filler"], scope: "session", source: src[0].label }, searchCtx(p.session_id));
   assert.equal(r.isError, false, r.text);
