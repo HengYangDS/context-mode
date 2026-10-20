@@ -329,14 +329,15 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   assert.equal(src.length, 1);
   assert.ok(replaced.slice(more).includes(JSON.stringify(src[0].label)), "the more line names the source label");
   assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole output is indexed, nothing cut");
-  // The full output is findable: a line the replace dropped comes back from ctx_search.
-  const lines = text.split("\n");
-  const dropped = lines.find((l) => l.includes("filler") && !body.includes(l + "\n") && !body.endsWith(l));
-  assert.ok(dropped !== undefined, "some line was not in the replaced text");
-  const num = dropped.split(" ")[1];
+  // The full output is findable: a chunk the replace dropped comes back from ctx_search, by a line only it holds.
+  const all = chunkText(text, "text");
+  const gone = all.find((c) => !body.includes(c.text));
+  assert.ok(gone !== undefined, "some chunk was not in the replaced text");
+  const inner = gone.text.split("\n").slice(1, -1).find((l) => l.includes("filler"));
+  const num = inner.split(" ")[1];
   const r = await ctxSearch.handler({ queries: ["line " + num + " filler"], scope: "session", source: src[0].label }, searchCtx(p.session_id));
   assert.equal(r.isError, false, r.text);
-  assert.ok(r.text.includes(dropped), "ctx_search finds the dropped line");
+  assert.ok(r.text.includes(src[0].label + " #" + gone.ord + ":"), "ctx_search finds the dropped chunk");
 });
 
 test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory selection, detached index", async () => {

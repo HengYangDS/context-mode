@@ -1,29 +1,28 @@
 // impl/08 §6 (module enforcement): decide(ev, row, userDeny) -> Decision for PreToolUse only.
-// Rule order (T-ROUTE, DECISIONS-r9 V6): user deny, WebFetch, curl/http/build, Read and shell dump, Grep, other-MCP
-// hint. ADR-0008, DECISIONS-r8 (Read deny), DECISIONS-r9 E1-E5. DEVIATIONS D-M3-E4-1..10. No regex, nothing cut.
+// Rule order (T-ROUTE, DECISIONS-r9 V6): user deny, WebFetch, curl/http/build (rows with no replace and subagent
+// calls only, D-M7-RR-1), Read and shell dump. No hints (D-M7-RR-2). ADR-0008, DECISIONS-r8 (Read deny), DECISIONS-r9 E1-E5. DEVIATIONS D-M3-E4-1..10. No regex, nothing cut.
 // Never returns "replace" (PostToolUse only). Subagent case B/C is applied by hooks/dispatch.ts (D-M3-E4-1).
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-  BASH_HINT, BOUNDED_COMMANDS, BOUNDED_GIT_COMMAND, BOUNDED_GIT_SUBCOMMANDS, BOUNDED_UNLESS_VERBOSE, BUILD_COMMANDS,
-  CANONICAL_MCP_PREFIX, CANONICAL_MCP_SEP, CURL_COMMANDS, CURL_DUMP_HEADER_FLAG, CURL_SILENT_FLAGS, CURL_VERBOSE_FLAGS,
+  BUILD_COMMANDS, CURL_COMMANDS, CURL_DUMP_HEADER_FLAG, CURL_SILENT_FLAGS, CURL_VERBOSE_FLAGS,
   DENY_EXEC_TOOL, DENY_INTENT_DEFAULT, DENY_PREFIX, DENY_RUN_HERE_LINE, DENY_TOOL_LABEL, DENY_WEBFETCH_JOIN,
   DENY_WEBFETCH_TOOLS, DENY_WHAT, DENY_WHAT_SUFFIX, DUMP_COUNT_COMMANDS, DUMP_COUNT_FLAGS, FETCH_CALL, FETCH_QUOTES,
-  GREP_HINT, HINT_KEY, HTTP_SCHEME, INLINE_HTTP_CALLS, JQ_COMMAND, JQ_WHITELIST, MCP_HINT, NEVER_DENY_HOSTS,
-  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING, READ_DENY_MESSAGE, READ_HINT,
-  READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SERVER_KEY, SHELL_DUMP_COMMANDS,
-  SHELL_HINT_ONLY_TOOLS, TOOL_PREFIX_SLOT, USER_DENY_REASON_PREFIX, VERBOSE_FLAGS, VERSION_PROBE_FLAGS,
+  HTTP_SCHEME, INLINE_HTTP_CALLS, JQ_COMMAND, JQ_WHITELIST, NEVER_DENY_HOSTS,
+  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING, READ_DENY_MESSAGE,
+  READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS,
+  USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
 import type { AdapterRow, CanonicalHookEvent, Decision, DenyKind, SimpleCommand } from "../contracts/types.ts";
-import { lex } from "./lexer.ts";
+import { hasReplace } from "../../adapters/table.ts";
 import { parseShell } from "./parse.ts";
+import { isSubagentCall } from "./subagent.ts";
 import { unwrap } from "./unwrap.ts";
 import { matchesAnyDenyPattern } from "./user-deny.ts";
 
 // Canonical tool names (impl/01 §2) and input field values; names, not tunable values.
 const BASH = "Bash";
 const READ = "Read";
-const GREP = "Grep";
 const WEBFETCH = "WebFetch";
 const CTX_EXECUTE = "ctx_execute";
 const CTX_BATCH = "ctx_batch";
@@ -44,10 +43,6 @@ const str = (v: unknown): string | undefined => (typeof v === "string" ? v : und
 const present = (v: unknown): boolean => v !== undefined && v !== null;
 const has = (list: readonly string[], v: string): boolean => list.includes(v);
 
-function hint(template: string, family: string, ev: CanonicalHookEvent, row: AdapterRow): Decision {
-  return { kind: "hint", text: template.split(TOOL_PREFIX_SLOT).join(row.toolNamePrefix), onceKey: family + ev.sessionId };
-}
-
 /** impl/08 §6.1. `userDeny === null`: a present policy file could not be read (DECISIONS-r9 E2). */
 export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string[] | null): Decision {
   const tool = ev.tool;
@@ -67,10 +62,8 @@ export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string
 
   if (canonical === WEBFETCH) return webFetch(input, row); // step 4
   if (canonical === BASH) return bash(ev, row, input, rules); // steps 5, 6a
-  if (has(SHELL_HINT_ONLY_TOOLS, canonical)) return hint(BASH_HINT, HINT_KEY.bash, ev, row); // D-M3-E4-6
-  if (canonical === READ) return read(ev, row, input); // step 6
-  if (canonical === GREP) return hint(GREP_HINT, HINT_KEY.grep, ev, row); // step 7
-  if (isOtherMcp(canonical)) return hint(MCP_HINT, HINT_KEY.mcp, ev, row); // step 8 (throttle applies MCP_HINT_EVERY)
+  if (canonical === READ) return read(ev, input); // step 6
+  // Steps 5d, 7, 8 (Bash/PowerShell/Read/Grep/other-MCP hints) are retired: D-M7-RR-2, DECISIONS-r10 (2).
   return ALLOW; // step 9
 }
 
@@ -170,13 +163,15 @@ function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
     const h = segmentHit(c, rules);
     if (h !== null) return deny(USER_DENY_REASON_PREFIX + h);
   }
-  for (const c of cmds) {
-    const kind = denyKind(c);
-    if (kind !== null) return deny(denyMessage(kind, cmd, row, str(input.description)));
+  // 5c size-guess denies: only where no post-run replace exists, or on a subagent call (ADR-0016).
+  // On a replace row the main agent runs the command and PostToolUse replaces a large result (D-M7-RR-1).
+  if (!hasReplace(row) || isSubagentCall(ev)) {
+    for (const c of cmds) {
+      const kind = denyKind(c);
+      if (kind !== null) return deny(denyMessage(kind, cmd, row, str(input.description)));
+    }
   }
-  const dump = shellDump(cmds, ev.cwd, row); // 6a, before the generic hint
-  if (dump !== null) return dump;
-  return bounded(cmd, cmds) ? ALLOW : hint(BASH_HINT, HINT_KEY.bash, ev, row); // 5d
+  return shellDump(cmds, ev.cwd, row) ?? ALLOW; // 6a: file size known by stat, kept (D-M7-RR-1)
 }
 
 /** 5c, in the §6.1 order: curl/wget, inline HTTP, build tool. */
@@ -218,19 +213,6 @@ function inlineHttp(raw: string): boolean {
   return false;
 }
 
-/** 5d (E1, E4): one command, no op/io/unhandled token at all, argv0 in the structurally bounded set. */
-function bounded(cmd: string, cmds: SimpleCommand[]): boolean {
-  if (cmds.length !== 1) return false;
-  for (const t of lex(cmd)) if (t.kind !== "word") return false;
-  const c = cmds[0];
-  const name = c.argv0;
-  if (has(BOUNDED_COMMANDS, name)) return true;
-  if (name === BOUNDED_GIT_COMMAND) return c.args.length > 0 && has(BOUNDED_GIT_SUBCOMMANDS, c.args[0]);
-  if (c.args.length === 1 && has(VERSION_PROBE_FLAGS, c.args[0])) return true;
-  if (has(BOUNDED_UNLESS_VERBOSE, name)) return !c.args.some((a) => has(VERBOSE_FLAGS, a));
-  return false;
-}
-
 // ---------- steps 6, 6a: Read and one-file shell dumps (DECISIONS-r8 VR) ----------
 
 function fileSize(abs: string): number {
@@ -242,7 +224,7 @@ function fileSize(abs: string): number {
   }
 }
 
-function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>): Decision {
+function read(ev: CanonicalHookEvent, input: Record<string, unknown>): Decision {
   if (!present(input.offset) && !present(input.limit)) {
     const p = readPath(input);
     if (p !== undefined) {
@@ -251,7 +233,7 @@ function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unk
       if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size));
     }
   }
-  return hint(READ_HINT, HINT_KEY.read, ev, row); // ranged Read is never denied; small Read: D-M3-E4-4
+  return ALLOW; // ranged Read is never denied; no Read hint (D-M7-RR-2)
 }
 
 /** 6a on hosts with no Read tool: null = not a dump, ALLOW = bounded dump, deny = unbounded dump over the cap. */
@@ -319,13 +301,4 @@ function dumpTarget(name: string, args: readonly string[]): { file: string; boun
     if (files.shift() !== JQ_WHITELIST.identity) return null;
   }
   return files.length === 1 && files[0] !== OPT ? { file: files[0], bounded } : null;
-}
-
-// ---------- step 8 ----------
-
-function isOtherMcp(canonical: string): boolean {
-  if (!canonical.startsWith(CANONICAL_MCP_PREFIX)) return false;
-  const rest = canonical.slice(CANONICAL_MCP_PREFIX.length);
-  const end = rest.indexOf(CANONICAL_MCP_SEP);
-  return (end < 0 ? rest : rest.slice(0, end)) !== SERVER_KEY;
 }

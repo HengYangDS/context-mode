@@ -22,8 +22,23 @@ function canonicalName(name: string, ownPrefix: string): string {
   return "mcp:" + rest.slice(0, sep) + ":" + rest.slice(sep + MCP_SEP.length);
 }
 
+// D-M7-RR-1: a Bash tool_response {stdout, stderr, ...} is read as the output the model sees (stdout, then
+// stderr on its own line), so the replace selects and indexes plain lines, not one escaped JSON string.
+function outputOf(resp: unknown): string {
+  if (resp === undefined) return "";
+  if (typeof resp === "string") return resp;
+  if (typeof resp === "object" && resp !== null) {
+    const r = resp as { stdout?: unknown; stderr?: unknown };
+    if (typeof r.stdout === "string") {
+      const err = typeof r.stderr === "string" ? r.stderr : "";
+      return err === "" ? r.stdout : r.stdout === "" ? err : r.stdout + "\n" + err;
+    }
+  }
+  return JSON.stringify(resp);
+}
+
 function readResult(resp: unknown): ToolResultInfo {
-  const text = resp === undefined ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
+  const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && (resp as { is_error?: unknown }).is_error === true;
   return { isError, bytes: Buffer.byteLength(text), text };
 }
@@ -44,6 +59,7 @@ export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: strin
     const name = String(p.tool_name ?? "");
     const input = typeof p.tool_input === "object" && p.tool_input !== null ? (p.tool_input as Record<string, unknown>) : {};
     const tool: ToolCall = { name, canonicalName: canonicalName(name, ownPrefix), input };
+    if (typeof p.tool_use_id === "string" && p.tool_use_id !== "") tool.callId = p.tool_use_id;
     ev.tool = tool;
   }
   if (event === "PostToolUse") ev.result = readResult(p.tool_response);

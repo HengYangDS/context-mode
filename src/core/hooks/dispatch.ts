@@ -4,17 +4,17 @@
 import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
-  COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX, HINT_KEY,
-  MCP_HINT_EVERY, OUTPUT_CAP, OWN_TOOL_PREFIX, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
+  OUTPUT_CAP, OWN_TOOL_PREFIX, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
-  RUN_WRAPPER_NODE, SHELL_TOOL, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
+  RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
 import type {
   AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall,
 } from "../contracts/types.ts";
-import { getAdapter } from "../../adapters/table.ts";
+import { getAdapter, hasReplace } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
 import { isSubagentCall, pickSubagentCase, toolSetForAgentType } from "../policy/subagent.ts";
 import { readUserDeny } from "../policy/user-deny.ts";
@@ -222,11 +222,7 @@ async function preToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Proj
     const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
     if (subCase === "B") decision = caseB(ev, row, decision0, userDeny);
   }
-  if (decision.kind !== "hint") return decision;
-  // §4.5 step 4, A24: the throttle marker in meta is the one DB touch on this path.
-  const db = await openDb(project);
-  const everyN = decision.onceKey.startsWith(HINT_KEY.mcp) ? MCP_HINT_EVERY : undefined;
-  return shouldHint(db, ev.sessionId, decision.onceKey, everyN) ? decision : ALLOW;
+  return decision; // no PreToolUse hint, so no throttle marker and no DB touch (D-M7-RR-2)
 }
 
 function isShell(tool: ToolCall, row: AdapterRow): boolean {
@@ -310,11 +306,18 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
       body: text, turn: ev.turn ?? 0, sandbox_bytes: result.bytes, returned_bytes: result.bytes,
     });
   }
-  // step 5: subagent case B/C replace, DECISIONS-r9 F1 split.
-  if (!isSubagentCall(ev) || result.bytes <= OUTPUT_CAP) return ALLOW;
-  const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
-  if (subCase === "A") return ALLOW;
-  const label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + String(ev.turn ?? 0);
+  // step 5: replace, DECISIONS-r9 F1 split. Subagent case B/C (ADR-0016), and the main agent on a row
+  // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
+  if (result.bytes <= OUTPUT_CAP) return ALLOW;
+  let label: string;
+  if (isSubagentCall(ev)) {
+    const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
+    if (subCase === "A") return ALLOW;
+    label = SUBAGENT_SOURCE_PREFIX + tool.canonicalName + ":" + String(ev.turn ?? 0);
+  } else {
+    if (!hasReplace(row)) return ALLOW; // ADR-0001: one path per row, no runtime fallback
+    label = mainLabel(tool, ev);
+  }
   const intent = str(tool.input.description);
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
@@ -327,6 +330,15 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   }
   const selected = selectChunksInMemory(chunks, intent, OUTPUT_CAP, label);
   return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
+}
+
+// D-M7-RR-1: "<tool>:" + the first line of the command (or the tool name), at most SOURCE_LABEL_MAX_CHARS,
+// + "#" + call id when the host gives one, so two runs of one command stay two sources.
+function mainLabel(tool: ToolCall, ev: CanonicalHookEvent): string {
+  const cmd = str(tool.input.command) ?? str(tool.input.file_path) ?? "";
+  const nl = cmd.indexOf("\n");
+  const head = (tool.canonicalName + ":" + (nl < 0 ? cmd : cmd.slice(0, nl))).slice(0, SOURCE_LABEL_MAX_CHARS);
+  return head + "#" + (tool.callId ?? String(ev.turn ?? 0));
 }
 
 // F1: above SYNC_INDEX_MAX_BYTES the FTS5 write never blocks the decision; same rules as appendDetached.
