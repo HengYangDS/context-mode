@@ -78,3 +78,25 @@ test("[W1-core] #788: python/javascript run in the project root and leave no tem
     assert.equal(existsSync(dirname(line("S="))), false);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// W1-core PORT of tests/core/server.test.ts "Non-zero Exit Code Classification" (v1 isError rules) to ctx_execute.
+// v2 class (impl/04 step 12, GP4): shell exit 1 with empty stderr is not an error; stderr or exit >= 2 or a
+// non-shell runtime exiting non-zero is. The v1 "shell exit 1 with empty stdout is an error" row is NOT carried:
+// v2 decided grep no-match (exit 1, no output) is a clean result.
+test("[W1-core] exit class: shell exit 1 with stdout is ok; exit 2 and 127 are errors; javascript exit 1 is an error", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "cm-exit-")));
+  try {
+    const ctx = ctxFor(root);
+    const run = (language, code) => ctxExecute.handler({ language, code }, ctx);
+    const soft = await run("shell", "echo out; exit 1");
+    assert.equal(soft.isError, false);
+    assert.ok(soft.text.includes("out"));
+    assert.equal((await run("shell", "echo e >&2; exit 2")).isError, true);
+    const nf = await run("shell", "nonexistcmd_zz");
+    assert.equal(nf.isError, true);
+    assert.ok(nf.text.startsWith("exit 127"));
+    const js = await run("javascript", "console.log('o'); process.exit(1)");
+    assert.equal(js.isError, true);
+    assert.ok(js.text.includes("o"));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
