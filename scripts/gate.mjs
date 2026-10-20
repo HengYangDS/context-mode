@@ -6,10 +6,9 @@
 //        node scripts/gate.mjs --all [--quick]          (--all = M7)
 //
 // Layers run in this order and stop at the first FAIL (impl/14 §8 step 3):
-//   1 keep-pass      npx vitest run --config tests/vitest.config.ts <files>   (DECISIONS-r9 G5)
-//   1a v2-unit       node build/build.mjs --generated-only, then
+//   1 v2-unit        node build/build.mjs --generated-only, then
 //                    node --test --test-reporter=tap tests/v2/                (>= M1, D-M1-13, D-M2-arch-6)
-//   1b ci-checks     node scripts/gen-keep-pass.mjs --check, node scripts/ci-gs4-lint.mjs,
+//   1b ci-checks     node scripts/ci-gs4-lint.mjs,
 //                    node build/check-readme.mjs: the ci.yml steps no other layer runs (D-M4-GS4-1)
 //   2 gp-cases       node build/build.mjs --out release-out, then
 //                    node e2e/cases/run.mjs --milestone Mn                   (DEVIATIONS D-M0-2, D-M0-F1-1)
@@ -21,20 +20,19 @@
 // FAIL are not run; they print "SKIP <layer> not run: <failed layer> failed" so the output keeps
 // one line per layer. Child output goes to stderr only when its layer fails.
 // Exit 0 only if no layer printed FAIL. Node built-ins only.
-import { existsSync, readFileSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MILESTONES = ["M0", "M1", "M2", "M3", "M4", "M5", "M6", "M7"];
-// v2-unit sits right after keep-pass: unit tests before E2E, the TEST-TRIAGE-r2 order
-// (impl/14 §8 step 3); D-M1-13 names the layer but not its place.
+// v2-unit runs first: unit tests before E2E, the TEST-TRIAGE-r2 order (impl/14 §8 step 3);
+// D-M1-13 names the layer but not its place. The keep-pass layer is gone (D-M7-CLN-5).
 // ci-checks sits before gp-cases so the local gate runs every check ci.yml runs (D-M4-GS4-1).
-const LAYERS = ["keep-pass", "v2-unit", "ci-checks", "gp-cases", "prompt-lint", "check-removed", "live"];
+const LAYERS = ["v2-unit", "ci-checks", "gp-cases", "prompt-lint", "check-removed", "live"];
 // First milestone at which each layer runs (DEVIATIONS D-M0-1; check-removed D-M6-arch-2). Before it the layer is SKIP.
-const LAYER_START = { "keep-pass": 0, "v2-unit": 1, "ci-checks": 0, "gp-cases": 0, "prompt-lint": 0, "check-removed": 7, live: 0 };
+const LAYER_START = { "v2-unit": 1, "ci-checks": 0, "gp-cases": 0, "prompt-lint": 0, "check-removed": 7, live: 0 };
 const PROMPT_LINT_BUNDLE_FROM = 2; // M2: lint the built bundle instead of drafts.md (impl/13 §7)
 const LIVE_BASE_REF = "origin/v2-design";
 const CHILD_MAX_BUFFER = 256 * 1024 * 1024;
@@ -75,65 +73,6 @@ function missing(files) {
   return gone.length ? { status: "FAIL", detail: `missing ${gone.join(", ")}` } : null;
 }
 
-// ---- layer 1: KEEP-PASS (impl/14 §7, DECISIONS-r9 G5, DEVIATIONS D-M0-3, D-M0-9) ----
-function keepPass(ms) {
-  const gone = missing(["tests/vitest.config.ts", "tests/keep-pass.list.json", ".impl/keep-pass-map.json"]);
-  if (gone) return gone;
-  const map = readJson(rel(".impl/keep-pass-map.json"));
-  const done = readDone();
-  const baselinePath = rel(".impl/keep-pass-baseline.json");
-  const baseline = existsSync(baselinePath) ? readJson(baselinePath) : [];
-  if (!Array.isArray(baseline)) return { status: "FAIL", detail: ".impl/keep-pass-baseline.json is not a JSON array of paths" };
-
-  const ownerMs = (file) => MILESTONES.indexOf(map.moduleMilestone[map.files[file].module]);
-  const unknown = Object.keys(map.files).filter((f) => ownerMs(f) < 0);
-  if (unknown.length) return { status: "FAIL", detail: `.impl/keep-pass-map.json: no milestone for ${unknown.join(", ")}` };
-  const strayBaseline = baseline.filter((f) => !map.files[f]);
-  if (strayBaseline.length) return { status: "FAIL", detail: `baseline paths not in keep-pass map: ${strayBaseline.join(", ")}` };
-
-  // Selected: owner milestone <= Mn, or owner module already done. A baseline file fails the
-  // layer only from its owner module's milestone on; before that it is reported (D-M0-3).
-  const selected = Object.keys(map.files)
-    .filter((f) => ownerMs(f) <= ms || done.includes(map.files[f].module)).sort();
-  const isHard = (f) => !baseline.includes(f) || ownerMs(f) <= ms;
-  if (!selected.length) return { status: "PASS", detail: `0 files due at ${MILESTONES[ms]} (done: ${done.join(",") || "none"})` };
-
-  // D-M3-F-1: v1 `pretest` ran tsc; a KEEP-PASS file that imports build/*.js needs fresh tsc output,
-  // never a stale build/ left by an earlier local run (that hid the CI failure). Same step as CI.
-  const t = run("npx", ["tsc", "-p", "tsconfig.json"]);
-  if (t.status !== 0) {
-    dumpChild("keep-pass", t);
-    return { status: "FAIL", detail: `npx tsc -p tsconfig.json exit ${t.status}` };
-  }
-
-  const outDir = mkdtempSync(path.join(tmpdir(), "cm-gate-"));
-  const report = path.join(outDir, "vitest.json");
-  try {
-    const r = run("npx", ["vitest", "run", "--config", "tests/vitest.config.ts",
-      "--reporter=json", `--outputFile=${report}`, ...selected]);
-    if (!existsSync(report)) {
-      dumpChild("keep-pass", r);
-      return { status: "FAIL", detail: `vitest wrote no report (exit ${r.status})` };
-    }
-    const results = readJson(report).testResults ?? [];
-    const failed = new Set(results.filter((t) => t.status !== "passed")
-      .map((t) => path.relative(REPO_ROOT, t.name).split(path.sep).join("/")));
-    const ran = new Set(results.map((t) => path.relative(REPO_ROOT, t.name).split(path.sep).join("/")));
-    const notRun = selected.filter((f) => !ran.has(f));
-    const red = selected.filter((f) => failed.has(f) || notRun.includes(f));
-    const hard = red.filter(isHard);
-    const soft = red.filter((f) => !isHard(f));
-    const tail = soft.length ? `; baseline red (not due): ${soft.join(", ")}` : "";
-    if (hard.length) {
-      dumpChild("keep-pass", r);
-      return { status: "FAIL", detail: `${hard.length}/${selected.length} files red: ${hard.join(", ")}${tail}` };
-    }
-    return { status: "PASS", detail: `${selected.length - soft.length}/${selected.length} files green${tail}` };
-  } finally {
-    rmSync(outDir, { recursive: true, force: true });
-  }
-}
-
 // ---- layer 1a: v2 unit tests, TECH-SPEC §6.2a (DEVIATIONS D-M1-13) ----
 // TAP reporter so the counts come from fixed "# tests N" / "# pass N" / "# fail N" lines.
 // src/ imports src/prompt/_generated.ts, so the layer writes it first (DEVIATIONS D-M2-arch-6).
@@ -169,10 +108,9 @@ function v2Unit() {
 }
 
 // ---- layer 1b: ci.yml checks no other layer runs (DEVIATIONS D-M4-GS4-1) ----
-// Same commands and order as the ci.yml steps "KEEP-PASS list is current", "GS4 lint" and
+// Same commands and order as the ci.yml steps "GS4 lint" and
 // "README line cap". Before this layer a CI-only check could fail on a gate-green commit.
 const CI_CHECKS = [
-  ["scripts/gen-keep-pass.mjs", "--check"],
   ["scripts/ci-gs4-lint.mjs"],
   ["build/check-readme.mjs"],
 ];
@@ -271,13 +209,6 @@ function live(quick) {
   return { status: "PASS", detail: `${m[1]}/${m[2]} live cases ran; e2e/live/run.mjs --base ${base.slice(0, 12)} ${header}` };
 }
 
-function readDone() {
-  const p = rel(".impl/progress.json");
-  if (!existsSync(p)) return [];
-  const done = readJson(p).done;
-  return Array.isArray(done) ? done : [];
-}
-
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.error) {
@@ -286,7 +217,6 @@ function main() {
   }
   const { ms, quick } = args;
   const runners = {
-    "keep-pass": () => keepPass(ms),
     "v2-unit": () => v2Unit(),
     "ci-checks": () => ciChecks(),
     "gp-cases": () => gpCases(ms),

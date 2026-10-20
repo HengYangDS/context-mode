@@ -126,12 +126,11 @@ function keptMap() {
   return JSON.parse(`{${body.endsWith(",") ? body.slice(0, -1) : body}}`);
 }
 
-test("every KEPT_FOR_KEEP_PASS value is a KEEP-PASS file or the KEEP-PASS runner config", () => {
-  const list = JSON.parse(readFileSync(path.join(REPO, "tests", "keep-pass.list.json"), "utf8"));
+test("every KEPT_FOR_KEEP_PASS value is a v1 test path under tests/ (list file removed, D-M7-CLN-5)", () => {
   const kept = keptMap();
   assert.ok(Object.keys(kept).length > 0);
   for (const [p, t] of Object.entries(kept)) {
-    assert.ok(list.includes(t) || t === "tests/vitest.config.ts", `${p} -> ${t} is not a KEEP-PASS file`);
+    assert.ok(t.startsWith("tests/") && (t.endsWith(".test.ts") || t === "tests/vitest.config.ts"), `${p} -> ${t} is not a v1 test path`);
   }
 });
 
