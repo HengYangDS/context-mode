@@ -90,3 +90,15 @@ The T4 forced-Read tasks were not re-run (task scope: the 10 + 10 set).
 ## Verdict (updated)
 
 Under-routing: PASS on all three models under the new rule. Under the old rule the same rows still fail (8/11/8 of 20), because a native `grep -c`, `jq` or `awk` that returns a few bytes counts as a miss there. The new rule matches the intent (savings reached when native output returned to the model is <= 2048 bytes). Over-routing: PASS. Correctness: PASS.
+
+## GP-LIVE-ROUTING run 5 (646-char instructions)
+
+Runner: e2e/live/routing/run.mjs, scorer score.mjs, 2 runs per task, effort low, budget 0.25 USD per session. Models: claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5.
+
+| Model | Under | Over | Correct large | Correct small | Max native bytes, one run | No tool call | Verdict |
+|---|---|---|---|---|---|---|---|
+| opus-5-5 | 0/20 | 0/20 | 20/20 | 20/20 | 41 | 3 | PASS |
+| sonnet-5-5 | 0/20 | 0/20 | 20/20 | 20/20 | 610 | 2 | PASS |
+| haiku-5-5 | 0/20 | 0/20 | 20/20 | 20/20 | 122 | 0 | PASS |
+
+T4 forced-Read tasks excluded from the tally (same as run 4). Raw rows kept outside the repo.
