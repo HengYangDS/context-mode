@@ -244,38 +244,38 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/guidance-throttle.test.ts` | yes | - | RETIRE | ADR-0008 amendment 2026-10-20 (DECISIONS-r10: all hints removed) | W1-hooks |
 | `tests/hook-runtime-resolution.test.ts` | yes | - | COVERED | e2e GP1-absolute-node-path | W1-hooks |
 | `tests/hooks/antigravity-cli-hooks.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-hooks |
-| `tests/hooks/cache-heal-self-heal.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/cache-heal-self-heal.test.ts` |  | PORT | RETIRED, deleted | D2 + ADR-0002 (heal/normalize/shell-snapshot scripts removed; v2 writes absolute-path hook commands at build, GP1-absolute-node-path + GP11 doctor/upgrade; DEVIATIONS D-M7-CLN-2) | W1-hooks |
 | `tests/hooks/claude-stop.test.ts` | yes | KEEP-PASS | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
 | `tests/hooks/codex-goal-compact.test.ts` | yes | KEEP-PASS | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
 | `tests/hooks/codex-sessionstart-rule-capture.test.ts` | yes | KEEP-PASS | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
 | `tests/hooks/copilot-cli-hooks.test.ts` | yes | KEEP-PASS | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
-| `tests/hooks/core-routing.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/core-routing.test.ts` |  | PORT | PORTED, deleted | tests/v2/hooks/routing-ported.test.mjs | W1-hooks |
 | `tests/hooks/cursor-hooks.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-hooks |
 | `tests/hooks/ensure-deps.test.ts` | yes | KEEP-PASS | RETIRE | D2 (no runtime installs; deps bundled; v2-issue-map REMOVED:D2) | W1-hooks |
 | `tests/hooks/formatters.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/*.test.mjs (encode) + GP3-hooks | W1-hooks |
 | `tests/hooks/gemini-hooks.test.ts` | yes | KEEP-PASS | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
 | `tests/hooks/hook-latency.test.ts` | yes | KEEP-PASS | COVERED | e2e GP3-hook-perf + bench/hook-gs6.mjs | W1-hooks |
-| `tests/hooks/integration.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/integration.test.ts` |  | PORT | PORTED, deleted | tests/v2/hooks/routing-ported.test.mjs | W1-hooks |
 | `tests/hooks/jetbrains-hooks.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-hooks |
 | `tests/hooks/kimi-config-dir.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-hooks |
 | `tests/hooks/kimi-hooks.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-hooks |
 | `tests/hooks/kiro-hooks.test.ts` | yes | KEEP-PASS | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
-| `tests/hooks/normalize-hooks-bun.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/normalize-hooks-bun.test.ts` |  | PORT | RETIRED, deleted | D2 + ADR-0002 (heal/normalize/shell-snapshot scripts removed; v2 writes absolute-path hook commands at build, GP1-absolute-node-path + GP11 doctor/upgrade; DEVIATIONS D-M7-CLN-2) | W1-hooks |
 | `tests/hooks/platform-bridge-wire.test.ts` | yes | KEEP-PASS | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
-| `tests/hooks/post-upgrade-first-hook-fire.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/post-upgrade-first-hook-fire.test.ts` |  | PORT | RETIRED, deleted | D2 + ADR-0002 (heal/normalize/shell-snapshot scripts removed; v2 writes absolute-path hook commands at build, GP1-absolute-node-path + GP11 doctor/upgrade; DEVIATIONS D-M7-CLN-2) | W1-hooks |
 | `tests/hooks/precompact-snapshot-event.test.ts` |  | PORT | RETIRE | ADR-0009 / D9 (no injected snapshot; ctx_resume is explicit, GP6) | W1-hooks |
 | `tests/hooks/redirect-marker-bash.test.ts` |  | PORT | RETIRE | ADR-0008 amendment 2026-10-20 (hints and redirect markers removed) | W1-hooks |
 | `tests/hooks/redirect-marker-read.test.ts` |  | PORT | RETIRE | ADR-0008 amendment 2026-10-20 (hints and redirect markers removed) | W1-hooks |
 | `tests/hooks/redirect-marker-webfetch.test.ts` |  | PORT | RETIRE | ADR-0008 amendment 2026-10-20 (hints and redirect markers removed) | W1-hooks |
-| `tests/hooks/require-security.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
-| `tests/hooks/run-hook.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/require-security.test.ts` |  | PORT | PORTED, deleted | tests/v2/hooks/routing-ported.test.mjs | W1-hooks |
+| `tests/hooks/run-hook.test.ts` |  | PORT | PORTED, deleted | tests/v2/hooks/entry-ported.test.mjs | W1-hooks |
 | `tests/hooks/sessionstart-resume-event.test.ts` |  | PORT | RETIRE | ADR-0009 / D9 (no injected snapshot; ctx_resume is explicit, GP6) | W1-hooks |
-| `tests/hooks/sessionstart-shell-snapshot-heal.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
-| `tests/hooks/shell-snapshot-heal.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
-| `tests/hooks/stdin-idle-timeout.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
-| `tests/hooks/tool-naming.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/sessionstart-shell-snapshot-heal.test.ts` |  | PORT | RETIRED, deleted | D2 + ADR-0002 (heal/normalize/shell-snapshot scripts removed; v2 writes absolute-path hook commands at build, GP1-absolute-node-path + GP11 doctor/upgrade; DEVIATIONS D-M7-CLN-2) | W1-hooks |
+| `tests/hooks/shell-snapshot-heal.test.ts` |  | PORT | RETIRED, deleted | D2 + ADR-0002 (heal/normalize/shell-snapshot scripts removed; v2 writes absolute-path hook commands at build, GP1-absolute-node-path + GP11 doctor/upgrade; DEVIATIONS D-M7-CLN-2) | W1-hooks |
+| `tests/hooks/stdin-idle-timeout.test.ts` |  | PORT | PORT (open gap) | v2 hook entry has no stdin idle timeout (#242 #639 #719); kept, see DEVIATIONS D-M7-CLN-2 | W1-hooks |
+| `tests/hooks/tool-naming.test.ts` |  | PORT | PORTED, deleted | tests/v2/hooks/routing-ported.test.mjs | W1-hooks |
 | `tests/hooks/vscode-hooks.test.ts` |  | PORT | COVERED | e2e GP3-hooks + tests/v2/hooks/dispatch(-compact) | W1-hooks |
-| `tests/hooks/windows-hooks-normalization.test.ts` |  | PORT | PORT | triage P or no v2 case named yet; check GP3-hooks + tests/v2/hooks/* first | W1-hooks |
+| `tests/hooks/windows-hooks-normalization.test.ts` |  | PORT | RETIRED, deleted | D2 + ADR-0002 (heal/normalize/shell-snapshot scripts removed; v2 writes absolute-path hook commands at build, GP1-absolute-node-path + GP11 doctor/upgrade; DEVIATIONS D-M7-CLN-2) | W1-hooks |
 | `tests/integration/commit-message-symmetry.test.ts` | yes | - | PORT | v1 rollup forward (bridge.maybeForward) has no v2 code path; find the ADR that drops it, else port | W1-core |
 | `tests/integration/cross-project-attribution.test.ts` | yes | - | COVERED | e2e GP7-scope + tests/v2/store/resolve | W1-core |
 | `tests/integration/project-dir-strict.test.ts` |  | - | COVERED | e2e GP7-scope + tests/v2/store/resolve | W1-core |
