@@ -131,14 +131,19 @@ function session(bin, env, task, arm, run) {
     const { prompt, expect } = task.build(dir);
     const armArgs = arm === "v2" ? ["--plugin-dir", path.join(ROOT, "release-out"), "--allowedTools", ...TOOLS, MCP] : ["--strict-mcp-config", "--allowedTools", ...TOOLS];
     const t0 = Date.now();
+    // stdout goes to a file, not a pipe: claude can exit before a pipe with a large stream-json is flushed (cut result event).
+    fs.mkdirSync(PRIV, { recursive: true });
+    const outFile = path.join(PRIV, `saving-score-out-${process.pid}-${task.id}-${arm}-${run}.jsonl`);
+    const fd = fs.openSync(outFile, "w");
     const p = spawn(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
-      "--no-session-persistence", "--setting-sources", "project", ...armArgs], { cwd: dir, env, stdio: ["ignore", "pipe", "ignore"] });
-    let out = ""; p.stdout.on("data", (d) => (out += d));
+      "--no-session-persistence", "--setting-sources", "project", ...armArgs], { cwd: dir, env, stdio: ["ignore", fd, "ignore"] });
     const kill = setTimeout(() => p.kill("SIGKILL"), TIMEOUT_MS);
     p.on("close", () => {
       clearTimeout(kill);
+      fs.closeSync(fd);
+      const out = fs.readFileSync(outFile, "utf8");
       const { bytes, results, res, calls, ctxCalls } = toolResultBytes(out);
-      if (!res) { try { fs.mkdirSync(PRIV, { recursive: true }); fs.writeFileSync(path.join(PRIV, `saving-score-nores-${task.id}-${arm}-${run}.txt`), out.slice(-6000)); } catch {} }
+      if (res) fs.rmSync(outFile, { force: true });
       const u = res?.usage ?? {}, text = normalize(res?.result ?? "");
       const ok = !!res && res.is_error !== true && expect.every((e) => text.includes(e));
       const key = createHash("sha256").update(fs.realpathSync.native(path.join(dir, ".git"))).digest("hex").slice(0, 16);
