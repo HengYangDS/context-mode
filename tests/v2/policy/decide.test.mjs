@@ -8,12 +8,12 @@ import { join, sep } from "node:path";
 import { decide, denyMessage } from "../../../src/core/policy/decide.ts";
 import { getAdapter } from "../../../src/adapters/table.ts";
 import {
-  OUTPUT_CAP, READ_DENY_MESSAGE, BASH_HINT, GREP_HINT, READ_HINT, MCP_HINT, PARSE_ERROR_DENY_LINE,
+  OUTPUT_CAP, READ_DENY_MESSAGE, PARSE_ERROR_DENY_LINE,
   POLICY_UNREADABLE_LINE, REQUIRE_SECURITY_ENV, USER_DENY_REASON_PREFIX,
 } from "../../../src/core/contracts/constants.ts";
 
 const CC = getAdapter("claude-code");
-const CODEX = getAdapter("codex"); // no Read tool: shell dumps are checked (6a)
+const CODEX = getAdapter("codex"); // no Read tool: shell dumps are checked (6a); no replace: size-guess denies stay
 let dir, big, small;
 
 before(() => {
@@ -29,7 +29,8 @@ function ev(canonicalName, input, extra = {}) {
   return { event: "PreToolUse", agent: "claude-code", sessionId: "s1", cwd: dir, tool: { name: canonicalName, canonicalName, input }, ...extra };
 }
 const bash = (command, row = CC, deny = []) => decide(ev("Bash", { command }), row, deny);
-const prefixed = (t, row) => t.split("{prefix}").join(row.toolNamePrefix);
+// Owner decision 2026-10-20 (D-M7-RR-1): size-guess denies run only on rows with no replace (CODEX here).
+const bashNoReplace = (command, deny = []) => bash(command, CODEX, deny);
 
 // §6.3: [command, expected kind, deny kind or null]
 const CURL = "curl -s https://x.io/a.json";
@@ -62,10 +63,10 @@ const GOLDEN = [
 
 for (const [cmd, want, kind] of GOLDEN) {
   test(`§6.3 golden: ${JSON.stringify(cmd)}`, () => {
-    const d = bash(cmd);
+    const d = bashNoReplace(cmd);
     if (want === "deny") {
       assert.equal(d.kind, "deny");
-      assert.equal(d.reason, denyMessage(kind, cmd, CC));
+      assert.equal(d.reason, denyMessage(kind, cmd, CODEX));
     } else assert.notEqual(d.kind, "deny", JSON.stringify(d));
   });
 }
@@ -88,9 +89,7 @@ test("§6.3 / DECISIONS-r8 Read-deny case 1: unranged Read over OUTPUT_CAP is de
 });
 test("Read-deny case 2: ranged Read over OUTPUT_CAP is never denied", () => {
   for (const input of [{ file_path: big, offset: 1 }, { file_path: big, limit: 200 }, { file_path: big, offset: 0, limit: 10 }]) {
-    const d = decide(ev("Read", input), CC, []);
-    assert.equal(d.kind, "hint");
-    assert.equal(d.text, prefixed(READ_HINT, CC));
+    assert.deepEqual(decide(ev("Read", input), CC, []), { kind: "allow" }); // D-M7-RR-2: no Read hint
   }
 });
 test("Read-deny case 3: unbounded one-file shell dump over OUTPUT_CAP is denied (no Read tool host)", () => {
@@ -124,21 +123,21 @@ test("V8: 10 curl, 10 wget, 5 build commands -> 25/25 deny", () => {
   for (let i = 0; i < 10; i++) cmds.push(`wget -qO- https://data.example.com/dump-${i}.json`);
   cmds.push("./gradlew build", "gradle test", "mvn package", "./mvnw verify", "sbt compile");
   let denied = 0;
-  for (const c of cmds) if (bash(c).kind === "deny") denied++;
+  for (const c of cmds) if (bashNoReplace(c).kind === "deny") denied++;
   assert.equal(denied, 25);
 });
 
 test("inline HTTP is denied with kind http", () => {
   const cmd = `node -e "fetch('https://x.io').then(r=>r.text()).then(console.log)"`;
-  assert.deepEqual(bash(cmd), { kind: "deny", reason: denyMessage("http", cmd, CC) });
+  assert.deepEqual(bashNoReplace(cmd), { kind: "deny", reason: denyMessage("http", cmd, CODEX) });
   const py = `python3 -c "import requests; print(requests.get('https://x.io').text)"`;
-  assert.equal(bash(py).reason, denyMessage("http", py, CC));
+  assert.equal(bashNoReplace(py).reason, denyMessage("http", py, CODEX));
 });
 
 test("#166: curl to a file that is not silent, or is verbose, is denied", () => {
-  assert.equal(bash("curl -o out.bin https://x.io/f").kind, "deny");
-  assert.equal(bash("curl -s -v -o out.bin https://x.io/f").kind, "deny");
-  assert.notEqual(bash("curl -s -o out.bin https://x.io/f").kind, "deny");
+  assert.equal(bashNoReplace("curl -o out.bin https://x.io/f").kind, "deny");
+  assert.equal(bashNoReplace("curl -s -v -o out.bin https://x.io/f").kind, "deny");
+  assert.notEqual(bashNoReplace("curl -s -o out.bin https://x.io/f").kind, "deny");
 });
 
 test("deny message: intent from description, tool prefix from the row", () => {
@@ -175,27 +174,51 @@ test("E2: unreadable policy fails closed only with the env flag", () => {
   }
 });
 
-test("E4: structurally bounded commands are allowed with no hint; others get the Bash hint", () => {
-  for (const c of ["pwd", "whoami", "git status", "node --version", "rm a.txt", "mv a b", "cp a b"]) assert.deepEqual(bash(c), { kind: "allow" }, c);
-  for (const c of ["ls -la", "rm -v a.txt", "pwd > out.txt", "git log", "npm test"]) {
-    const d = bash(c);
-    assert.equal(d.kind, "hint", c);
-    assert.equal(d.text, prefixed(BASH_HINT, CC));
-    assert.equal(d.onceKey, "bash:s1"); // E5: session id only
+test("D-M7-RR-2: no hint on any PreToolUse: bounded and unbounded Bash, PowerShell, Grep, Read, other MCP", () => {
+  for (const row of [CC, CODEX]) {
+    for (const c of ["pwd", "whoami", "git status", "node --version", "rm a.txt", "mv a b", "cp a b", "ls -la", "rm -v a.txt", "pwd > out.txt", "git log", "npm test"]) {
+      assert.deepEqual(bash(c, row), { kind: "allow" }, row.id + " " + c);
+    }
   }
 });
 
-test("GP3/powershell-same-hint-as-bash", () => {
+test("GP3/powershell-same-decision-as-bash", () => {
   const ps = decide(ev("PowerShell", { command: "Get-ChildItem -Recurse" }), CC, []);
   const sh = bash("ls -R");
   assert.deepEqual(ps, sh);
+  assert.deepEqual(ps, { kind: "allow" });
 });
 
-test("Grep hint and other-MCP hint; own MCP tools and unknown tools are allowed", () => {
-  assert.deepEqual(decide(ev("Grep", { pattern: "x" }), CC, []), { kind: "hint", text: prefixed(GREP_HINT, CC), onceKey: "grep:s1" });
-  assert.deepEqual(decide(ev("mcp:github:get_file", {}), CODEX, []), { kind: "hint", text: prefixed(MCP_HINT, CODEX), onceKey: "mcp:s1" });
+test("Grep, other MCP, own MCP tools and unknown tools are allowed with no hint (D-M7-RR-2)", () => {
+  assert.deepEqual(decide(ev("Grep", { pattern: "x" }), CC, []), { kind: "allow" });
+  assert.deepEqual(decide(ev("mcp:github:get_file", {}), CODEX, []), { kind: "allow" });
+  assert.deepEqual(decide(ev("mcp:github:get_file", {}), CC, []), { kind: "allow" });
   assert.deepEqual(decide(ev("mcp:context-mode:ctx_stats", {}), CC, []), { kind: "allow" });
   assert.deepEqual(decide(ev("Edit", { file_path: big }), CC, []), { kind: "allow" });
+  assert.deepEqual(decide(ev("Read", { file_path: small }), CC, []), { kind: "allow" });
+});
+
+test("D-M7-RR-1: a replace row (claude-code, pi) drops the Bash size-guess denies on the main agent", () => {
+  const sizeGuess = [CURL, "wget -qO- https://data.example.com/d.json", "./gradlew build", "mvn package",
+    `node -e "fetch('https://x.io').then(r=>r.text()).then(console.log)"`];
+  for (const cmd of sizeGuess) {
+    assert.deepEqual(bash(cmd, CC), { kind: "allow" }, cmd);
+    assert.equal(bash(cmd, CODEX).kind, "deny", "no replace: one path, unchanged (ADR-0001) " + cmd);
+  }
+  const PI = getAdapter("pi");
+  assert.deepEqual(decide({ ...ev("Bash", { command: CURL }), agent: "pi" }, PI, []), { kind: "allow" });
+});
+
+test("D-M7-RR-1: subagent calls keep the size-guess denies (ADR-0016 case A/B/C)", () => {
+  const d = decide(ev("Bash", { command: CURL }, { agentId: "sub-1", agentType: "sheller" }), CC, []);
+  assert.deepEqual(d, { kind: "deny", reason: denyMessage("curl", CURL, CC) });
+});
+
+test("D-M7-RR-1: kept on a replace row: user deny, parse-error deny, Read deny, WebFetch deny", () => {
+  assert.deepEqual(bash(CURL, CC, ["Bash(curl:*)"]), { kind: "deny", reason: USER_DENY_REASON_PREFIX + "Bash(curl:*)" });
+  assert.deepEqual(bash('ls; rm -rf / "x', CC, ["Bash(rm -rf:*)"]), { kind: "deny", reason: PARSE_ERROR_DENY_LINE });
+  assert.deepEqual(decide(ev("Read", { file_path: big }), CC, []), { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024) });
+  assert.equal(decide(ev("WebFetch", { url: "https://example.com/a" }), CC, []).kind, "deny");
 });
 
 test("rule order (T-ROUTE): user deny beats the Read deny", () => {
@@ -208,7 +231,7 @@ test("decide never returns replace", () => {
   for (const [cmd] of GOLDEN) assert.notEqual(bash(cmd).kind, "replace");
 });
 
-test("B2: drafts.md deny-* / hint-* blocks equal the code's text", () => {
+test("B2: drafts.md deny-* blocks equal the code's text (hint-* blocks retired, D-M7-RR-2)", () => {
   const md = readFileSync(new URL("../../../docs/v2/prompt/drafts.md", import.meta.url), "utf8");
   const block = (id) => {
     const at = md.indexOf(`<!-- id: ${id} -->`);
@@ -220,9 +243,5 @@ test("B2: drafts.md deny-* / hint-* blocks equal the code's text", () => {
   for (const k of ["curl", "http", "build"]) assert.equal(block("deny-" + k), denyMessage(k, "{command}", row, "{intent}"));
   assert.equal(block("deny-webfetch"), denyMessage("webfetch", "{url}", row));
   assert.equal(block("deny-read"), READ_DENY_MESSAGE("{path}", "{size}"));
-  assert.equal(block("hint-bash"), BASH_HINT);
-  assert.equal(block("hint-read"), READ_HINT);
-  assert.equal(block("hint-grep"), GREP_HINT);
-  assert.equal(block("hint-mcp-followup"), MCP_HINT);
   assert.ok(OUTPUT_CAP > 0);
 });
