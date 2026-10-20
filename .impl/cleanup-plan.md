@@ -170,8 +170,8 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/adapters/claude-code-memory.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/index/auto-memory.test.mjs + GP5/non-ascii-auto-memory-match | W1-adapters |
 | `tests/adapters/claude-code.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/client-map.test.ts` |  | PORT | COVERED | tests/v2/adapters/client-map.test.mjs + e2e GP1/opencode-clientinfo-detect | W1-adapters |
-| `tests/adapters/codex-external-mcp-routing.test.ts` |  | PORT | PORT | triage P (ADR-0008 r3, #529): first check tests/v2/policy/decide + tests/v2/adapters/claude-code (mcp__ rows) | W1-adapters |
-| `tests/adapters/codex-usage.test.ts` | yes | KEEP-PASS | PORT | v2 usage rows exist only for opencode (tests/v2/hooks/usage); confirm against ADR-0015 pricing removal, then RETIRE or port | W1-adapters |
+| `tests/adapters/codex-external-mcp-routing.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/policy/external-mcp-ported.test.mjs (#529; v2 matcher has no mcp__ catch-all, decide allows with no hint, ADR-0008 table, D-M7-RR-2) | W1-adapters |
+| `tests/adapters/codex-usage.test.ts` | yes | KEEP-PASS | RETIRE | RETIRE (reclassified W1-adapters): per-turn file-tail usage capture and pricing removed, ADR-0015 L48; v2 usage rows are tests/v2/hooks/usage.test.mjs (opencode step-finish). KEEP-PASS file, W2 deletes | W1-adapters |
 | `tests/adapters/codex.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/copilot-base-cwd-consistency.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
 | `tests/adapters/copilot-cli.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
@@ -182,14 +182,14 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/adapters/detect-claude-code-in-vscode.test.ts` |  | PORT | RETIRE | TECH-SPEC §5 step 1 (agent comes from --agent; src/entries/server.ts reads no clientInfo); GP1/opencode-clientinfo-detect proves #1276 | W1-adapters |
 | `tests/adapters/detect-config-dir.test.ts` |  | PORT | RETIRE | TECH-SPEC §5 step 1 (agent comes from --agent; src/entries/server.ts reads no clientInfo); GP1/opencode-clientinfo-detect proves #1276 | W1-adapters |
 | `tests/adapters/detect.test.ts` |  | PORT | RETIRE | TECH-SPEC §5 step 1 (agent comes from --agent; src/entries/server.ts reads no clientInfo); GP1/opencode-clientinfo-detect proves #1276 | W1-adapters |
-| `tests/adapters/gemini-cli-external-mcp-routing.test.ts` |  | PORT | PORT | triage P (ADR-0008 r3, #529): first check tests/v2/policy/decide + tests/v2/adapters/claude-code (mcp__ rows) | W1-adapters |
+| `tests/adapters/gemini-cli-external-mcp-routing.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/policy/external-mcp-ported.test.mjs (#529; v2 matcher has no mcp__ catch-all, decide allows with no hint, ADR-0008 table, D-M7-RR-2) | W1-adapters |
 | `tests/adapters/gemini-cli.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/hook-path-parity.test.ts` |  | PORT | COVERED | e2e GP1-absolute-node-path + tests/v2/build/manifests | W1-adapters |
 | `tests/adapters/hook-runtime-per-adapter.test.ts` |  | PORT | COVERED | e2e GP1-absolute-node-path + tests/v2/build/manifests | W1-adapters |
 | `tests/adapters/jetbrains-copilot.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
 | `tests/adapters/kimi-usage.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
 | `tests/adapters/kimi.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
-| `tests/adapters/kiro-external-mcp-routing.test.ts` |  | PORT | PORT | triage P (ADR-0008 r3, #529): first check tests/v2/policy/decide + tests/v2/adapters/claude-code (mcp__ rows) | W1-adapters |
+| `tests/adapters/kiro-external-mcp-routing.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/policy/external-mcp-ported.test.mjs (#529; v2 matcher has no mcp__ catch-all, decide allows with no hint, ADR-0008 table, D-M7-RR-2) | W1-adapters |
 | `tests/adapters/kiro.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/memory-conventions.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/index/auto-memory.test.mjs + GP5/non-ascii-auto-memory-match | W1-adapters |
 | `tests/adapters/omp-plugin.test.ts` |  | PORT | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
@@ -199,14 +199,14 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `tests/adapters/openclaw.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
 | `tests/adapters/opencode.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/pi-adapter.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/pi.test.mjs + tests/v2/plugins/pi.test.mjs | W1-adapters |
-| `tests/adapters/pi-bridge-parent-death.test.ts` |  | PORT | PORT | triage P (ADR-0016): check tests/v2/plugins/pi + GP9/pi-reload-no-leak + GP11-pi-agy first | W1-adapters |
-| `tests/adapters/pi-extension-workspace-resolve.test.ts` | yes | KEEP-PASS | PORT | triage P (ADR-0016): check tests/v2/plugins/pi + GP9/pi-reload-no-leak + GP11-pi-agy first | W1-adapters |
-| `tests/adapters/pi-help-skip-bootstrap.test.ts` |  | PORT | PORT | triage P (ADR-0016): check tests/v2/plugins/pi + GP9/pi-reload-no-leak + GP11-pi-agy first | W1-adapters |
-| `tests/adapters/pi-mcp-bridge-env-scrub.test.ts` |  | PORT | PORT | triage P (ADR-0016): check tests/v2/plugins/pi + GP9/pi-reload-no-leak + GP11-pi-agy first | W1-adapters |
-| `tests/adapters/pi-mcp-bridge.test.ts` |  | PORT | PORT | triage P (ADR-0016): check tests/v2/plugins/pi + GP9/pi-reload-no-leak + GP11-pi-agy first | W1-adapters |
-| `tests/adapters/pi-no-orphan-on-help.test.ts` |  | PORT | PORT | triage P (ADR-0016): check tests/v2/plugins/pi + GP9/pi-reload-no-leak + GP11-pi-agy first | W1-adapters |
-| `tests/adapters/qwen-code-external-mcp-routing.test.ts` |  | PORT | PORT | triage P (ADR-0008 r3, #529): first check tests/v2/policy/decide + tests/v2/adapters/claude-code (mcp__ rows) | W1-adapters |
-| `tests/adapters/qwen-code-usage.test.ts` | yes | KEEP-PASS | PORT | v2 usage rows exist only for opencode (tests/v2/hooks/usage); confirm against ADR-0015 pricing removal, then RETIRE or port | W1-adapters |
+| `tests/adapters/pi-bridge-parent-death.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/plugins/pi-ported.test.mjs (#534/#809/#545; in-process Pi has no bridge child, ADR-0001 §3, ADR-0016) | W1-adapters |
+| `tests/adapters/pi-extension-workspace-resolve.test.ts` | yes | KEEP-PASS | COVERED | COVERED (reclassified W1-adapters): tests/v2/plugins/pi-ported.test.mjs #545 + tests/v2/store/resolve.test.mjs 'resolveProject reads piCwd for pi'. KEEP-PASS file, W2 deletes | W1-adapters |
+| `tests/adapters/pi-help-skip-bootstrap.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/plugins/pi-ported.test.mjs (#534/#809/#545; in-process Pi has no bridge child, ADR-0001 §3, ADR-0016) | W1-adapters |
+| `tests/adapters/pi-mcp-bridge-env-scrub.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/plugins/pi-ported.test.mjs (#534/#809/#545; in-process Pi has no bridge child, ADR-0001 §3, ADR-0016) | W1-adapters |
+| `tests/adapters/pi-mcp-bridge.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/plugins/pi-ported.test.mjs (#534/#809/#545; in-process Pi has no bridge child, ADR-0001 §3, ADR-0016) | W1-adapters |
+| `tests/adapters/pi-no-orphan-on-help.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/plugins/pi-ported.test.mjs (#534/#809/#545; in-process Pi has no bridge child, ADR-0001 §3, ADR-0016) | W1-adapters |
+| `tests/adapters/qwen-code-external-mcp-routing.test.ts` |  | PORT | COVERED | PORTED W1-adapters: tests/v2/policy/external-mcp-ported.test.mjs (#529; v2 matcher has no mcp__ catch-all, decide allows with no hint, ADR-0008 table, D-M7-RR-2) | W1-adapters |
+| `tests/adapters/qwen-code-usage.test.ts` | yes | KEEP-PASS | RETIRE | RETIRE (reclassified W1-adapters): per-turn file-tail usage capture and pricing removed, ADR-0015 L48; v2 usage rows are tests/v2/hooks/usage.test.mjs (opencode step-finish). KEEP-PASS file, W2 deletes | W1-adapters |
 | `tests/adapters/qwen-code.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/vscode-copilot.test.ts` | yes | KEEP-PASS | COVERED | tests/v2/adapters/<agent>.test.mjs + e2e GP3-hooks | W1-adapters |
 | `tests/adapters/zed.test.ts` | yes | KEEP-PASS | RETIRE | TECH-SPEC §3.10 (removed agent) | W1-adapters |
