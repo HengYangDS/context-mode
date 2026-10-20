@@ -51,12 +51,12 @@ function main() {
   const buildIdx = joined.search(/build/i);
   const lintIdx = joined.search(/lint/i);
   const gpIdx = joined.search(/e2e\/cases\/run\.mjs/);
-  const vitestIdx = joined.search(/npx vitest run --config tests\/vitest\.config\.ts/);
-  if ([buildIdx, lintIdx, gpIdx, vitestIdx].some((i) => i === -1)) {
-    return fail("ci.yml test job must run build, lint, e2e/cases/run.mjs, then vitest (DECISIONS-r9 G5)");
+  const unitIdx = joined.search(/node --test "tests\/v2\/\*\*\/\*\.test\.mjs"|v2 unit tests/);
+  if ([buildIdx, lintIdx, gpIdx, unitIdx].some((i) => i === -1)) {
+    return fail("ci.yml test job must run build, lint, e2e/cases/run.mjs, then the v2 unit tests (D-M7-CLN-5)");
   }
-  if (!(buildIdx < lintIdx && lintIdx < gpIdx && gpIdx < vitestIdx)) {
-    return fail("ci.yml step order must be build -> lint -> e2e/cases/run.mjs -> vitest");
+  if (!(buildIdx < lintIdx && lintIdx < gpIdx && gpIdx < unitIdx)) {
+    return fail("ci.yml step order must be build -> lint -> e2e/cases/run.mjs -> v2 unit tests");
   }
 
   if (/\bsecrets\.|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY/.test(src)) {
