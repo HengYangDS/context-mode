@@ -5,6 +5,7 @@
 // Private per-session rows go to /private/tmp/cm-v2-impl-private/bench/sessions.json, never into the repo.
 import { createReadStream, statSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
+import { createHash } from "node:crypto";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -128,7 +129,7 @@ async function replayFile(file) {
             // src/core/hooks/dispatch.ts (D-M7-SV-1): trigger, chunk cap and return budget, not OUTPUT_CAP.
             if (before > C.REPLACE_TRIGGER_BYTES) {
               const intent = typeof u.input.description === "string" ? u.input.description : "";
-              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, "replay:" + canonical);
+              const sel = selectChunksInMemory(chunkText(text, "text", C.REPLACE_CHUNK_BYTES), intent, C.REPLACE_RETURN_BYTES, canonical + "#" + createHash("sha256").update(b.tool_use_id).digest("hex").slice(0, C.REPLACE_LABEL_HASH_CHARS)); // D-M7-SV-4 label form
               after = bytes(sel.text) + (sel.more !== null ? 1 + bytes(sel.more) : 0);
               afterBound = after;
               kind = "replace";
