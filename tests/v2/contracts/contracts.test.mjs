@@ -162,7 +162,7 @@ test("CtxError carries code, vars and the one-line message; toLine() === message
 
 test("contracts source: no regex, imports only node:* or local type re-exports", () => {
   const files = readdirSync(SRC).filter((f) => f.endsWith(".ts")).sort();
-  assert.deepEqual(files, ["agents.ts", "constants.ts", "errors.ts", "types.ts"]);
+  assert.deepEqual(files, ["agents.ts", "client-map.ts", "constants.ts", "errors.ts", "types.ts"]);
   for (const f of files) {
     const src = readFileSync(join(SRC, f), "utf8");
     assert.equal(/new RegExp|\.match\(|\.matchAll\(|\.replace\(|\.replaceAll\(|\.split\(\s*\//.test(src), false, `${f}: regex use`);
