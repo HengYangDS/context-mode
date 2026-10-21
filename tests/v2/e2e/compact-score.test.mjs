@@ -2,7 +2,7 @@
 // arm d correct >= 70%; ctx_resume(seq) returns the row 10/10.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { verdict } from "../../../e2e/live/compact/score.mjs";
+import { verdict, exactMatch } from "../../../e2e/live/compact/score.mjs";
 
 const run = (o = {}) => ({ factInSummary: false, calledTool: true, correct: true, resumeSeqOk: true, ...o });
 const n = (k, o) => Array.from({ length: k }, () => run(o));
@@ -54,4 +54,24 @@ test("verdict lists named checks", () => {
   const v = verdict(base());
   assert.ok(Array.isArray(v.checks) && v.checks.length >= 5);
   for (const c of v.checks) assert.ok(typeof c.name === "string" && typeof c.pass === "boolean");
+});
+
+test("exactMatch is case-sensitive by default (path, id, number)", () => {
+  assert.equal(exactMatch("packages/cli/lib/Config/layered-loader.mjs", "packages/cli/lib/config/layered-loader.mjs"), false);
+  assert.equal(exactMatch("7350", "7350"), true);
+});
+
+test("exactMatch with caseSensitive:false folds case only (prose answer)", () => {
+  const opt = { caseSensitive: false };
+  assert.equal(exactMatch("Newline-delimited JSON (NDJSON)", "newline-delimited JSON", opt), true);
+  assert.equal(exactMatch("CSV", "newline-delimited JSON", opt), false);
+  assert.equal(exactMatch("One JSON array", "newline-delimited JSON", opt), false);
+});
+
+test("session-03 key is prose (case-insensitive), session-01/02 keys stay case-sensitive", async () => {
+  const { FIXTURES } = await import("../../../e2e/live/compact/fixtures.mjs");
+  const by = Object.fromEntries(FIXTURES.map((f) => [f.id, f.answer]));
+  assert.equal(by["session-03"].caseSensitive, false);
+  assert.notEqual(by["session-01"].caseSensitive, false);
+  assert.notEqual(by["session-02"].caseSensitive, false);
 });

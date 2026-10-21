@@ -25,6 +25,7 @@
   "needs": "option",
   "answer": {
     "kind": "option",
-    "exact": "newline-delimited JSON"
+    "exact": "newline-delimited JSON",
+    "caseSensitive": false
   }
 }

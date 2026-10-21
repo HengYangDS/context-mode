@@ -14,10 +14,12 @@ export const MIN_CORRECT_D = 0.7;
 export const RESUME_SEQ_RUNS = 10;
 
 // Exact-match checker on the answer key: the answer holds the fact value verbatim.
-export function exactMatch(answer, value) {
+// Case-sensitive unless the fixture key sets caseSensitive:false (a prose word, not a path, id or number).
+export function exactMatch(answer, value, { caseSensitive = true } = {}) {
   if (typeof answer !== "string" || typeof value !== "string") return false;
   const v = value.trim();
-  return v.length > 0 && answer.includes(v);
+  if (v.length === 0) return false;
+  return caseSensitive ? answer.includes(v) : answer.toLowerCase().includes(v.toLowerCase());
 }
 
 const rate = (k, n) => (n === 0 ? null : k / n);

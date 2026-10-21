@@ -99,7 +99,7 @@ async function one(id, i, bin, root) {
       fixture: f.id,
       factInSummary: false,
       calledTool: r.toolCalls.some((t) => t.turn >= after && READ_TOOLS.includes(t.name)),
-      correct: exactMatch(r.finalText, f.answer.exact),
+      correct: exactMatch(r.finalText, f.answer.exact, { caseSensitive: f.answer.caseSensitive !== false }),
       resumeSeqOk: await resumeSeqOk(s.cwd, big),
       compacted: r.compacted,
       isError: r.isError,
