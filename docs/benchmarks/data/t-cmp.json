@@ -1,0 +1,108 @@
+{
+  "id": "T-CMP",
+  "model": "claude-sonnet-5-5",
+  "effort": "low",
+  "budgetUsd": "0.25",
+  "runsPerArm": 10,
+  "arms": [
+    "a",
+    "b",
+    "c",
+    "d",
+    "e"
+  ],
+  "complete": true,
+  "costUsd": 4.5222,
+  "stats": {
+    "a": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "b": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "c": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "d": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    },
+    "e": {
+      "runs": 10,
+      "missing": 10,
+      "called": 0,
+      "callRate": 0,
+      "correct": 7,
+      "correctRate": 0.7,
+      "resumeRuns": 10,
+      "resumeOk": 10
+    }
+  },
+  "info": {
+    "a_correct_minus_b": 0
+  },
+  "checks": [
+    {
+      "name": "runs_per_arm",
+      "pass": true,
+      "want": ">= 10 each"
+    },
+    {
+      "name": "a_call_rate",
+      "pass": false,
+      "got": 0,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "a_correct",
+      "pass": false,
+      "got": 0.7,
+      "want": ">= 0.8"
+    },
+    {
+      "name": "a_correct_ge_c",
+      "pass": true,
+      "got": 0.7,
+      "want": ">= c 0.7"
+    },
+    {
+      "name": "d_correct",
+      "pass": true,
+      "got": 0.7,
+      "want": ">= 0.7"
+    },
+    {
+      "name": "resume_seq",
+      "pass": true,
+      "got": "50/50",
+      "want": "all, >= 10"
+    }
+  ]
+}

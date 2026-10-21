@@ -145,7 +145,7 @@ Read more: [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](do
 
 ## Benchmarks
 
-Only measured numbers. Each row names its source and date. Method and caveats: [docs/v2/benchmarks.md](docs/v2/benchmarks.md), [docs/v2/prompt/results.md](docs/v2/prompt/results.md), [docs/performance.md](docs/performance.md). Agent: Claude Code 2.1.303, claude-sonnet-5-5, effort low, keyless `claude -p`, unless a row says otherwise.
+Full publish pack with data files and reproduce commands: [docs/benchmarks/](docs/benchmarks/README.md). Only measured numbers. Each row names its source and date. Method and caveats: [docs/v2/benchmarks.md](docs/v2/benchmarks.md), [docs/v2/prompt/results.md](docs/v2/prompt/results.md), [docs/performance.md](docs/performance.md). Agent: Claude Code 2.1.303, claude-sonnet-5-5, effort low, keyless `claude -p`, unless a row says otherwise.
 
 **Large output: what the model sees** (v2-design `980272a5`, 2026-10-21, [method](docs/v2/benchmarks.md#replace-live-proof-final)). The task runs `seq 1 N` and asks for the last number. 16 runs (4 sizes x git and non-git cwd x 2): no error, the model got a reply under 200 characters instead of the full output, and the answer was right 16 of 16.
 
