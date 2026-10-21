@@ -76,15 +76,30 @@ v2 cost less than v1 on every task: grep 23% lower (likely 14 to 32%), edit 28% 
 
 ## Bridge check: is the 2026-09-29 gateway result still true today?
 
-We planned 2 extra direct-vs-gateway pairs per task on today's client, as a drift check only. Bridge numbers have no verdict. We do not merge them into any row.
+This is a drift check, not a result. We ran 2 extra direct-vs-gateway pairs per task on today's client (Claude Code 2.1.303, `claude-opus-5-5`). The published rows used Claude Code 2.1.283 on 2026-09-29. Two pairs give no interval and no verdict. We do not merge them into any row.
 
-- **log:** pair 1 (direct first) direct $0.0820, gateway $0.1531, **+86.7%**. Pair 2 (gateway first) direct $0.0936, gateway $0.0351, −62.6%. 0 of 2 inside the published range (−30.2 to −14.7%). The two pairs differ in sign. This is not a result.
-- **git:** pair 1 direct $0.0679, gateway $0.0556, −18.1% (inside the published range −33.9 to −16.5%). Pair 2 direct $0.0428, gateway $0.0211, −50.7% (below the range). 1 of 2 inside.
-- **tests, json, grep, edit:** not run. The gateway host in the harness config answered HTTP 404 at the tenant preflight. The lanes then ran without the bridge. For these four tasks we have no gateway figure from today (INCONCLUSIVE).
+Pair 1 ran direct first, pair 2 gateway first. Each cell gives direct → gateway cost and the change. "Published" is the published change with its 95% range.
 
-Bridge gateway sessions: one new disposable tenant per task, tenant ids withheld. The harness changed no flag. It read `memory: true, skills: true` (the defaults) before and after each run. The gateway version was the same before and after each pair. The gateway's per-call record covered all the tokens the client saw.
+| Task | Published | Pair 1 (direct first) | Pair 2 (gateway first) | Inside the range |
+|---|---|---|---|---|
+| npm test fix loop, short | −21.8% (−27.7 to −15.8) | $0.0804 → $0.0624, −22.3% | $0.0805 → $0.0618, −23.2% | 2 of 2 |
+| One large JSON file | −21.4% (−29.9 to −12.9) | $0.0559 → $0.0416, −25.5% | $0.0818 → $0.0683, −16.5% | 2 of 2 |
+| Repo history question | −25.2% (−33.9 to −16.5) | $0.0679 → $0.0556, −18.1% | $0.0428 → $0.0211, −50.7% | 1 of 2 |
+| Code search | −28.7% (−34.1 to −23.4) | $0.0947 → $0.1120, +18.3% | $0.0850 → $0.0668, −21.4% | 0 of 2 |
+| One-line edit | −27.8% (−42.2 to −13.5) | $0.0479 → $0.0322, −32.8% | $0.0481 → $0.0596, +24.1% | 1 of 2 |
+| One large log | −22.4% (−30.2 to −14.7) | $0.0820 → $0.1531, +86.7% | $0.0936 → $0.0351, −62.6% | 0 of 2 |
 
-Four pairs cannot confirm or reject the published rows. A real check needs a new pre-registered run on today's client.
+What it says about drift:
+
+- **tests, json:** both pairs fall inside the published range. We see no sign of drift on these two tasks.
+- **git:** the gateway cost less in both pairs. One pair is inside the range. The other saved more than the range.
+- **grep, edit, log:** the gateway cost more in one pair and less in the other. Two pairs cannot tell drift from noise here.
+- **All 12 pairs:** the gateway cost less in 9 of 12. 6 of 12 fall inside the published range. Sum over the 12 pairs: direct $0.861, gateway $0.770 (−10.6%). The published sum over 88 pairs was −24.5%.
+- The 3 gateway sessions that cost more than their direct run wrote more tokens to the prompt cache than the other gateway session of the same task (grep 11,638 vs 6,365, log 17,258 vs 2,427, edit 5,482 vs 2,145). We did not measure why.
+
+All 24 bridge sessions passed their task check. Each task used one new disposable tenant (tenant ids withheld). The harness changed no flag. It read `memory: true, skills: true` (the defaults) before and after each gateway run. The gateway version was the same before and after each pair, so no pair ran again. The gateway's per-call record was found and complete for all 12 gateway runs and covered all the tokens the client saw. Its cost was within 0.002% of the client's own total.
+
+Twelve pairs cannot confirm or reject the published rows. A real check needs a new pre-registered run on today's client.
 
 ## How we measured
 
@@ -95,7 +110,8 @@ Four pairs cannot confirm or reject the published rows. A real check needs a new
 - **Written down first.** [prereg.md](prereg.md) was pushed as `bcc45e33` at 2026-10-21T19:47Z. The first run file was pushed at 2026-10-21T20:13Z.
 - **Analysis.** d = arm − direct per cycle. Change = 100 × mean(d) / mean(direct), with the 95% t interval (t = 2.365 at n = 8). Verdict "less" when the whole interval is below zero, "more" when it is above zero, else "same". Every measured cycle counts. We dropped no outlier.
 - **Gateway rows.** Copied from `/benchmarks/data/v3-opus55-short.json` (SHA-256 `3298b1b2…`, checked by `analyze.mjs`). Same tasks, same prompts and the same checks (gateway commit `408333a4`). `analyze.mjs` runs the same method on the published pairs. It gets the same change, interval, verdict and wins on all 6 rows (interval ends differ by 0.0 points).
-- **Spend.** 170 sessions (18 warm-up, 144 measured, 8 bridge), $13.75 at list price.
+- **Bridge.** Same client flags as above. The gateway arm sets `ANTHROPIC_BASE_URL` to the deployed gateway at `https://gateway.context-mode.com`. Gateway cost comes from the gateway's per-call record, hidden calls included, at list price. The run files do not hold the host.
+- **Spend.** 186 sessions (18 warm-up, 144 measured, 24 bridge), $14.83 at list price.
 - **Not done.** Gate S0 (does `bypassPermissions` keep the plugin hook active?) has no saved result for this run. We report it as INCONCLUSIVE. It does not change the cost figures.
 
 ## Verify it yourself
@@ -107,7 +123,7 @@ node analyze.mjs --check   # exit 0: ab.json and index.json match the run files
 node analyze.mjs           # writes them again and prints one line per task
 ```
 
-`analyze.mjs` uses no clock, no network and no random numbers. It stops on a changed gateway file, an unresolved arm, a model or client change, or a cost that does not match its token columns. The run files hold token counts per session, cost, success, tool-call names and the arm evidence. We withheld prompts, answers, session ids, tenant ids, the gateway host, local paths and transcripts. To run the cycles again, see [bench/gateway-ab/README.md](../../../bench/gateway-ab/README.md) and `harness.patch`.
+`analyze.mjs` uses no clock, no network and no random numbers. It stops on a changed gateway file, an unresolved arm, a model or client change, or a cost that does not match its token columns. The run files hold token counts per session, cost, success, tool-call names and the arm evidence. We withheld prompts, answers, session ids, tenant ids, local paths and transcripts. The run files do not hold the gateway host. We name it once, under How we measured. To run the cycles again, see [bench/gateway-ab/README.md](../../../bench/gateway-ab/README.md) and `harness.patch`.
 
 ## Sources
 

@@ -24,7 +24,7 @@
       "pct": -21.8,
       "verdict": "less"
      },
-     "bridge": "not run"
+     "bridge": "2 of 2 inside the published range"
     },
     {
      "id": "json",
@@ -41,7 +41,7 @@
       "pct": -21.4,
       "verdict": "less"
      },
-     "bridge": "not run"
+     "bridge": "2 of 2 inside the published range"
     },
     {
      "id": "log",
@@ -92,7 +92,7 @@
       "pct": -28.7,
       "verdict": "less"
      },
-     "bridge": "not run"
+     "bridge": "0 of 2 inside the published range"
     },
     {
      "id": "edit",
@@ -109,7 +109,7 @@
       "pct": -27.8,
       "verdict": "less"
      },
-     "bridge": "not run"
+     "bridge": "1 of 2 inside the published range"
     }
    ]
   },

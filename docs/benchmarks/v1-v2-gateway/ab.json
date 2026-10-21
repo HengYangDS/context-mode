@@ -55,8 +55,8 @@
  },
  "cost_basis": "List price on the token counts in each session's result event, per model. Cache writes whose lifetime is not split are priced at the 1 hour rate (usd) and the 5 minute rate (usd_low). Claude Code's own total_cost_usd is kept as usd_client; a gap above 1% sets client_gap_flag. Bridge gateway sessions: the gateway's per-call record, hidden calls included. The runs used a claude.ai login: there is no per-token invoice, so every figure is a list-price equivalent.",
  "analysis_method": "Every measured cycle, failures included, no outlier dropped. Per workload, d = arm - plain per cycle. % = 100 x mean(d) / mean(plain), with the 95% t interval. Verdict: less when the whole interval is below zero, more when above, else same. arm_wins: cycles where the arm cost less than plain. v2 against v1 is secondary. Gateway rows are the published rows, cited by workload id, each against its own published plain arm.",
- "spend_usd_list_price": 13.74647,
- "sessions": 170,
+ "spend_usd_list_price": 14.82575,
+ "sessions": 186,
  "void_sessions": 0,
  "inputs": [
   {
@@ -65,13 +65,13 @@
   },
   {
    "file": "runs/tests.jsonl",
-   "sha256": "d954a698effbb39cc8a609f669eb003324b674cbb24836d6534f00b5f414bffc",
-   "sessions": 27
+   "sha256": "be48042ad3e821ad6b2ca3643b229acfd1aaf63718f6f3ff63f6751d418d161b",
+   "sessions": 31
   },
   {
    "file": "runs/json.jsonl",
-   "sha256": "9e6f37ec7487acb3f05bf48a54779eb3bba607e0fc304e03d7d2955c8d855d71",
-   "sessions": 27
+   "sha256": "64fa0e6e74cdfeab3e43296a62130eb659e99dcb843638a0fc4194740a5a3581",
+   "sessions": 31
   },
   {
    "file": "runs/log.jsonl",
@@ -85,13 +85,13 @@
   },
   {
    "file": "runs/grep.jsonl",
-   "sha256": "763c790e8daeb2f223d492567e4eff329cba79ab8fa122a5c0cb290dda6551cd",
-   "sessions": 27
+   "sha256": "b85ba54a2a26f4e0ac2b568ee653607b12f13bee906e56f4256a330b127ac02a",
+   "sessions": 31
   },
   {
    "file": "runs/edit.jsonl",
-   "sha256": "a663455a5339d1ff14e4c0d454bbfddf5adef8673f2449a1bf6408c25f7aa839",
-   "sessions": 27
+   "sha256": "f33f6a21ab1dd70eb9640cbb2fd83ef3436c74bc594d7a8fe8b1fddf54a30135",
+   "sessions": 31
   }
  ],
  "pooled": {
@@ -226,8 +226,238 @@
     }
    },
    "bridge": {
-    "ran": false,
-    "why": "not run in this lane: the gateway host in the harness config answered HTTP 404 at the tenant preflight, and the lane ran without the bridge. No gateway figure from today for this workload (INCONCLUSIVE)."
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0803652,
+       "usd_low": 0.0803652,
+       "usd_client": 0.0803652,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48286
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8008
+        ],
+        "out": [
+         331
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.06244,
+       "usd_low": 0.06244,
+       "usd_client": 0.0624402,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         728
+        ],
+        "cr": [
+         49021
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5148
+        ],
+        "out": [
+         427
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 54897,
+         "output": 427,
+         "cache_read": 49021,
+         "cache_write": 5148
+        },
+        "anthropic_usd": 0.06244,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -22.3,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0804732,
+       "usd_low": 0.0804732,
+       "usd_client": 0.08047320000000001,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48286
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8014
+        ],
+        "out": [
+         334
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.0618,
+       "usd_low": 0.0618,
+       "usd_client": 0.0618,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         728
+        ],
+        "cr": [
+         49020
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5128
+        ],
+        "out": [
+         403
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 54876,
+         "output": 403,
+         "cache_read": 49020,
+         "cache_write": 5128
+        },
+        "anthropic_usd": 0.0618,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -23.2,
+      "inside_published_range": true
+     }
+    ],
+    "plain_usd_mean": 0.08042,
+    "gateway_usd_mean": 0.06212,
+    "pct_of_means": -22.8,
+    "inside_published_range": "2 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
    },
    "pairs": [
     {
@@ -1386,8 +1616,238 @@
     }
    },
    "bridge": {
-    "ran": false,
-    "why": "not run in this lane: the gateway host in the harness config answered HTTP 404 at the tenant preflight, and the lane ran without the bridge. No gateway figure from today for this workload (INCONCLUSIVE)."
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.055931800000000004,
+       "usd_low": 0.055931800000000004,
+       "usd_client": 0.055931800000000004,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         45339
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5360
+        ],
+        "out": [
+         198
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.041643,
+       "usd_low": 0.041643,
+       "usd_client": 0.0416426,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         728
+        ],
+        "cr": [
+         44953
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         3195
+        ],
+        "out": [
+         209
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 48876,
+         "output": 209,
+         "cache_read": 44953,
+         "cache_write": 3195
+        },
+        "anthropic_usd": 0.041643,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -25.5,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.08181719999999999,
+       "usd_low": 0.08181719999999999,
+       "usd_client": 0.0818172,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48506
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8524
+        ],
+        "out": [
+         195
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.068315,
+       "usd_low": 0.068315,
+       "usd_client": 0.06831480000000001,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 4,
+       "calls": {
+        "in": [
+         732
+        ],
+        "cr": [
+         69134
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5900
+        ],
+        "out": [
+         218
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 3
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 4,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 75766,
+         "output": 218,
+         "cache_read": 69134,
+         "cache_write": 5900
+        },
+        "anthropic_usd": 0.068315,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -16.5,
+      "inside_published_range": true
+     }
+    ],
+    "plain_usd_mean": 0.06887,
+    "gateway_usd_mean": 0.05498,
+    "pct_of_means": -20.2,
+    "inside_published_range": "2 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
    },
    "pairs": [
     {
@@ -5342,8 +5802,238 @@
     }
    },
    "bridge": {
-    "ran": false,
-    "why": "not run in this lane: the gateway host in the harness config answered HTTP 404 at the tenant preflight, and the lane ran without the bridge. No gateway figure from today for this workload (INCONCLUSIVE)."
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0947036,
+       "usd_low": 0.0947036,
+       "usd_client": 0.0947036,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 4,
+       "calls": {
+        "in": [
+         8
+        ],
+        "cr": [
+         69338
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8843
+        ],
+        "out": [
+         503
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 3
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.112013,
+       "usd_low": 0.112013,
+       "usd_client": 0.1120134,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         46167
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         11638
+        ],
+        "out": [
+         338
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 58534,
+         "output": 338,
+         "cache_read": 46167,
+         "cache_write": 11638
+        },
+        "anthropic_usd": 0.112013,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": 18.3,
+      "inside_published_range": false
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0850478,
+       "usd_low": 0.0850478,
+       "usd_client": 0.08504779999999999,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         48499
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         8468
+        ],
+        "out": [
+         379
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.066839,
+       "usd_low": 0.066839,
+       "usd_client": 0.0668394,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         48117
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         6365
+        ],
+        "out": [
+         169
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 55211,
+         "output": 169,
+         "cache_read": 48117,
+         "cache_write": 6365
+        },
+        "anthropic_usd": 0.066839,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -21.4,
+      "inside_published_range": false
+     }
+    ],
+    "plain_usd_mean": 0.08988,
+    "gateway_usd_mean": 0.08943,
+    "pct_of_means": -0.5,
+    "inside_published_range": "0 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
    },
    "pairs": [
     {
@@ -6503,8 +7193,238 @@
     }
    },
    "bridge": {
-    "ran": false,
-    "why": "not run in this lane: the gateway host in the harness config answered HTTP 404 at the tenant preflight, and the lane ran without the bridge. No gateway figure from today for this workload (INCONCLUSIVE)."
+    "ran": true,
+    "pairs": [
+     {
+      "pair": 1,
+      "order": [
+       "plain",
+       "gateway"
+      ],
+      "plain": {
+       "usd": 0.0479372,
+       "usd_low": 0.0479372,
+       "usd_client": 0.0479372,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         44266
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         4315
+        ],
+        "out": [
+         227
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0
+      },
+      "gateway": {
+       "usd": 0.03223,
+       "usd_low": 0.03223,
+       "usd_client": 0.0322298,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         43569
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         2145
+        ],
+        "out": [
+         172
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 46443,
+         "output": 172,
+         "cache_read": 43569,
+         "cache_write": 2145
+        },
+        "anthropic_usd": 0.03223,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": -32.8,
+      "inside_published_range": true
+     },
+     {
+      "pair": 2,
+      "order": [
+       "gateway",
+       "plain"
+      ],
+      "plain": {
+       "usd": 0.0480834,
+       "usd_low": 0.0480834,
+       "usd_client": 0.0480834,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         6
+        ],
+        "cr": [
+         44217
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         4292
+        ],
+        "out": [
+         244
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "result_event_model_usage",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 1
+      },
+      "gateway": {
+       "usd": 0.059649,
+       "usd_low": 0.059649,
+       "usd_client": 0.059649,
+       "client_gap_flag": false,
+       "success": true,
+       "turns": 3,
+       "calls": {
+        "in": [
+         729
+        ],
+        "cr": [
+         47085
+        ],
+        "cw5": [
+         0
+        ],
+        "cw1h": [
+         5482
+        ],
+        "out": [
+         173
+        ],
+        "model": [
+         0
+        ],
+        "models": [
+         "claude-opus-5-5"
+        ]
+       },
+       "calls_from": "gateway_record_session",
+       "tools": {
+        "Bash": 2
+       },
+       "result_subtype": "success",
+       "timed_out": false,
+       "rate_limited": false,
+       "budget_hit": false,
+       "order_position": 0,
+       "gateway_record": {
+        "found": true,
+        "complete": true,
+        "requests": 3,
+        "edge_calls": 0,
+        "tokens": {
+         "prompt": 53296,
+         "output": 173,
+         "cache_read": 47085,
+         "cache_write": 5482
+        },
+        "anthropic_usd": 0.059649,
+        "covers_client": true
+       },
+       "flags_before": {
+        "memory": true,
+        "skills": true
+       },
+       "flags_after": {
+        "memory": true,
+        "skills": true
+       },
+       "gateway_version_same_before_after": true
+      },
+      "pct": 24.1,
+      "inside_published_range": false
+     }
+    ],
+    "plain_usd_mean": 0.04801,
+    "gateway_usd_mean": 0.04594,
+    "pct_of_means": -4.3,
+    "inside_published_range": "1 of 2",
+    "note": "Drift check only. Two pairs have no interval and no verdict. Not merged into any row."
    },
    "pairs": [
     {
