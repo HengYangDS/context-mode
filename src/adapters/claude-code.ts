@@ -29,9 +29,11 @@ function outputOf(resp: unknown): string {
   if (typeof resp === "string") return resp;
   if (typeof resp === "object" && resp !== null) {
     const r = resp as { stdout?: unknown; stderr?: unknown };
-    if (typeof r.stdout === "string") {
+    // D-FU-RF-DECODE-1: a Bash shape with only one of stdout/stderr reads the missing one as "".
+    if (typeof r.stdout === "string" || typeof r.stderr === "string") {
+      const out = typeof r.stdout === "string" ? r.stdout : "";
       const err = typeof r.stderr === "string" ? r.stderr : "";
-      return err === "" ? r.stdout : r.stdout === "" ? err : r.stdout + "\n" + err;
+      return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
   return JSON.stringify(resp);
@@ -92,8 +94,45 @@ export function encodeClaudeShape(ev: CanonicalHookEvent, d: Decision, hasReplac
   }
 }
 
+// D-FU-RF-DECODE-1: fields the decode cannot run without. The hooks docs list them as always present;
+// a payload without one fails decode with a line naming the field (handleHook writes it to stderr and
+// answers with the empty allow shape), never a silent empty answer. Every other field has a default.
+const REQUIRED_FIELDS: Readonly<Partial<Record<CanonicalEventName, readonly string[]>>> = {
+  PreToolUse: ["tool_name"],
+  PostToolUse: ["tool_name", "tool_response"],
+};
+
+// FNV-1a 32-bit, hex: a short stable id from a string. Not for security; the hook path stays free of
+// node:crypto (D-M7-HP-2).
+function fnv1a(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+function requireFields(raw: unknown): void {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return; // decodeClaudeShape throws
+  const p = raw as Record<string, unknown>;
+  if (p.hook_event_name === undefined) throw new Error("claude-code: missing required field hook_event_name");
+  for (const f of REQUIRED_FIELDS[p.hook_event_name as CanonicalEventName] ?? []) {
+    if (p[f] === undefined) throw new Error("claude-code: missing required field " + f);
+  }
+}
+
 export function decode(raw: unknown): CanonicalHookEvent {
-  return decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  requireFields(raw);
+  const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  // D-FU-RF-DECODE-1 defaults. cwd: the project dir Claude Code sets for its hooks, else the hook's own cwd.
+  if (ev.cwd === "") ev.cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  // tool_use_id: a label from a hash of the command and the turn, so one command in one turn keeps one source.
+  if (ev.event === "PostToolUse" && ev.tool !== undefined && ev.tool.callId === undefined) {
+    const cmd = typeof ev.tool.input.command === "string" ? ev.tool.input.command : JSON.stringify(ev.tool.input);
+    ev.tool.callId = "h" + fnv1a(ev.tool.name + "\0" + cmd + "\0" + String(ev.turn ?? 0));
+  }
+  return ev;
 }
 
 export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): HookOutput {
