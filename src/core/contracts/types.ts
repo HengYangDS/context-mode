@@ -165,6 +165,7 @@ export type CandidateSection =
   | "last_request"
   | "open_errors"
   | "changed_files"
+  | "decisions"
   | "earlier_requests"
   | "indexed_sources";
 

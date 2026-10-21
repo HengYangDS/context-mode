@@ -32,7 +32,8 @@ export const SURFACE_CAP = 8000; // Q5, Q13
 // Compaction scoring (ADR-0009, DECISIONS-r6 D1, DECISIONS-r9 §C)
 export const MAX_CANDIDATES = 85; // per section, ADR-0009 §3
 export const MAX_CANDIDATES_TOTAL = 340; // ADR-0009 §4
-export const WEIGHT: Readonly<Record<"toolerr" | "prompt" | "edit" | "index", number>> = Object.freeze({ toolerr: 900, prompt: 500, edit: 400, index: 200 });
+// DECISIONS-r11 (A): decision rows score (700: under an open error, over a prompt); they were never candidates before.
+export const WEIGHT: Readonly<Record<"toolerr" | "decision" | "prompt" | "edit" | "index", number>> = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 export const DECAY_HALF_LIFE_TURNS = 4;
 export const RATIO_SECTION_DECAY = 0.7;
 // DECAY_X1000[age] = round(1000 * (0.25 + 0.75 * 2^(-age / DECAY_HALF_LIFE_TURNS))), ages 0..127.

@@ -39,6 +39,13 @@ test("[M4] score/weight-ordering-toolerr-gt-prompt-gt-edit-gt-index", () => {
   assert.ok(toolerr > prompt && prompt > edit && edit > index);
 });
 
-test("[M4] score/decision-section-is-rejected-not-a-candidate", () => {
-  assert.throws(() => scoreCandidate({ section: "decision", currentTurn: 1, itemTurn: 1, repeatCount: 1 }));
+// DECISIONS-r11 (A) supersedes DECISIONS-r6 D3 (DEVIATIONS D-FU-CMP-PUSH-1): a decision row is scored,
+// under an open error and over a prompt; a row kind with no weight (cost) is still rejected.
+test("[M7] score/decision-section-scored-between-toolerr-and-prompt", () => {
+  const args = { currentTurn: 1, itemTurn: 1, repeatCount: 1 };
+  const toolerr = scoreCandidate({ section: "toolerr", ...args });
+  const decision = scoreCandidate({ section: "decision", ...args });
+  const prompt = scoreCandidate({ section: "prompt", ...args });
+  assert.ok(toolerr > decision && decision > prompt, [toolerr, decision, prompt].join(" "));
+  assert.throws(() => scoreCandidate({ section: "cost", ...args }));
 });

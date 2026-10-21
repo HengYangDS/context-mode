@@ -40,7 +40,8 @@ const openTag = (sid, upto) => `<context_mode_state session="${sid}" upto="${upt
 // DECISIONS-r9 M10: the pointer string is exactly `#<seq> (<bytes> B) ctx_resume(seq:<seq>)`.
 const POINTER_RE = /^#(\d+) \((\d+) B\) ctx_resume\(seq:(\d+)\)$/;
 // DECISIONS-r9 M4 line formats; M10 pointer; ADR-0009 §5 tags and the more: line. Nothing else is rendered.
-const LINE_PREFIXES = ["<context_mode_state ", "now: ", "error #", "edited ", "asked #", "indexed ", "more: ", CLOSE_TAG];
+// DECISIONS-r11 (A): "decided #" is the decisions section line.
+const LINE_PREFIXES = ["<context_mode_state ", "now: ", "error #", "edited ", "decided #", "asked #", "indexed ", "more: ", CLOSE_TAG];
 
 const B = (s) => Buffer.byteLength(s, "utf8");
 
@@ -408,8 +409,9 @@ test("[M4] GP6/decision-prose-no-row", async (t) => {
   assert.ok(!hits.includes("blue button"), hits);
 });
 
-// ADR-0009 §3 (DECISIONS-r9 F2/F8): a decision row has no weight and is never a state-block candidate.
-test("[M4] GP6/decision-never-candidate", async (t) => {
+// ADR-0009 §3 (DECISIONS-r9 F2/F8) as amended by DECISIONS-r11 (A), D-FU-CMP-PUSH-1: a decision row is the
+// decisions section of the state block (it was never a candidate before).
+test("[M7] GP6/decision-in-decisions-section", async (t) => {
   const f = fixture(t);
   const sid = "gp6-never";
   await f.hook("claude-code", sid, { hook_event_name: "UserPromptSubmit", prompt: "deploy?" });
@@ -424,6 +426,7 @@ test("[M4] GP6/decision-never-candidate", async (t) => {
   const c = await f.server();
   const state = textOf(await call(c, "ctx_resume", { session: sid }));
   assert.ok(state.startsWith(openTag(sid, decision.seq) + "\n"), state); // the row is read (newest seq) ...
-  assert.ok(!state.includes("Deploy now?") && !state.includes("#" + decision.seq + " "), state); // ... never rendered
+  // ... and rendered as the decisions line (DECISIONS-r11 A supersedes DECISIONS-r6 D3, D-FU-CMP-PUSH-1)
+  assert.ok(linesOf(state).includes("decided #" + decision.seq + ": Q: Deploy now? → A: Yes"), state);
   assert.ok(linesOf(state).includes("now: deploy?"), state);
 });

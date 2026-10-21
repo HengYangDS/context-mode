@@ -132,13 +132,24 @@ test("[M4] render/error-fixed-later-not-listed", () => {
   assert.ok(!renderState(rows, 1).includes("error #"));
 });
 
-test("[M4] render/decision-rows-never-rendered", () => {
+// DECISIONS-r11 (A) supersedes DECISIONS-r6 D3 (DEVIATIONS D-FU-CMP-PUSH-1): the anchored block has a
+// decisions section, after edited files and before earlier requests.
+test("[M7] render/decision-rows-rendered-in-fixed-order", () => {
   const rows = [
     row({ seq: 1, kind: "decision", tool: "AskUserQuestion", key: "Q: deploy?", body: "Q: deploy? → A: Yes" }),
-    row({ seq: 2, kind: "prompt", body: "go" }),
+    row({ seq: 2, kind: "edit", tool: "Edit", path: "a.ts" }),
+    row({ seq: 3, kind: "prompt", body: "first ask" }),
+    row({ seq: 4, kind: "prompt", body: "go" }),
   ];
-  const out = renderState(rows, 1);
-  assert.ok(!out.includes("deploy"));
+  assert.equal(renderState(rows, 1), [
+    OPEN("s1", 4),
+    "now: go",
+    "edited a.ts x1",
+    "decided #1: Q: deploy? → A: Yes",
+    "asked #3: first ask",
+    'more: ctx_search(queries:[], scope:"session")',
+    CLOSE,
+  ].join("\n"));
 });
 
 // ADR-0009 §4 "An item that does not fit is skipped, and smaller ones may still fit" (the D1

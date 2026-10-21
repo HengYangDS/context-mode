@@ -6,7 +6,7 @@ import type { Candidate, CandidateSection } from "../contracts/types.ts";
 export type WeightKey = keyof typeof WEIGHT;
 
 export interface ScoreInput {
-  section: WeightKey; // the weight row: toolerr, prompt, edit, index (cost and decision have none)
+  section: WeightKey; // the weight row: toolerr, decision, prompt, edit, index (cost has none; decision since DECISIONS-r11)
   currentTurn: number;
   itemTurn: number;
   repeatCount: number;
@@ -14,7 +14,7 @@ export interface ScoreInput {
 
 export function scoreCandidate(input: ScoreInput): number {
   if (!Object.hasOwn(WEIGHT, input.section)) {
-    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, prompt, edit and index rows are scored (ADR-0009 §3).`);
+    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, decision, prompt, edit and index rows are scored (ADR-0009 §3, DECISIONS-r11).`);
   }
   const age = Math.max(0, input.currentTurn - input.itemTurn); // impl/06 §2 step 2: a negative age clamps to 0
   const decay = DECAY_X1000[Math.min(age, DECAY_X1000.length - 1)] as number; // DECISIONS-r9 M6
@@ -33,6 +33,8 @@ function weightKey(section: CandidateSection): WeightKey {
       return "toolerr";
     case "changed_files":
       return "edit";
+    case "decisions":
+      return "decision";
     case "indexed_sources":
       return "index";
   }
