@@ -1,6 +1,6 @@
 # Install context-mode v2 on Kiro
 
-This guide writes the MCP entry to `~/.kiro/settings/mcp.json` and the hook file `~/.kiro/hooks/context-mode.json` with one command. Both hold the real path to the context-mode files. The hook file uses the standalone hook format from the Kiro docs (`version` `v1`, a `hooks` list with `trigger` and `action`). Kiro CLI V3 loads global hooks from `~/.kiro/hooks/`.
+This guide writes the MCP entry to `~/.kiro/settings/mcp.json` and the hook file `~/.kiro/hooks/context-mode.json` with one command. Both hold the real path to the context-mode files.
 
 ## Install
 
@@ -98,11 +98,5 @@ Tested on macOS with a temporary HOME, against the release branch, commit 043853
 | install command (sh) | not installed | 2026-10-21 | Pass: mcp.json and hook file written with the real path, other servers kept |
 | uninstall command (sh) | not installed | 2026-10-21 | Pass |
 
-| hook file format vs. kiro.dev hook docs | n/a | 2026-10-21 | Pass: same keys (`version` `v1`, `name`, `trigger`, `matcher` `@mcp`, `action.type` `command`, `timeout` in seconds). The docs show the IDs `SessionStart`, `PreToolUse`, `PostToolUse` and list Prompt Submit for the CLI, but do not show the exact ID `PromptSubmit`. |
+Not verified: Kiro itself. Kiro has no npm package we could put in a temporary folder, so no run showed Kiro load the server or fire the hooks, and `/ctx-doctor` did not run. The hook file format (`~/.kiro/hooks/context-mode.json`) is not checked against the Kiro docs: kiro.dev returned HTTP 403 to our checks. Windows commands.
 
-Not verified: Kiro itself. Kiro has no npm package we could put in a temporary folder, so no run showed Kiro load the server or fire the hooks, and `/ctx-doctor` did not run. Windows commands.
-
-## Sources
-
-- https://kiro.dev/docs/hooks/
-- https://kiro.dev/docs/hooks/types/

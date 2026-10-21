@@ -49,7 +49,7 @@ Order of preference: 1. the agent's own plugin or extension install; 2. the agen
 | Codex | [codex.md](./codex.md) | 2 (`codex mcp add`) + 4 (hooks) | yes, 2026-10-21, 0.163.0 |
 | Copilot CLI | [copilot-cli.md](./copilot-cli.md) | 2 (`copilot mcp add`) + 4 (hooks) | yes, 2026-10-21, 1.0.102 |
 | Gemini CLI | [gemini.md](./gemini.md) | 2 (`gemini mcp add`), no hooks | yes, 2026-10-21, 0.65.0 (Connected in a trusted folder) |
-| Kiro | [kiro.md](./kiro.md) | 4 (MCP and hooks) | no: command ran, hook format matches kiro.dev docs, Kiro not installed |
+| Kiro | [kiro.md](./kiro.md) | 4 (MCP and hooks) | no: command ran, Kiro not installed, hook format not checked |
 | OpenCode | [opencode.md](./opencode.md) | 3 (`{env:HOME}`), written by 4; no hooks | yes, 2026-10-21, 1.19.3 |
 | Pi | [pi.md](./pi.md) | 1 (`pi install git:...@release`) | partly, 2026-10-21, 1.3.0: installed, not loaded in a session |
 | Qwen Code | [qwen.md](./qwen.md) | 2 (`qwen mcp add`), no hooks | yes, 2026-10-21, 0.25.3 |
