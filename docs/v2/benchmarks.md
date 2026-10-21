@@ -383,3 +383,20 @@ A first pass with a looser prompt let the model run `seq 1 N | tail -n 1` (4 byt
 Rebase finding: after rebasing on v2-design 6f467b75, `tests/v2/ops/project-dir-ported.test.mjs` still asserted NO_GIT_DIR for a non-git cwd, and the saving-score gate guard failed (M2 78.22, gate false). The test now asserts the D-M7-NG-1 rule (DEVIATIONS row added). `node --test tests/v2/`: 1196 tests, 1194 pass, 0 fail, 2 skip.
 
 `node bench/saving-score.mjs` (lock ok): M1 94.21, M2 84.02, guards success true, small1k true (-0.32), tokens true, gate true. M2 is below the 90 target; it moves 78 to 86 between runs of the same code, which is the 2-run noise noted above.
+
+## Replace live proof (final)
+
+Final check on v2-design 980272a5, 2026-10-21. Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--max-budget-usd 0.25`, keyless, env ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1, `--include-hook-events`, `--allowedTools Bash`, `--plugin-dir release-out` built from this commit. Task: run `seq 1 N` with no pipe or redirect, then give the last number. Two runs per cell, git and non-git cwd. The 60 KB cell is above Claude Code's 30 KB persist threshold.
+
+| Full output (bytes) | Cwd | Runs | tool_result seen (chars) | Answer correct |
+|---:|---|---:|---|---|
+| 8893 (N 2000) | git | 2 | 152, 152 | 2 of 2 |
+| 8893 (N 2000) | non-git | 2 | 152, 152 | 2 of 2 |
+| 19998 (N 4221) | git | 2 | 187, 187 | 2 of 2 |
+| 19998 (N 4221) | non-git | 2 | 187, 187 | 2 of 2 |
+| 28003 (N 5822) | git | 2 | 182, 182 | 2 of 2 |
+| 28003 (N 5822) | non-git | 2 | 182, 182 | 2 of 2 |
+| 60090 (N 11866) | git | 2 | 190, 190 | 2 of 2 |
+| 60090 (N 11866) | non-git | 2 | 190, 190 | 2 of 2 |
+
+All 16 runs: no error, hook events present, the model saw the replace (under 200 chars) instead of the full output, and gave the right last number. Git and non-git cwd give the same result. The 60 KB output is also replaced. No src/ change.
