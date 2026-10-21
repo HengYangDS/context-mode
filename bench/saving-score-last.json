@@ -1,14 +1,14 @@
 {
-  "date": "2026-10-20",
+  "date": "2026-10-21",
   "m1": 94.21,
-  "m2": 84.02,
+  "m2": 85.83,
   "guards": {
     "success": true,
     "small1k": true,
     "tokens": true,
-    "gate": true
+    "gate": false
   },
-  "guardsOk": true,
+  "guardsOk": false,
   "detail": {
     "lockOk": true,
     "targetPct": 90,
@@ -16,15 +16,14 @@
     "tokensLimit": 38991.54,
     "small1kPct": -0.32,
     "gate": {
-      "ok": true,
-      "status": 0,
+      "ok": false,
+      "status": 1,
       "layers": [
-        "PASS keep-pass",
         "PASS v2-unit",
         "PASS ci-checks",
         "PASS gp-cases",
         "PASS prompt-lint",
-        "PASS check-removed",
+        "FAIL check-removed",
         "SKIP live"
       ]
     },
@@ -81,15 +80,15 @@
       },
       "perBucket": {
         "<=1K": {
-          "calls": 16624,
-          "before": 5456132,
-          "after": 5473508,
+          "calls": 16629,
+          "before": 5458379,
+          "after": 5475755,
           "savingPct": -0.32
         },
         "1-4K": {
-          "calls": 5134,
-          "before": 10554415,
-          "after": 10558686,
+          "calls": 5135,
+          "before": 10555611,
+          "after": 10559882,
           "savingPct": -0.04
         },
         "4-16K": {
@@ -106,17 +105,17 @@
         }
       },
       "corpusTotal": {
-        "calls": 23383,
+        "calls": 23389,
         "savingPct": 45.69,
         "savingPctWithRerunBound": 44.06
       },
       "corpus": {
-        "files": 3103,
+        "files": 3109,
         "sessions": 920,
-        "calls": 23383,
-        "lastTs": "2026-10-20T22:25:10.325Z"
+        "calls": 23389,
+        "lastTs": "2026-10-21T01:05:36.836Z"
       },
-      "seconds": 47
+      "seconds": 41
     },
     "live": {
       "agent": "2.1.303 (Claude Code)",
@@ -129,9 +128,9 @@
           "task": "json-1",
           "inScore": true,
           "small": true,
-          "offBytes": 874.5,
-          "v2Bytes": 212,
-          "savingPct": 75.76,
+          "offBytes": 750,
+          "v2Bytes": 142,
+          "savingPct": 81.07,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -141,13 +140,13 @@
           "task": "multi-1",
           "inScore": true,
           "small": false,
-          "offBytes": 7334,
-          "v2Bytes": 567.5,
-          "savingPct": 92.26,
+          "offBytes": 6828,
+          "v2Bytes": 642,
+          "savingPct": 90.6,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 1
+          "v2CtxCalls": 2
         },
         {
           "task": "big-tests",
@@ -165,21 +164,21 @@
           "task": "big-json",
           "inScore": true,
           "small": false,
-          "offBytes": 2371.5,
-          "v2Bytes": 574.5,
-          "savingPct": 75.77,
+          "offBytes": 2395.5,
+          "v2Bytes": 610.5,
+          "savingPct": 74.51,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
-          "v2CtxCalls": 4
+          "v2CtxCalls": 3
         },
         {
           "task": "log-1",
           "inScore": false,
           "small": true,
           "offBytes": 62,
-          "v2Bytes": 32,
-          "savingPct": 48.39,
+          "v2Bytes": 2,
+          "savingPct": 96.77,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -213,9 +212,9 @@
           "task": "git-1",
           "inScore": false,
           "small": true,
-          "offBytes": 33,
-          "v2Bytes": 20.5,
-          "savingPct": 37.88,
+          "offBytes": 8,
+          "v2Bytes": 8,
+          "savingPct": 0,
           "passOff": 2,
           "passV2": 2,
           "runs": 2,
@@ -223,8 +222,8 @@
         }
       ],
       "medianSessionTokens": {
-        "off": 36179.5,
-        "v2": 38176,
+        "off": 36181,
+        "v2": 38178,
         "tasks": [
           "log-1",
           "json-1",
@@ -239,10 +238,10 @@
         "sessionsPerArm": 16
       },
       "costUsd": {
-        "off": 0.5342,
-        "v2": 0.4065
+        "off": 0.5452,
+        "v2": 0.4247
       },
-      "seconds": 52
+      "seconds": 46
     }
   }
 }
