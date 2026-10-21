@@ -58,7 +58,7 @@ Measured on `origin/v2-design` after D-M7-gate-1, D-M7-gate-2, D-M7-FT-1 and D-M
 | GS7 | PASS | GP1 in gp-cases |
 | GS9 | PASS | GP1/GP2 in gp-cases; prompt-lint GS9 OK |
 | GS10 | R1, R2: PENDING owner (D-M7-arch-5); R3 to R8: PASS | `check-removed.mjs` exit 0; 6/6 v1-migration live cases (last full run) |
-| GS11 | FAIL | (T-CMP not re-run in M7-S4; numbers from M7-S3) `ci-config` now PASS (D-M7-CI-3, `timeout-minutes: 20`). `T-CMP` FAIL on Sonnet 5.5 low (10 sessions per arm a to e): arm a correct 7/10 < 0.80, call rate 0/10 < 0.70; Opus 5.5 low arm a correct 4/10, call rate 0/10. 0 bytes returned from `ctx_resume`/`ctx_search` in all 60 sessions. Arm d 7/10 < 0.70 gate is not met either. Cost 8.1365 USD. claude-code `compactSummary` stays `none` (D-M7-CL-1, D-M7-CL-2) |
+| GS11 | FAIL | (T-CMP not re-run in M7-S4; numbers from M7-S3) `ci-config` now PASS (D-M7-CI-3, `timeout-minutes: 20`). `T-CMP` FAIL on Sonnet 5.5 low (10 sessions per arm a to e): arm a correct 7/10 < 0.80, call rate 0/10 < 0.70; Opus 5.5 low arm a correct 4/10, call rate 0/10. 0 bytes returned from `ctx_resume`/`ctx_search` in all 60 sessions. Arm d 7/10 < 0.70 gate is not met either. Cost 8.1365 USD. claude-code `compactSummary` stays `none` (D-M7-CL-1, D-M7-CL-2) T-CMP clean re-run 2026-10-21 (Sonnet 5.5 low, 10 per arm, all arms): correct 7/10 in every arm, call rate 0/10, 0 bytes returned, cost 4.5222 USD; arm a still FAIL (< 0.80, < 0.70); arm d 0.70 meets its gate. |
 | GS8 | not measured | review |
 
 M7 is not done. Open items are listed in `.impl/BLOCKED-M7.md`. R1, R2 stay PENDING owner.

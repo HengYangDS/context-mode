@@ -11,3 +11,9 @@
 - Opus 5.5 low, arm (a) only: correct 4/10, call 0/10; 3 of 10 sessions hit the 0.25 USD cap (empty reply). Cost 2.1133 USD.
 - Rule applied: arm (a) fails (correct < 0.80, call rate < 0.70) on both models. `claude-code` `compactSummary` stays `"none"`. ADR-0009 §6 and DECISIONS-r6 D6 updated. `table.ts` and its tests unchanged.
 
+
+## Clean re-measure (2026-10-21)
+
+- Clean re-measure 2026-10-21 (isolation from D-M7-CL-3: no host auto-memory, no CLAUDE.md, no claude.ai MCP; 0 of 50 sessions touched memory), Sonnet 5.5 low, 10 sessions per arm, all arms, 0.25 USD cap: correct (a) 7/10, (b) 7/10, (c) 7/10, (d) 7/10, (e) 7/10; ctx_resume/ctx_search call rate 0/10 in every arm; bytes returned by those tools 0 in all 50 sessions; cost (a) 0.8682, (b) 0.9114, (c) 0.9014, (d) 0.8898, (e) 0.9514, total 4.5222 USD. Every miss is fixture session-03 (case-sensitive exactMatch, open for the owner). Result: arm (a) still fails both gates, so claude-code stays "none" (D-M7-CL-1). Result file: e2e/live/compact/results/2026-10-21-sonnet-5-5-clean-all-arms.json.
+- Rule (decided in this ticket): arm (a) fails, so `claude-code` `compactSummary` stays `"none"`. No code change; `table.ts` untouched. Opus arm not re-run (task scope).
+- Open for owner: case-sensitive `exactMatch` (session-03 is all 15 misses); a pointer-only call rate of 0 means the model does not use the pointer at low effort.
