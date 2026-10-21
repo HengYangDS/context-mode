@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "context-mode": {
+      "args": [
+        "server.mjs",
+        "--agent",
+        "copilot-cli"
+      ],
+      "command": "node"
+    }
+  },
+  "name": "context-mode",
+  "version": "2.0.0"
+}

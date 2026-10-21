@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "context-mode": {
+      "args": [
+        "server.mjs",
+        "--agent",
+        "qwen"
+      ],
+      "command": "node"
+    }
+  },
+  "name": "context-mode",
+  "version": "2.0.0"
+}

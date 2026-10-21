@@ -1,0 +1,59 @@
+{
+  "hooks": {
+    "AfterTool": [
+      {
+        "hooks": [
+          {
+            "command": "node hook.mjs --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "command": "node hook.mjs --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "command": "node hook.mjs --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "PreCompress": [
+      {
+        "hooks": [
+          {
+            "command": "node hook.mjs --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "node hook.mjs --agent gemini",
+            "timeout": 5000,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}
