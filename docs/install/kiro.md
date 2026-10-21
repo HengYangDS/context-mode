@@ -6,22 +6,19 @@ This guide is for Kiro CLI V3 users. Checked 2026-10-17 against the live kiro.de
 
 Kiro has no git-ref power install command yet (see "Differences" below). Use the local-folder path.
 
-1. Get the context-mode source at the `v2` ref:
-   ```bash
-   git clone --branch v2 https://github.com/mksglu/context-mode.git
-   cd context-mode && npm install && npm run build   # checked 2026-10-17, kiro.dev/docs/powers/installation/
-   ```
+1. Get the built files (no build step): see [Get the files](./README.md#get-the-files). They land in `~/.context-mode-app`.
 2. Add the MCP server to your user config at `~/.kiro/settings/mcp.json` (checked 2026-10-17, kiro.dev/docs/mcp/configuration/):
    ```json
    {
      "mcpServers": {
        "context-mode": {
          "command": "node",
-         "args": ["<path-to-clone>/dist/server.js", "--agent", "kiro"]
+         "args": ["/Users/you/.context-mode-app/server.mjs", "--agent", "kiro"]
        }
      }
    }
    ```
+   Change `/Users/you` to your home folder (Windows: `C:\\Users\\you\\.context-mode-app\\server.mjs`).
 3. Add the hook file at `~/.kiro/hooks/context-mode.json` (checked 2026-10-17, kiro.dev/docs/hooks/). context-mode's build step writes this file for you from the adapter table.
 4. Start (or restart) `kiro-cli` in your project.
 
@@ -77,3 +74,11 @@ These are gaps between the live Kiro docs and `docs/v2/impl/10-adapters.md` row 
 2. **Config paths confirmed.** `impl/10-adapters.md` row "kiro" names `.kiro/hooks/<id>.json` and `~/.kiro/hooks/` for hooks, and the Kiro v1-footprint row in ADR-0011 names `~/.kiro/agents/default.json`. Both match the live docs. The MCP config path (`~/.kiro/settings/mcp.json`, workspace `.kiro/settings/mcp.json`) is not named in `impl/10-adapters.md` or ADR-0011; it is added here from the live docs only, not a disagreement.
 3. **Hook format is current, not legacy.** The live docs show two current hook shapes: standalone files under `.kiro/hooks/*.json` (matches `impl/10-adapters.md`'s row) and a `hooks` array inside an agent profile file. CLI V3 still reads the old camelCase shape (`agentSpawn`, `preToolUse`, `postToolUse`) for backward compatibility only; `/upgrade-agent` converts it. `impl/10-adapters.md` and ADR-0011's Kiro row already assume the current PascalCase trigger names and the `.kiro/hooks/` file path, so no correction is needed there — this item records that the legacy shape still exists on a user's machine and the troubleshooting section above covers it.
 4. **No command for "which power version is installed".** The docs show `/powers install` and "Check for updates" in the Powers panel, but no `kiro-cli powers list --version` style command. This guide's "Update" and "Upgrade from v1" sections rely on context-mode's own `ctx_doctor`/`ctx_upgrade` for version awareness instead of a Kiro-native one. Nothing in `impl/10-adapters.md` or ADR-0011 claims otherwise.
+
+## Verified
+
+| Step | Result | Agent version | Date |
+|---|---|---|---|
+| `node ~/.context-mode-app/server.mjs --agent kiro`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
+| `node ~/.context-mode-app/hook.mjs --agent kiro`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
+| Agent CLI | not installed on this machine; only the server and hook commands were run | n/a | 2026-10-21 |

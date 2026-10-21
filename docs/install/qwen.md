@@ -113,7 +113,8 @@ Qwen Code has no single command that reverses an extension install back into a v
    ```json
    {
      "mcpServers": {
-       "context-mode": { "command": "npx", "args": ["-y", "context-mode", "mcp"] }
+       "context-mode": { "command": "context-mode",
+      "args": ["mcp"] }
      }
    }
    ```
@@ -168,3 +169,6 @@ This section lists what the live Qwen Code research found that the spec (`docs/v
 | `qwen --version` | worked | 0.25.2 | 2026-10-17 |
 | `qwen extensions --help` (command shape check) | worked, matches the doc's `install`/`update`/`disable`/`uninstall` commands | 0.25.2 | 2026-10-17 |
 | `qwen extensions install ...` against the real repo | not run, no v2 build on `v2-design` yet to install | 0.25.2 | 2026-10-17 |
+| `node ~/.context-mode-app/server.mjs --agent qwen`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
+| `node ~/.context-mode-app/hook.mjs --agent qwen`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
+| `gemini`/`qwen` extension install from `release` | not run: CLI not installed here and the `release` ref does not exist yet | n/a | 2026-10-21 |

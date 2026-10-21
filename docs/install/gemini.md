@@ -99,14 +99,14 @@ plain MCP entry. Re-add the v1 entry by hand in `~/.gemini/settings.json`:
 {
   "mcpServers": {
     "context-mode": {
-      "command": "npx",
-      "args": ["-y", "context-mode", "mcp"]
+      "command": "context-mode",
+      "args": ["mcp"]
     }
   }
 }
 ```
 
-Then run `gemini extensions uninstall context-mode` to remove the v2
+First run `npm install -g context-mode` (the v1 package). Then run `gemini extensions uninstall context-mode` to remove the v2
 extension. This manual-rollback path is a known limitation, not an
 automated one (ADR-0011, "Facts").
 Source for the uninstall command: [extensions reference](https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md) — checked 2026-10-17.
@@ -199,3 +199,6 @@ researched for this guide.
 | `gemini --version` | worked | 0.64.0 | 2026-10-17 |
 | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | needs owner login (CLI stopped on an interactive "trust this workspace?" prompt; `--ref release` also does not exist yet) | 0.64.0 | 2026-10-17 |
 | MCP/hook config file steps | not run, no v2 build on `v2-design` yet | 0.64.0 | 2026-10-17 |
+| `node ~/.context-mode-app/server.mjs --agent gemini`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
+| `node ~/.context-mode-app/hook.mjs --agent gemini`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
+| `gemini`/`qwen` extension install from `release` | not run: CLI not installed here and the `release` ref does not exist yet | n/a | 2026-10-21 |

@@ -17,9 +17,10 @@ All facts below carry a source link and the date checked.
 1. Install a server entry by hand. The CLI does not read a plugin's `.mcp.json` unless the plugin is enabled, so add context-mode directly under `mcp.servers` in `~/.zcode/cli/config.json`:
    ```json
    { "mcp": { "servers": {
-     "context-mode": { "type": "stdio", "command": "node", "args": ["<path-to>/start.mjs"] }
+     "context-mode": { "type": "stdio", "command": "node", "args": ["/Users/you/.context-mode-app/server.mjs", "--agent", "zcode"] }
    }}}
    ```
+   Change `/Users/you` to your home folder (Windows: `C:\\Users\\you\\.context-mode-app\\server.mjs`). Get the files first: see [Get the files](./README.md#get-the-files).
    Source: GitHub `zai-org/ZCode`, `apps/zcode-cli` README (checked 2026-10-17)
 2. Check it loaded: `/mcp list`, then `/mcp status`.
    Source: same README (checked 2026-10-17)
@@ -70,3 +71,11 @@ This section lists facts that disagree with `docs/v2/impl/10-adapters.md`'s `zco
 3. **The config path is confirmed for MCP servers, not shown for hooks.** `~/.zcode/cli/config.json` is correct and matches `impl/10-adapters.md` §1.5's assumed path, under `mcp.servers`. The docs do not show a `hooks.events.<Event>` key shape anywhere, because the CLI does not run plugin hooks (see point 1); no confirmation either way for a non-plugin, hand-written hook entry.
 4. **There is no official npm CLI package.** Z.ai's own install path is the desktop app only; the CLI source lives in `zai-org/ZCode` and must be built from source. The `zcode` command most installers get comes from an unofficial third-party package, `zcode-app-cli` on npm, not a Z.ai release. ADR-0011's update-command table should flag ZCode's CLI row as community-maintained if v2 ever documents an update command for it.
 5. **Git-ref plugin installs are confirmed possible**, supporting ADR-0011's "ZCode: test first, then document" line for the `release` branch update path: a marketplace entry's `source` object takes `ref` (tested: branch name) and `path` (subfolder). Tag/commit-hash support is undocumented, so ADR-0011's release step should still test the exact ref it plans to use before publishing docs that claim it works.
+
+## Verified
+
+| Step | Result | Agent version | Date |
+|---|---|---|---|
+| `node ~/.context-mode-app/server.mjs --agent zcode`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
+| `node ~/.context-mode-app/hook.mjs --agent zcode`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
+| Agent CLI | not installed on this machine; only the server and hook commands were run | n/a | 2026-10-21 |
