@@ -130,3 +130,12 @@ Caveats: n=3 per cell, one model, one date, list-price cost. Full caveats are in
 Logs, search results, and docs get stored and indexed instead of filling
 the context window. Your agent searches back for the exact text it needs,
 on any of 10 supported agents, with one code path and no fallback chains.
+
+## Before the first real release
+
+A `release` branch now exists on GitHub (rehearsal, 2026-10-21). `plan.mjs` reads the `Source-Commit` trailer of that branch. With the branch present it plans a patch or minor bump, or fails with "no releasable commits". It does not plan 2.0.0.
+Before the real first release, run:
+
+    git push origin --delete release release-staging
+
+Then `plan.mjs` takes the "first release" path again (version 2.0.0, notes over all history). Checked locally: with a `release` branch the plan failed; after deleting it the plan printed `version: 2.0.0`.
