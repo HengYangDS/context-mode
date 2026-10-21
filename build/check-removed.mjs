@@ -98,7 +98,7 @@ const SELF = "build/check-removed.mjs";
 const ALLOWED_DIRS = [
   "src/core/", "src/prompt/", "src/entries/",
   "tests/v2/", "e2e/", "build/", "bench/", "tickets/", "metrics/",
-  "docs/v2/", "docs/install/",
+  "docs/v2/", "docs/install/", "docs/benchmarks/",
   "scripts/release/",
   ".github/", ".impl/",
   ".claude-plugin/", ".codex-plugin/", ".agents/plugins/",

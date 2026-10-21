@@ -36,6 +36,8 @@ Counted on `origin/main` @ `5869f4fa`, as git blob bytes:
 
 What is kept: `LICENSE`, `.gitattributes`, `.github/FUNDING.yml`, `.claude/settings.json`. In total, the v2 source keeps 87 files (1.5 MB).
 
+Target tree addition (2026-10-21): `docs/benchmarks/` is the owner's benchmark publish pack (README plus `data/*.json`). It stays, and `build/check-removed.mjs` allows every path under it.
+
 Largest items deleted:
 - `web/`: 29 files, 4.1 MB, deleted (owner decision)
 - `tests/`: 252 files, 3.8 MB. Deleted last, once the GS4 ledger is complete.

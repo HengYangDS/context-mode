@@ -193,3 +193,14 @@ test("no regex in the script: literal compares only (impl/15 §2.3 step 2, 4)", 
   }
   assert.ok(SOURCE.includes('"ls-files", "-z"'), "tracked tree via git ls-files -z");
 });
+
+test("allow-list: docs/benchmarks/ passes, a stray root file still fails (D-FU-RF-BENCH-1)", () => {
+  const ok = run(fixture({ ...ALLOWED, "docs/benchmarks/README.md": "x", "docs/benchmarks/data/a.json": "{}" }));
+  assert.equal(ok.status, 0);
+  assert.deepEqual(ok.lines, ["check-removed: clean"]);
+  const bad = run(fixture({ ...ALLOWED, "docs/benchmarks/README.md": "x", "stray.txt": "x" }));
+  assert.equal(bad.status, 1);
+  assert.deepEqual(bad.lines, [OUT + "stray.txt"]);
+  const sibling = run(fixture({ ...ALLOWED, "docs/benchmarks-old/a.md": "x" }));
+  assert.equal(sibling.status, 1);
+});
