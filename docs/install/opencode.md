@@ -22,12 +22,13 @@ All commands checked on 2026-10-17 against the current OpenCode build (`1.19.3`,
      "mcp": {
        "context-mode": {
          "type": "local",
-         "command": ["<context-mode server command>"],
+         "command": ["node", "/Users/you/.context-mode-app/server.mjs", "--agent", "opencode"],
          "enabled": true
        }
      }
    }
    ```
+   Change `/Users/you` to your home folder (Windows: `C:\\Users\\you\\.context-mode-app\\server.mjs`). Get the files first: see [Get the files](./README.md#get-the-files).
    Source: [opencode.ai/docs/mcp-servers](https://opencode.ai/docs/mcp-servers/) — checked 2026-10-17.
 
 3. Install the hooks. OpenCode has no separate hooks file — hooks are a plugin. context-mode writes its plugin file to `.opencode/plugins/context-mode.js` (project) or `~/.config/opencode/plugins/context-mode.js` (global); OpenCode loads files in those directories at startup, no extra config line needed.
@@ -98,3 +99,11 @@ Still broken? Run `/ctx-doctor` and open a [bug report](https://github.com/mksgl
 4. **Plugin distribution is file-drop or npm-module-string, not a documented git-ref install.** `opencode plugin <module>` and the config's `plugin: [...]` array are documented only for npm package names (plain or scoped); ADR-0011's planned v2 OpenCode entry (`"git+https://github.com/mksglu/context-mode.git#release"`) relies on OpenCode's installer (Bun) accepting a git specifier in that same string slot. No OpenCode doc page shows a git-ref example for `plugin`, so this is this guide's own inference from "Bun installs the array's entries," not a confirmed-live install path — test it against a real `release` branch before relying on it.
 
 None of these change `toolNamePrefix`, `installMode`, or the `eventMap`/matcher rows in `impl/10-adapters.md` — this file is not edited.
+
+## Verified
+
+| Step | Result | Agent version | Date |
+|---|---|---|---|
+| `node ~/.context-mode-app/server.mjs --agent opencode`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
+| `node ~/.context-mode-app/hook.mjs --agent opencode`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
+| Agent CLI | not installed on this machine; only the server and hook commands were run | n/a | 2026-10-21 |

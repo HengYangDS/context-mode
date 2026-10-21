@@ -12,14 +12,17 @@ All commands checked on 2026-10-17 against the latest Codex CLI (`0.163.0`, npm 
 
 2. Add the context-mode MCP server. Either run the add command:
    ```
-   codex mcp add context-mode -- <context-mode server command>
+   codex mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent codex
    ```
+   Windows PowerShell: `codex mcp add context-mode -- node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent codex`. Get the files first: see [Get the files](./README.md#get-the-files).
    or write the block by hand in `~/.codex/config.toml` (user scope) or `<project>/.codex/config.toml` (project scope, trusted projects only):
    ```toml
    [mcp_servers.context-mode]
-   command = "<context-mode server command>"
+   command = "node"
+   args = ["/Users/you/.context-mode-app/server.mjs", "--agent", "codex"]
    startup_timeout_sec = 20
    ```
+   Change `/Users/you` to your home folder (Linux `/home/you`; Windows `C:\\Users\\you\\.context-mode-app\\server.mjs`). `config.toml` does not expand `~`, so use the full path.
    Source: [developers.openai.com/codex/mcp](https://developers.openai.com/codex/mcp) — checked 2026-10-17.
 
 3. Install the hooks file. Context-mode writes `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`), same shape as the Claude Code hooks file. Restart Codex so it picks up both the MCP entry and the hooks file.
@@ -53,8 +56,8 @@ Running the uninstall first breaks the v1 hooks (they call the global `context-m
 2. Re-add the v1 MCP entry by hand in `config.toml`:
    ```toml
    [mcp_servers.context-mode]
-   command = "npx"
-   args = ["-y", "context-mode", "mcp"]
+   command = "context-mode"
+   args = ["mcp"]
    ```
 3. Restore the v1 `hooks.json` entries context-mode's uninstall step removed.
 
@@ -96,8 +99,8 @@ Neither difference changes the `toolNamePrefix`, matcher, or event-map rows in `
 | Step | Result | Agent version | Date |
 |---|---|---|---|
 | CLI on PATH | worked | codex-cli 0.156.1 | 2026-10-17 |
-| `codex mcp add context-mode -- <cmd>` (isolated HOME, placeholder command) | worked, wrote `[mcp_servers.context-mode]` block to `~/.codex/config.toml` | codex-cli 0.156.1 | 2026-10-17 |
+| `codex mcp add context-mode -- node <HOME>/.context-mode-app/server.mjs --agent codex` (temp HOME, built `release-out` copied there) | worked, wrote `command = "node"` and the `args` array to `config.toml` | codex-cli 0.156.1 | 2026-10-21 |
 | `codex mcp list` | worked | codex-cli 0.156.1 | 2026-10-17 |
-| Real server command | not run, v2 MCP server has no build on `v2-design` yet, so the real `<context-mode server command>` could not be substituted | codex-cli 0.156.1 | 2026-10-17 |
-| Hooks file (`$CODEX_HOME/hooks.json`) | not run, same reason | codex-cli 0.156.1 | 2026-10-17 |
+| Real server command, MCP `initialize` + `tools/list` over stdio | worked: server `context-mode`, 9 tools (`ctx_execute` to `ctx_purge`) | node 26.8.1 | 2026-10-21 |
+| `node .../hook.mjs --agent codex` with a SessionStart payload | worked, exit 0, returned `hookSpecificOutput` JSON | node 26.8.1 | 2026-10-21 |
 | `default_tools_approval_mode = "auto"` | not run, config-only change, deferred to the real server test | codex-cli 0.156.1 | 2026-10-17 |
