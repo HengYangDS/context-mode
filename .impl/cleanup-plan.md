@@ -154,6 +154,7 @@ Four waves, not three: 80 v1 src files and 15 hooks/ files are reachable only th
 | `bench/**` | KEEP | - | GS6 and saving-score sources for docs/v2/benchmarks.md. No bench file imports v1 src (checked: only comments name src/core). |
 | `tickets/**` | KEEP | - | scripts/ci-gs4-lint.mjs reads tickets/v2-test-ledger.md; TECH-SPEC and DECISIONS cite tickets/*. |
 | `e2e/**`, `build/**`, `docs/v2/**` | KEEP | - | v2 tree. |
+| `docs/benchmarks/**` | KEEP | - | Owner's benchmark publish pack (ADR-0015, D-FU-RF-BENCH-1). |
 | `docs/install/*`, `docs/how-it-works.md`, `docs/tools.md`, `docs/algorithms.md`, `docs/performance.md` | KEEP | - | v2 user docs (ADR-0015, GP1-install-docs). |
 | `docs/UPSTREAM-CREDITS.md` | KEEP | - | license credits. |
 | `docs/platform-support.md` | DELETE | W2-root | its own header says "v1 document ... not valid for v2". Fix any link to it. |
