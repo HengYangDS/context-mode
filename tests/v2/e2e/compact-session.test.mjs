@@ -86,3 +86,16 @@ test("result: compact boundary seen, final text and cost from the last turn", { 
   assert.equal(r.costUsd, 0.04);
   assert.deepEqual(r.toolCalls, []);
 });
+
+test("hook events: --include-hook-events set and additionalContext bytes recorded", { skip: !posix }, async (t) => {
+  const { additionalContextBytes } = await import("../../../e2e/live/compact/session.mjs");
+  assert.equal(additionalContextBytes(JSON.stringify({ hookSpecificOutput: { additionalContext: "héllo" } })), 6);
+  assert.equal(additionalContextBytes(JSON.stringify({ additionalContext: "ab" })), 2);
+  assert.equal(additionalContextBytes("not json"), 0);
+  assert.equal(additionalContextBytes(""), 0);
+  const s = stub(t);
+  const r = await runSession({ bin: s.bin, turns: ["one"], nextRequest: "two", budgetUsd: "0.25", cwd: s.dir });
+  const { argv } = JSON.parse(readFileSync(s.rec, "utf8"));
+  assert.ok(argv.includes("--include-hook-events"));
+  assert.deepEqual(r.hookContexts, []);
+});

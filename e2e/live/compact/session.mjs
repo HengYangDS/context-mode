@@ -26,6 +26,14 @@ function userLine(text) {
   return JSON.stringify({ type: "user", message: { role: "user", content: [{ type: "text", text }] } }) + "\n";
 }
 
+// Bytes of hookSpecificOutput.additionalContext (or a top-level additionalContext) in one hook's stdout JSON; 0 if none.
+export function additionalContextBytes(raw) {
+  let j;
+  try { j = typeof raw === "string" ? JSON.parse(raw) : raw; } catch { return 0; }
+  const c = j?.hookSpecificOutput?.additionalContext ?? j?.additionalContext;
+  return typeof c === "string" ? Buffer.byteLength(c) : 0;
+}
+
 /**
  * @param {{ bin: string, turns: string[], nextRequest: string, budgetUsd: string, cwd: string,
  *   model?: string, effort?: string, args?: string[] }} o
@@ -35,12 +43,12 @@ function userLine(text) {
  */
 export function runSession(o) {
   const args = o.args ?? ["--strict-mcp-config", "--tools", ""];
-  const argv = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+  const argv = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-hook-events",
     "--model", o.model ?? MODEL, "--effort", o.effort ?? EFFORT, "--max-budget-usd", String(o.budgetUsd),
     "--no-session-persistence", "--setting-sources", "project", ...args];
   const sends = [...o.turns, "/compact", o.nextRequest];
   const child = spawn(o.bin, argv, { cwd: o.cwd, env: childEnv(), stdio: ["pipe", "pipe", "pipe"] });
-  const out = { toolCalls: [], toolResults: [], finalText: "", costUsd: 0, compacted: false, isError: false, exitCode: null, stderr: "" };
+  const out = { toolCalls: [], toolResults: [], hookContexts: [], finalText: "", costUsd: 0, compacted: false, isError: false, exitCode: null, stderr: "" };
   let turn = 0;
   let timer = null;
 
@@ -53,6 +61,11 @@ export function runSession(o) {
 
   const onEvent = (ev) => {
     if (ev.type === "system" && ev.subtype === "compact_boundary") out.compacted = true;
+    if (ev.type === "system" && ev.subtype === "hook_response") {
+      // Hook additionalContext bytes (the injected side of the T-CMP measure), read from the hook's JSON output.
+      const bytes = additionalContextBytes(ev.stdout ?? ev.output);
+      if (bytes > 0) out.hookContexts.push({ turn, event: String(ev.hook_event ?? ""), bytes });
+    }
     if (ev.type === "assistant") {
       for (const c of ev.message?.content ?? []) {
         if (c.type === "tool_use") out.toolCalls.push({ turn, id: c.id, name: c.name, input: c.input });

@@ -107,6 +107,9 @@ async function one(id, i, bin, root) {
       toolCalls: r.toolCalls,
       // Returned bytes of the read tools after the reset turn, and whether the big fact came back whole.
       returned: returnedAfter(r, after, big),
+      // Hook additionalContext bytes over the whole session (from --include-hook-events).
+      hookContexts: r.hookContexts,
+      injectedBytes: r.hookContexts.reduce((n, x) => n + x.bytes, 0),
       finalText: r.finalText,
       exitCode: r.exitCode,
     };
@@ -123,10 +126,17 @@ mkdirSync(SCRATCH, { recursive: true });
 const root = mkdtempSync(path.join(SCRATCH, "cm-t-cmp-"));
 const byArm = {};
 let cost = 0;
+// Median over arm (a) runs of the hook additionalContext bytes per session; null when no run exists.
+const injectedMedian = () => {
+  const xs = (byArm.a ?? []).map((r) => r.injectedBytes).sort((x, y) => x - y);
+  if (xs.length === 0) return null;
+  const m = xs.length >> 1;
+  return xs.length % 2 ? xs[m] : (xs[m - 1] + xs[m]) / 2;
+};
 const snapshot = (final) => {
   const v = verdict(byArm);
   const doc = { id: "T-CMP", model: MODEL ?? "session.mjs default", effort: EFFORT ?? "session.mjs default", budgetUsd: BUDGET,
-    runsPerArm: RUNS, arms: ARMS_SEL, complete: final, costUsd: Number(cost.toFixed(4)), stats: v.arms, checks: v.checks, info: v.info, runs: byArm };
+    runsPerArm: RUNS, arms: ARMS_SEL, complete: final, costUsd: Number(cost.toFixed(4)), stats: v.arms, checks: v.checks, info: { ...v.info, injectedBytesMedian: injectedMedian() }, runs: byArm };
   mkdirSync(path.dirname(OUT), { recursive: true });
   writeFileSync(OUT, JSON.stringify(doc, null, 2));
   return v;
@@ -147,7 +157,7 @@ try {
 }
 const v = snapshot(true);
 const sessions = ARMS_SEL.reduce((n, id) => n + byArm[id].length, 0);
-console.log(JSON.stringify({ id: v.id, ok: v.pass, sessions, costUsd: Number(cost.toFixed(4)), resultFile: OUT, checks: v.checks.map(({ name, pass }) => ({ name, pass })), info: v.info }));
+console.log(JSON.stringify({ id: v.id, ok: v.pass, sessions, costUsd: Number(cost.toFixed(4)), resultFile: OUT, checks: v.checks.map(({ name, pass }) => ({ name, pass })), info: { ...v.info, injectedBytesMedian: injectedMedian() } }));
 console.error(table(v));
 console.error(`result file: ${OUT}`);
 console.error(`T-CMP ${v.pass ? "PASS" : "FAIL"} | ${sessions} sessions | list-price $${cost.toFixed(4)}`);
