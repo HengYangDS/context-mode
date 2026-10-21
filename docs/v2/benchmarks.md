@@ -400,3 +400,28 @@ Final check on v2-design 980272a5, 2026-10-21. Claude Code 2.1.303, claude-sonne
 | 60090 (N 11866) | non-git | 2 | 190, 190 | 2 of 2 |
 
 All 16 runs: no error, hook events present, the model saw the replace (under 200 chars) instead of the full output, and gave the right last number. Git and non-git cwd give the same result. The 60 KB output is also replaced. No src/ change.
+
+## Final A/B (after final push)
+
+Arms: off, v1 (branch main built as a local plugin, 1.0.169), v2 (build release-out). Model claude-sonnet-5-5, effort low, keyless `claude -p`, 3 runs per task and arm, all sessions in parallel. Tool: `bench/live/ab-quick.mjs` (new `--tasks` option picks the task list). Total cost $2.68 (limit $8). Data: `bench/live/results/ab-final2.json` (also `ab-final2-small.json`, `ab-final2-large.json`).
+
+Groups: SMALL = log-1 json-1 tests-1 file-1 git-1 (45 sessions). LARGE = multi-1 big-tests big-json (own run) plus json-1 (rows from the SMALL run). `score-tasks.mjs` has four tasks: json-1, multi-1, big-tests, big-json. Saving = median over tasks of 1 - arm tokens / reference tokens. Negative = the arm used more tokens.
+
+| Group | Arm | Median session tokens | Saving vs off | v2 vs v1 | Median tool_result bytes | Success | Cost |
+|---|---|---|---|---|---|---|---|
+| SMALL | off | 36184 | - | - | 31 | 15/15 | $0.330 |
+| SMALL | v1 | 42493 | -17.4% | - | 31 | 15/15 | $0.537 |
+| SMALL | v2 | 38210 | -5.7% | +10.2% | 8 | 15/15 | $0.359 |
+| LARGE | off | 55897 | - | - | 4694.5 | 12/12 | $0.607 |
+| LARGE | v1 | 65599 | -16.5% | - | 2436.5 | 12/12 | $0.754 |
+| LARGE | v2 | 60390 | -19.6% | -2.7% | 734.5 | 12/12 | $0.391 |
+
+Per task, median tokens (off / v1 / v2): log-1 36184/42424/38114; json-1 55024/64541/60386; tests-1 36121/42493/38166; file-1 36159/42453/38210; git-1 36248/42629/38296; multi-1 108290/125342/140110; big-tests 53104/59478/38359; big-json 56707/66559/98955.
+
+Result, plainly:
+- All 81 sessions passed in every arm. Success is equal.
+- v2 does not save session tokens vs off in this run. It is 5.7% worse on SMALL and 19.6% worse on LARGE. The fixed plugin overhead (tool schemas and hooks) is about 2000 tokens for v2 and about 6300 for v1 on tasks with tiny output.
+- v2 beats v1 on SMALL (+10.2%), and loses to v1 on LARGE (-2.7%). On LARGE, v2 wins big-tests (-28% vs off) but loses multi-1 (+29%) and big-json (+74%).
+- v2 cuts the tool_result bytes the model saw (LARGE: 734.5 vs 4694.5 off), but the extra turns spent on the 5 context-mode calls cost more tokens than the bytes saved on multi-1 and big-json.
+- v1 made 0 context-mode calls in all sessions, so its overhead is schema cost only. The session token count (input + cache creation + cache read) counts cached prefix reads on each turn; extra turns raise it.
+- Not tuned after the run. Follow-up: look at multi-1 and big-json v2 transcripts for the cause of the extra turns.
