@@ -19,7 +19,7 @@ const PRICES = { // USD per million tokens, copied from the published evidence f
   "claude-opus-5-5": { in: 4, out: 20, cr: 0.2, cw5: 5, cw1h: 8 },
   "claude-haiku-4-5": { in: 1, out: 5, cr: 0.1, cw5: 1.25, cw1h: 2 },
 };
-// two-sided 95% t quantiles, df 1..30 (same table as the gateway repo's rerun-analyze.py)
+// two-sided 95% t quantiles, df 1..30 (index = df - 1, so n pairs use T975[n - 2])
 const T975 = [12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.16, 2.145,
   2.131, 2.12, 2.11, 2.101, 2.093, 2.086, 2.08, 2.074, 2.069, 2.064, 2.06, 2.056, 2.052, 2.048, 2.045, 2.042];
 
@@ -37,7 +37,7 @@ export function paired(base, arm) {
   if (base.length !== arm.length || base.length < 2) fail("paired: need >= 2 equal-length samples");
   const n = base.length, d = arm.map((x, i) => x - base[i]);
   if (n - 1 > T975.length) fail("paired: n above the t table");
-  const mb = mean(base), md = mean(d), h = T975[n - 1] * sd(d) / Math.sqrt(n);
+  const mb = mean(base), md = mean(d), h = T975[n - 2] * sd(d) / Math.sqrt(n);
   const lo = 100 * (md - h) / mb, hi = 100 * (md + h) / mb;
   return {
     n, base_usd_mean: r5(mb), arm_usd_mean: r5(mean(arm)), pct: r1(100 * md / mb), pct_ci95: [r1(lo), r1(hi)],
@@ -183,7 +183,7 @@ export function build() {
         prereg: "/benchmarks/prereg/v3-opus55-short-prereg.md", analysis: pw.analysis,
         reanalysed_from_pairs: { pct: re.pct, pct_ci95: re.pct_ci95, verdict: re.verdict, wins: re.arm_wins,
           per_1000_tasks_usd: re.per_1000_tasks_usd, ci_end_gap_points: ciGap, matches_published: reproduced,
-          rule: "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)" },
+          rule: "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)" },
       },
       bridge,
       pairs,

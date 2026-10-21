@@ -20,9 +20,9 @@ Everyday agent steps: search the code, ask the repo history, make an edit.
 
 | Category and task | Direct | v1 | v2 | Context Mode Gateway | Saving vs own direct | Head-to-head | Evidence |
 |---|---:|---:|---:|---:|---|---|---|
-| Code search (grep over 150 files) | $0.093 | $0.099 | $0.077 | $0.093 → $0.066 | v1: cost 7% more, likely 7% less to 22% more, **same**<br>v2: **17% lower**, likely 7 to 27%, **less**<br>Gateway: **29% lower**, likely 23 to 34%, **less** | v1 4 of 8<br>v2 7 of 8<br>Gateway 16 of 16 | [JSON](ab.json) · [runs](runs/grep.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
-| One-line edit | $0.057 | $0.095 | $0.068 | $0.075 → $0.054 | v1: cost **66% more**, likely 32 to 99% more, **more**<br>v2: cost 19% more, likely 13% less to 51% more, **same**<br>Gateway: **28% lower**, likely 14 to 42%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 11 of 12 | [JSON](ab.json) · [runs](runs/edit.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
-| Repo history question (git log, 320 commits) | $0.052 | $0.087 | $0.062 | $0.071 → $0.053 | v1: cost **66% more**, likely 31 to 101% more, **more**<br>v2: cost 19% more, likely 12% less to 51% more, **same**<br>Gateway: **25% lower**, likely 17 to 34%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/git.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
+| Code search (grep over 150 files) | $0.093 | $0.099 | $0.077 | $0.093 → $0.066 | v1: cost 7% more, likely 7% less to 22% more, **same**<br>v2: **17% lower**, likely 6 to 28%, **less**<br>Gateway: **29% lower**, likely 23 to 34%, **less** | v1 4 of 8<br>v2 7 of 8<br>Gateway 16 of 16 | [JSON](ab.json) · [runs](runs/grep.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
+| One-line edit | $0.057 | $0.095 | $0.068 | $0.075 → $0.054 | v1: cost **66% more**, likely 31 to 100% more, **more**<br>v2: cost 19% more, likely 14% less to 52% more, **same**<br>Gateway: **28% lower**, likely 14 to 42%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 11 of 12 | [JSON](ab.json) · [runs](runs/edit.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
+| Repo history question (git log, 320 commits) | $0.052 | $0.087 | $0.062 | $0.071 → $0.053 | v1: cost **66% more**, likely 30 to 102% more, **more**<br>v2: cost 19% more, likely 13% less to 52% more, **same**<br>Gateway: **25% lower**, likely 17 to 34%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/git.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
 
 ### Large Tool-Output Handling
 
@@ -30,7 +30,7 @@ A command prints far more than the model needs.
 
 | Category and task | Direct | v1 | v2 | Context Mode Gateway | Saving vs own direct | Head-to-head | Evidence |
 |---|---:|---:|---:|---:|---|---|---|
-| One large log | $0.077 | $0.104 | $0.075 | $0.091 → $0.071 | v1: cost **34% more**, likely 10 to 58% more, **more**<br>v2: 3% lower, likely 24% less to 17% more, **same**<br>Gateway: **22% lower**, likely 15 to 30%, **less** | v1 2 of 8<br>v2 5 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/log.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
+| One large log | $0.077 | $0.104 | $0.075 | $0.091 → $0.071 | v1: cost **34% more**, likely 9 to 58% more, **more**<br>v2: 3% lower, likely 24% less to 17% more, **same**<br>Gateway: **22% lower**, likely 15 to 30%, **less** | v1 2 of 8<br>v2 5 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/log.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
 | One large JSON file | $0.073 | $0.095 | $0.076 | $0.086 → $0.068 | v1: cost **31% more**, likely 9 to 52% more, **more**<br>v2: cost 5% more, likely 21% less to 31% more, **same**<br>Gateway: **21% lower**, likely 13 to 30%, **less** | v1 2 of 8<br>v2 4 of 8<br>Gateway 12 of 12 | [JSON](ab.json) · [runs](runs/json.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
 
 ### Test-Driven Debugging
@@ -39,7 +39,7 @@ Run the tests, fix the code, run them again.
 
 | Category and task | Direct | v1 | v2 | Context Mode Gateway | Saving vs own direct | Head-to-head | Evidence |
 |---|---:|---:|---:|---:|---|---|---|
-| npm test fix loop, short | $0.075 | $0.096 | $0.078 | $0.087 → $0.068 | v1: cost **27% more**, likely 7 to 47% more, **more**<br>v2: cost 4% more, likely 18% less to 27% more, **same**<br>Gateway: **22% lower**, likely 16 to 28%, **less** | v1 1 of 8<br>v2 3 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/tests.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
+| npm test fix loop, short | $0.075 | $0.096 | $0.078 | $0.087 → $0.068 | v1: cost **27% more**, likely 7 to 48% more, **more**<br>v2: cost 4% more, likely 18% less to 27% more, **same**<br>Gateway: **22% lower**, likely 16 to 28%, **less** | v1 1 of 8<br>v2 3 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/tests.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
 
 ### All six tasks together
 
@@ -62,11 +62,11 @@ A sum over pairs, not a mean of rows. No interval: the rows are different tasks.
 | Repo history question | −$35 | −$10 | $18 |
 | One large log | −$26 | $3 | $20 |
 | One large JSON file | −$22 | −$4 | $18 |
-| npm test fix loop, short | −$21 | −$3 | $19 |
+| npm test fix loop, short | −$20 | −$3 | $19 |
 
 ### v2 against v1 (secondary)
 
-v2 cost less than v1 on every task: grep 23% lower (likely 14 to 31%), edit 28% lower (likely 14 to 43%), git 28% lower (likely 13 to 44%), log 28% lower (likely 13 to 42%), json 20% lower (likely 4 to 35%), tests 18% lower (likely 2 to 34%). All six verdicts are "less".
+v2 cost less than v1 on every task: grep 23% lower (likely 14 to 32%), edit 28% lower (likely 14 to 43%), git 28% lower (likely 12 to 44%), log 28% lower (likely 13 to 43%), json 20% lower (likely 4 to 35%), tests 18% lower (likely 1 to 35%). All six verdicts are "less".
 
 ### Success and plugin tool use
 
@@ -94,7 +94,7 @@ Four pairs cannot confirm or reject the published rows. A real check needs a new
 - **The cost.** List price on the token counts in each session's result event (Opus 5.5 per million tokens: input $4, output $20, cache read $0.20, cache write 5 min $5, 1 h $8). Claude Code's own total is kept beside it. No session had a gap above 1%. `analyze.mjs` prices every row again from its token columns and stops on any difference.
 - **Written down first.** [prereg.md](prereg.md) was pushed as `bcc45e33` at 2026-10-21T19:47Z. The first run file was pushed at 2026-10-21T20:13Z.
 - **Analysis.** d = arm − direct per cycle. Change = 100 × mean(d) / mean(direct), with the 95% t interval (t = 2.365 at n = 8). Verdict "less" when the whole interval is below zero, "more" when it is above zero, else "same". Every measured cycle counts. We dropped no outlier.
-- **Gateway rows.** Copied from `/benchmarks/data/v3-opus55-short.json` (SHA-256 `3298b1b2…`, checked by `analyze.mjs`). Same tasks, same prompts and the same checks (gateway commit `408333a4`). `analyze.mjs` runs the same method on the published pairs. It gets the same change, verdict and wins on all 6 rows. The interval ends differ by up to 0.2 points. The published pair values are rounded, which can explain this, but we did not check the cause.
+- **Gateway rows.** Copied from `/benchmarks/data/v3-opus55-short.json` (SHA-256 `3298b1b2…`, checked by `analyze.mjs`). Same tasks, same prompts and the same checks (gateway commit `408333a4`). `analyze.mjs` runs the same method on the published pairs. It gets the same change, interval, verdict and wins on all 6 rows (interval ends differ by 0.0 points).
 - **Spend.** 170 sessions (18 warm-up, 144 measured, 8 bridge), $13.75 at list price.
 - **Not done.** Gate S0 (does `bypassPermissions` keep the plugin hook active?) has no saved result for this run. We report it as INCONCLUSIVE. It does not change the cost figures.
 

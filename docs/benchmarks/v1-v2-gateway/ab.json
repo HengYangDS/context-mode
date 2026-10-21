@@ -150,8 +150,8 @@
      "arm_usd_mean": 0.09551,
      "pct": 27.3,
      "pct_ci95": [
-      7.4,
-      47.1
+      6.9,
+      47.7
      ],
      "verdict": "more",
      "median_diff_usd": 0.0259764,
@@ -164,8 +164,8 @@
      "arm_usd_mean": 0.07828,
      "pct": 4.3,
      "pct_ci95": [
-      -17.9,
-      26.6
+      -18.5,
+      27.1
      ],
      "verdict": "same",
      "median_diff_usd": 0.0030191,
@@ -178,8 +178,8 @@
      "arm_usd_mean": 0.07828,
      "pct": -18,
      "pct_ci95": [
-      -34.4,
-      -1.7
+      -34.8,
+      -1.3
      ],
      "verdict": "less",
      "median_diff_usd": -0.0232593,
@@ -222,7 +222,7 @@
      "per_1000_tasks_usd": 19,
      "ci_end_gap_points": 0,
      "matches_published": true,
-     "rule": "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)"
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
     }
    },
    "bridge": {
@@ -1310,8 +1310,8 @@
      "arm_usd_mean": 0.09473,
      "pct": 30.5,
      "pct_ci95": [
-      9.2,
-      51.8
+      8.6,
+      52.4
      ],
      "verdict": "more",
      "median_diff_usd": 0.0261507,
@@ -1324,8 +1324,8 @@
      "arm_usd_mean": 0.07618,
      "pct": 5,
      "pct_ci95": [
-      -20.8,
-      30.7
+      -21.4,
+      31.4
      ],
      "verdict": "same",
      "median_diff_usd": 0.0022365,
@@ -1338,8 +1338,8 @@
      "arm_usd_mean": 0.07618,
      "pct": -19.6,
      "pct_ci95": [
-      -35,
-      -4.2
+      -35.4,
+      -3.8
      ],
      "verdict": "less",
      "median_diff_usd": -0.0228697,
@@ -1374,15 +1374,15 @@
     "reanalysed_from_pairs": {
      "pct": -21.4,
      "pct_ci95": [
-      -29.8,
-      -13
+      -29.9,
+      -12.9
      ],
      "verdict": "less",
      "wins": 12,
      "per_1000_tasks_usd": 18.4,
-     "ci_end_gap_points": 0.1,
+     "ci_end_gap_points": 0,
      "matches_published": true,
-     "rule": "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)"
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
     }
    },
    "bridge": {
@@ -2476,8 +2476,8 @@
      "arm_usd_mean": 0.10359,
      "pct": 33.7,
      "pct_ci95": [
-      9.5,
-      57.8
+      8.9,
+      58.4
      ],
      "verdict": "more",
      "median_diff_usd": 0.021678,
@@ -2490,8 +2490,8 @@
      "arm_usd_mean": 0.07488,
      "pct": -3.4,
      "pct_ci95": [
-      -23.7,
-      16.9
+      -24.2,
+      17.5
      ],
      "verdict": "same",
      "median_diff_usd": -0.0050171,
@@ -2504,8 +2504,8 @@
      "arm_usd_mean": 0.07488,
      "pct": -27.7,
      "pct_ci95": [
-      -42.2,
-      -13.2
+      -42.6,
+      -12.9
      ],
      "verdict": "less",
      "median_diff_usd": -0.0332847,
@@ -2540,15 +2540,15 @@
     "reanalysed_from_pairs": {
      "pct": -22.4,
      "pct_ci95": [
-      -30.1,
+      -30.2,
       -14.7
      ],
      "verdict": "less",
      "wins": 15,
      "per_1000_tasks_usd": 20.4,
-     "ci_end_gap_points": 0.1,
+     "ci_end_gap_points": 0,
      "matches_published": true,
-     "rule": "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)"
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
     }
    },
    "bridge": {
@@ -3876,8 +3876,8 @@
      "arm_usd_mean": 0.08686,
      "pct": 66.2,
      "pct_ci95": [
-      31.4,
-      101
+      30.5,
+      101.8
      ],
      "verdict": "more",
      "median_diff_usd": 0.0464874,
@@ -3890,8 +3890,8 @@
      "arm_usd_mean": 0.06236,
      "pct": 19.3,
      "pct_ci95": [
-      -12.2,
-      50.8
+      -13,
+      51.6
      ],
      "verdict": "same",
      "median_diff_usd": 0.0130412,
@@ -3904,8 +3904,8 @@
      "arm_usd_mean": 0.06236,
      "pct": -28.2,
      "pct_ci95": [
-      -43.8,
-      -12.6
+      -44.2,
+      -12.2
      ],
      "verdict": "less",
      "median_diff_usd": -0.0222762,
@@ -3948,7 +3948,7 @@
      "per_1000_tasks_usd": 17.8,
      "ci_end_gap_points": 0,
      "matches_published": true,
-     "rule": "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)"
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
     }
    },
    "bridge": {
@@ -5266,8 +5266,8 @@
      "arm_usd_mean": 0.0994,
      "pct": 7.4,
      "pct_ci95": [
-      -6.9,
-      21.8
+      -7.3,
+      22.1
      ],
      "verdict": "same",
      "median_diff_usd": -0.0008656,
@@ -5280,8 +5280,8 @@
      "arm_usd_mean": 0.07679,
      "pct": -17,
      "pct_ci95": [
-      -27.4,
-      -6.6
+      -27.7,
+      -6.3
      ],
      "verdict": "less",
      "median_diff_usd": -0.0155746,
@@ -5294,8 +5294,8 @@
      "arm_usd_mean": 0.07679,
      "pct": -22.7,
      "pct_ci95": [
-      -31.4,
-      -14.1
+      -31.6,
+      -13.9
      ],
      "verdict": "less",
      "median_diff_usd": -0.0242907,
@@ -5330,15 +5330,15 @@
     "reanalysed_from_pairs": {
      "pct": -28.7,
      "pct_ci95": [
-      -34,
+      -34.1,
       -23.4
      ],
      "verdict": "less",
      "wins": 16,
      "per_1000_tasks_usd": 26.6,
-     "ci_end_gap_points": 0.1,
+     "ci_end_gap_points": 0,
      "matches_published": true,
-     "rule": "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)"
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
     }
    },
    "bridge": {
@@ -6427,8 +6427,8 @@
      "arm_usd_mean": 0.09506,
      "pct": 65.5,
      "pct_ci95": [
-      31.8,
-      99.2
+      30.9,
+      100.1
      ],
      "verdict": "more",
      "median_diff_usd": 0.0536105,
@@ -6441,8 +6441,8 @@
      "arm_usd_mean": 0.06818,
      "pct": 18.7,
      "pct_ci95": [
-      -13.4,
-      50.9
+      -14.2,
+      51.7
      ],
      "verdict": "same",
      "median_diff_usd": 0.0170672,
@@ -6455,8 +6455,8 @@
      "arm_usd_mean": 0.06818,
      "pct": -28.3,
      "pct_ci95": [
-      -42.5,
-      -14.1
+      -42.9,
+      -13.7
      ],
      "verdict": "less",
      "median_diff_usd": -0.0239521,
@@ -6491,15 +6491,15 @@
     "reanalysed_from_pairs": {
      "pct": -27.8,
      "pct_ci95": [
-      -42,
-      -13.7
+      -42.2,
+      -13.5
      ],
      "verdict": "less",
      "wins": 11,
      "per_1000_tasks_usd": 20.9,
-     "ci_end_gap_points": 0.2,
+     "ci_end_gap_points": 0,
      "matches_published": true,
-     "rule": "same pct, verdict and wins; interval ends within 0.2 points (the published pair usd values are rounded copies; the cause of the gap is not checked)"
+     "rule": "same pct, verdict and wins; interval ends within 0.2 points (tolerance for the rounded published pair usd values)"
     }
    },
    "bridge": {
