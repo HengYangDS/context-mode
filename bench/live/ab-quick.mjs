@@ -31,7 +31,7 @@ function multi(dir) {
   }
   return { prompt: 'Run cat on data/part1.txt, then data/part2.txt, then data/part3.txt (one Bash call each). In each, find the line starting with SECRET-<n> (n = file number) and read the value after "value=". Reply with only the three values separated by spaces, in order.', expect: vals };
 }
-const IDS = ["log-1", "json-1", "tests-1", "file-1", "git-1", "multi-1"];
+const IDS = arg("tasks", "log-1,json-1,tests-1,file-1,git-1,multi-1").split(",");
 const tasks = IDS.map((id) => ALL_TASKS.find((t) => t.id === id));
 
 function realClaude() {
