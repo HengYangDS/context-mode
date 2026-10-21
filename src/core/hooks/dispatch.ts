@@ -4,9 +4,9 @@
 import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
-  COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
+  COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
   OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
-  PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
+  PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
   SUBAGENT_RUN_DENY,
@@ -14,15 +14,16 @@ import {
 import type {
   AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall,
 } from "../contracts/types.ts";
-import { getAdapter, hasReplace } from "../../adapters/table.ts";
+import { getAdapter, hasRecall, hasReplace } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
 import { isSubagentCall, pickSubagentCase, toolSetForAgentType } from "../policy/subagent.ts";
 import { readUserDeny } from "../policy/user-deny.ts";
 import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
-import { readLastPrompt, readSessionEvents } from "../journal/read.ts";
+import { readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
 import { renderState } from "../compaction/render.ts";
+import { pickRecall } from "../compaction/recall.ts";
 import { chunkText } from "../index/chunk.ts";
 import { selectChunksInMemory } from "../index/select.ts";
 import { indexText } from "../index/text.ts";
@@ -86,7 +87,7 @@ function dispatch(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectConte
     case "PostToolUse":
       return postToolUse(ev, row, project, env);
     case "PreCompact":
-      return preCompact(ev, project);
+      return preCompact(ev, row, project);
     case "Usage":
       return usage(ev, project);
   }
@@ -107,6 +108,7 @@ function compactText(db: DbHandle, ev: CanonicalHookEvent, row: AdapterRow): str
 }
 
 async function sessionStart(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext): Promise<Decision> {
+  if (ev.source === "compact" && hasRecall(row)) markCompacted(await openDb(project), ev.sessionId);
   if (ev.source === "compact" && row.compactDelivery === "sessionstart") {
     const db = await openDb(project);
     // A23: the throttle marker guards a duplicate SessionStart(compact) in one session.
@@ -133,11 +135,45 @@ async function userPromptSubmit(ev: CanonicalHookEvent, row: AdapterRow, project
     sandbox_bytes: 0, returned_bytes: 0,
   });
   echoDetached(ev, project, body);
-  if (row.compactDelivery !== "pending-flag") return ALLOW;
+  if (row.compactDelivery === "pending-flag") {
+    const db = await openDb(project);
+    // §4.4 step 2.2: DELETE ... RETURNING inside BEGIN IMMEDIATE, so the delivery fires once.
+    if (metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) !== null) {
+      return { kind: "hint", text: compactText(db, ev, row), onceKey: PENDING_COMPACT_KEY };
+    }
+  }
+  return recall(ev, row, project, body);
+}
+
+// ---------- DECISIONS-r11 (B) turn-boundary recall ----------
+
+function markCompacted(db: DbHandle, sessionId: string): void {
+  if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+}
+
+function seenSeqs(value: string | null): number[] {
+  if (value === null) return [];
+  try {
+    const v = JSON.parse(value) as unknown;
+    return Array.isArray(v) ? v.filter((n): n is number => typeof n === "number") : [];
+  } catch {
+    return [];
+  }
+}
+
+// No compaction in this session (or a row without UserPromptSubmit additionalContext): ALLOW, zero added
+// bytes. After one: BM25 of this session's rows and the same worktree's prior-session rows against the
+// prompt; whole rows over RECALL_MIN_SCORE, within RECALL_BUDGET_BYTES; a row goes out once per session.
+async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, prompt: string): Promise<Decision> {
+  if (!hasRecall(row) || ev.sessionId === "") return ALLOW;
   const db = await openDb(project);
-  // §4.4 step 2.2: DELETE ... RETURNING inside BEGIN IMMEDIATE, so the delivery fires once.
-  if (metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) === null) return ALLOW;
-  return { kind: "hint", text: compactText(db, ev, row), onceKey: PENDING_COMPACT_KEY };
+  if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW;
+  const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
+  const seen = seenSeqs(metaGet(db, seenKey));
+  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen));
+  if (picked.text === "") return ALLOW;
+  metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
 }
 
 // ---------- ADR-0009 §8.2 decision rows (D-M4-arch-5, D-M4-H2-2) ----------
@@ -369,9 +405,10 @@ function indexDetached(project: ProjectContext, sessionId: string, label: string
 
 // ---------- §4.7 PreCompact ----------
 
-async function preCompact(ev: CanonicalHookEvent, project: ProjectContext): Promise<Decision> {
+async function preCompact(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext): Promise<Decision> {
   const db = await openDb(project);
   metaSet(db, PENDING_COMPACT_META_PREFIX + ev.sessionId, PENDING_COMPACT_FLAG);
+  if (hasRecall(row)) markCompacted(db, ev.sessionId);
   return ALLOW;
 }
 

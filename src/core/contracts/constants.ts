@@ -243,6 +243,17 @@ export const COMPACT_STATE_KEY = "compact-state"; // §4.3 step 1 onceKey
 export const PENDING_COMPACT_KEY = "pending-compact"; // §4.4 step 2 onceKey
 export const PENDING_COMPACT_META_PREFIX = "pending_compact:"; // ADR-0009 §6 meta key, + session id
 export const PENDING_COMPACT_FLAG = "1";
+// DECISIONS-r11 (B) turn-boundary recall: after a compaction, each UserPromptSubmit ranks journal rows by BM25
+// against the prompt and injects whole rows. RECALL_MIN_SCORE is the -bm25 floor of the top row (rankTexts
+// "any"): on the T-CMP fixtures the asked-for row scores 6.49-10.58 and unrelated prompts top out at 4.08.
+export const RECALL_BUDGET_BYTES = 2048; // whole recall block, wrapper included (same size as STATE_BUDGET)
+export const RECALL_MIN_SCORE = 5;
+export const RECALL_MAX_ROWS = 340; // newest rows read per prompt (= MAX_CANDIDATES_TOTAL)
+export const COMPACTED_META_PREFIX = "compacted:"; // meta key + session id: a compaction happened in this session
+export const RECALL_SEEN_META_PREFIX = "recall_seen:"; // meta key + session id: JSON seq list already injected
+export const RECALL_OPEN_TAG = "<context_mode_recall>";
+export const RECALL_CLOSE_TAG = "</context_mode_recall>";
+export const RECALL_KEY = "recall"; // (B) onceKey of the recall hint (the seen list, not a marker, stops repeats)
 // §4.3 step 3 text; {prefix} is row.toolNamePrefix so it names the platform tool (GP6/hint-names-platform-tool, D-M3-H2-2).
 export const RESUME_HINT = "This session may have run before. Call {prefix}ctx_resume for a summary of what happened.";
 export const SUBAGENT_SOURCE_PREFIX = "subagent:"; // §4.6 step 5 source label: + canonical name + ":" + turn
