@@ -40,6 +40,7 @@ function select(chunks: Chunk[], intent: string, budget: number, label: string |
   const scores = rankQuery === undefined ? rankTexts(texts, intent) : rankTexts(texts, rankQuery, "any");
   // Step 3: score descending; equal score -> later chunk first (ADR-0016 "newest first").
   const order = chunks.map((_, i) => i).sort((a, b) => scores[b] - scores[a] || chunks[b].ord - chunks[a].ord);
+  promoteNeighbour(order, chunks, scores);
   const picked: Chunk[] = [];
   let used = 0;
   let skipped = false;
@@ -57,6 +58,25 @@ function select(chunks: Chunk[], intent: string, budget: number, label: string |
   const text = picked.map((c) => c.text).join(SEP);
   // Step 4.
   return { text, more: skipped ? moreLine(intent, label) : null };
+}
+
+// D-M7-SV-8: small replace chunks cut one record into several chunks, so the best chunk often holds only
+// half of what the user asked for (big-json: "priority": true in one chunk, its "amount" in the chunk
+// before). The best chunk's adjacent chunk (ord +-1) with the higher score > 0 moves to second place,
+// ahead of equal or weaker matches elsewhere. Equal neighbour scores -> the later chunk (newest first).
+// No match (best score 0) -> no change. Still whole chunks only, BM25-scored, within the same budget.
+function promoteNeighbour(order: number[], chunks: Chunk[], scores: number[]): void {
+  if (order.length < 3) return;
+  const best = order[0];
+  if (scores[best] <= 0) return;
+  let pick = -1;
+  for (let j = 0; j < chunks.length; j++) {
+    if (j === best || Math.abs(chunks[j].ord - chunks[best].ord) !== 1 || scores[j] <= 0) continue;
+    if (pick < 0 || scores[j] > scores[pick] || (scores[j] === scores[pick] && chunks[j].ord > chunks[pick].ord)) pick = j;
+  }
+  if (pick < 0) return;
+  order.splice(order.indexOf(pick), 1);
+  order.splice(1, 0, pick);
 }
 
 function moreLine(intent: string, label: string | undefined): string {

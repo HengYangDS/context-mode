@@ -115,9 +115,10 @@ function toMatch(q: string): string {
   return words.map((w) => `"${w}"*`).join(" ");
 }
 
-// D-M7-SV-5: any-word form for ranking only (each distinct word a quoted prefix term, joined by OR).
+// D-M7-SV-5: any-word form for ranking only (each distinct word a quoted term, joined by OR). D-M7-SV-8:
+// whole words, no prefix star, so a command word ("cat") does not match a data token ("catthzzh").
 function toMatchAny(q: string): string {
-  const terms = new Set(toMatch(q).split(" ").filter((t) => t !== ""));
+  const terms = new Set(toMatch(q).split(" ").filter((t) => t !== "").map((t) => t.slice(0, -1)));
   return [...terms].join(" OR ");
 }
 

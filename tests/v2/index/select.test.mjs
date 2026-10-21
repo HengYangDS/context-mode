@@ -80,3 +80,37 @@ test("selectChunksInMemory never writes to the DB (pure in-memory read)", () => 
   const chunks = [{ ord: 0, text: "hello", bytes: 5 }];
   assert.doesNotThrow(() => selectChunksInMemory(chunks, "hello", 10));
 });
+
+// D-M7-SV-8: small replace chunks cut one record into several chunks. After the best chunk, its higher-scoring
+// adjacent chunk (ord +-1) comes next, before weaker matches elsewhere, so the record's other line is returned.
+test("selectChunksInMemory takes the best chunk's higher-scoring neighbour before distant weaker matches", () => {
+  const texts = [
+    ...Array.from({ length: 10 }, (_, i) => "row " + i + " lorem"),
+    "amount 10",
+    "priority false",
+    "amount 3099",
+    "priority true",
+    "items gamma",
+    "amount 30",
+    "priority false",
+  ];
+  const chunks = texts.map((t, ord) => ({ ord, text: t, bytes: Buffer.byteLength(t) }));
+  const out = selectChunksInMemory(chunks, "cat orders.json", 26, "L", "cat orders.json priority true amount");
+  assert.equal(out.text, "amount 3099\npriority true");
+  assert.equal(typeof out.more, "string");
+});
+
+test("selectChunksInMemory: no neighbour rule without a match (all scores 0 keep the old order)", () => {
+  const chunks = ["a1", "b2", "c3", "d4"].map((t, ord) => ({ ord, text: t, bytes: 2 }));
+  const out = selectChunksInMemory(chunks, "zzz", 5);
+  assert.equal(out.text, "c3\nd4");
+});
+
+// D-M7-SV-8: the any-word rank query matches whole words only. A prefix form let "cat" (from the command)
+// match "catthzzh" (an id in the data), so a chunk with no asked word could outrank the asked line.
+test("rankTexts any-mode matches whole words, not prefixes", async () => {
+  const { rankTexts } = await import("../../../src/core/store/fts.ts");
+  const s = rankTexts(["id catthzzh", "cat data", "priority true"], "cat priority", "any");
+  assert.equal(s[0], 0);
+  assert.ok(s[1] > 0 && s[2] > 0);
+});
