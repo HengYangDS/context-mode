@@ -1,5 +1,22 @@
 # v2 benchmarks
 
+## Summary (2026-10-21, v2-design `980272a5`)
+
+Agent: Claude Code 2.1.303. Model: claude-sonnet-5-5, effort low. Keyless `claude -p`, `--max-budget-usd 0.25` per session. Each number below is explained in the section named in the last column.
+
+| Measure | Result | Source, date | Section |
+|---|---|---|---|
+| Large output, what the model saw | Full output 8,893 / 19,998 / 28,003 / 60,090 bytes; model saw 152 / 187 / 182 / 190 chars; answer correct 16 of 16 (4 sizes x git and non-git x 2), no error | live proof, 2026-10-21 | Replace live proof (final) |
+| Saving score, median of 3 runs | M1 94.21, M2 87.23 (target 90: M1 met, M2 not met). Per run M1/M2: 94.21/89.32, 94.21/85.83, 94.21/87.23. `guardsOk` false in all 3 runs: only the gate guard failed (layer `check-removed`); success, small-output and token guards passed. Lock hashes match `bench/saving-score.lock`. Median v2 small-task session tokens 38,178 (off arm about 36,167 to 36,196) | `bench/saving-score.mjs`, 3 runs, 2026-10-21 | Saving loop |
+| Final A/B, large tasks (multi-1, big-tests, big-json, json-1; 36 sessions) | median tool_result bytes off 4,694.5, v1 2,436.5, v2 734.5; median session tokens off 55,897, v1 65,599, v2 60,390 (v2 -19.6 % vs off, -2.7 % vs v1); 12/12 pass per arm; cost off 0.607, v1 0.754, v2 0.391 USD | `bench/live/results/ab-final2.json`, 2026-10-21 | Final A/B (after final push) |
+| Final A/B, small tasks (5 tasks x 3 runs; 45 sessions) | median session tokens off 36,184, v1 42,493, v2 38,210 (v2 -5.7 % vs off, +10.2 % vs v1); median tool_result bytes 31 / 31 / 8; 15/15 pass per arm; cost 0.330 / 0.537 / 0.359 USD | same | same |
+
+Plain reading:
+- v2 cuts the bytes the model reads when the output is large (734.5 vs 4,694.5, 84 % fewer; the 60 KB test case: 60,090 bytes became 190 chars). This is what the product does.
+- v2 does not yet cut session tokens. On small tasks it costs a fixed 5.7 % more than no plugin (about 2,000 tokens of tool schemas and hooks; v1 costs about 6,300). On large tasks big-tests saves 28 % tokens, but multi-1 (+29 %) and big-json (+74 %) use more, because the model spends extra turns on `ctx_*` calls. These two are not tuned yet.
+- The M2 score is below 90 and varies between runs (85.83 to 89.32); big-json is the noisiest task (74.51 to 86.6). `bench/saving-score-last.json` holds an older run (M2 84.02, 2026-10-20), not this median.
+- Earlier tables in this file (offline replay, 20-task live A/B, Final A/B of 2026-10-20 or 2026-10-21 with 6 tasks) are kept as history. They were measured on earlier builds; where they differ from this summary, this summary is newer.
+
 ## Offline replay
 
 Measured 2026-10-19 (run date; the clock says 2026-10-20 in the session). Node v26.8.1. Method: `bench/README.md`. Script: `bench/replay.mjs`. Aggregate JSON: `bench/offline-aggregate.json`.
@@ -205,7 +222,7 @@ Checks made on v2-design:
 - Success: 16 of 16 sessions pass in both arms in every committed score file (baseline, r1, r2, r3, r5). The small-output guard stays at -0.32%. Median small-task session tokens: v2 38185 against off 36169.5, inside the 2% token limit.
 - Selection: the replace path ranks whole chunks with BM25 (`src/core/index/select.ts`, `selectChunksInMemory`). Chunks are line-aligned (`chunkText`). The code has no head/tail cut and no regex filter on the returned text. The `slice` calls in `dispatch.ts` apply to the source label only. Not checked: how `chunkText` splits one line longer than 48 bytes.
 - Number mismatches to know: (1) r5 was committed first as M2 87.66 (640dccff), then re-run to 88.9 (1d55d561); the table uses the later file. (2) For r6 and r7 the round log gives M2 89.52 and 89.09, but the round notes give 88.8 and 87.98. Neither round is merged, so v2-design has no score file for them. (3) Only the r5 file is on v2-design; r1, r2 and r3 values are from the earlier commits of `bench/saving-score-last.json`, and show M2 69.22, 79.65 and 86.41 (the log for those rounds matches), but r1 to r3 commit-time files read 67.48, 82.49 and 85.56 in the DEVIATIONS-row commits and were re-run after.
-- This file has no M1/M2 numbers outside this section, so no other table can disagree with the score file.
+- The Summary at the top of this file and this section both hold M1/M2 numbers. The Summary is the newer one (median of 3 runs, 2026-10-21); the table below is the round history up to round 5.
 
 | Round | Change | M1 | M2 | Merged |
 |---|---|---:|---:|---|
@@ -218,12 +235,38 @@ Checks made on v2-design:
 | 6 | Label "<tool>#" plus 8 hex of sha256(call id) | 94.10 | 89.52 (notes: 88.8) | no (does not beat best) |
 | 7 | Read the full output from persistedOutputPath when stdout is cut | 94.12 | 89.09 (notes: 87.98) | no (does not beat best) |
 
-Final on v2-design: M1 94.12, M2 88.9 (round 5). Guards pass. The 90 target was reached for M1 and not for M2. Missing: 1.1 points.
+Round 5 on v2-design (2026-10-20): M1 94.12, M2 88.9, guards pass. Later re-measure: see "Re-measure after the final push" below. The 90 target was reached for M1 and not for M2. Missing: 1.1 points.
 
 Measured ceiling and what blocks it (M2 per task, last merged file): big-tests 99.23, multi-1 90.94, big-json 86.86, json-1 51.7.
 - json-1: the off-arm output is under the 4096-byte trigger, so no replace happens. The task is in the score and cannot rise without a lower trigger, which costs the small-output guard.
 - big-json: the model checks the answer with Read or ctx_execute after the replace. Round 7 showed that Claude Code gives the hook only the first 30000 chars of stdout; reading the full file fixed the missing line but the model still re-checked, and the task fell to 23.62 in that round.
 - Noise: 2 runs per arm. Round 6 moved big-json from 84.19 to 76.41 and multi-1 from 91.12 to 94.2 with no relevant change. A 1 point M2 gap is inside this noise, so "90 reached" cannot be claimed or ruled out for any round.
+
+### Re-measure after the final push (2026-10-21, `980272a5`)
+
+Three full runs of `bench/saving-score.mjs` on v2-design `980272a5`. Lock check OK: the sha256 of `bench/saving-score.mjs` and `bench/live/score-tasks.mjs` match `bench/saving-score.lock`. Build OK. Neither score file was changed.
+
+| Run | M1 | M2 | Median v2 small-task session tokens | guardsOk |
+|---|---:|---:|---:|---|
+| 1 | 94.21 | 89.32 | 38,178 | false |
+| 2 | 94.21 | 85.83 | 38,178 | false |
+| 3 | 94.21 | 87.23 | 38,179 | false |
+| Median | 94.21 | 87.23 | 38,178 | - |
+
+The off arm needed about 36,167 to 36,196 tokens. Guards: success, small1k and tokens passed in all 3 runs. The gate guard failed in all 3 runs (layer `check-removed` FAIL), so `guardsOk` is false. M1 meets the 90 target; M2 does not.
+
+M2 per scored task, savingPct (json-1, multi-1, big-tests, big-json): run 1 83.48, 92.05, 99.23, 86.6; run 2 81.07, 90.6, 99.23, 74.51; run 3 71.78, 92.03, 99.23, 82.44. Tasks outside the score (log-1, tests-1, file-1, git-1): run 1 48.39, 0, 0, 60.98; run 2 96.77, 0, 0, 0; run 3 48.39, 99.82, 0, 0.
+
+big-json is the noisiest task (74.51 to 86.6) and drives the M2 spread. The runs changed the tracked file `bench/saving-score-last.json` only in the run clone; it was not committed, so the file on v2-design still holds the older run (M2 84.02, 2026-10-20).
+
+Two other builds were scored the same way (3 runs each, not merged into v2-design):
+
+| Build | M1 | M2 | Median v2 small-task tokens | guardsOk |
+|---|---:|---:|---:|---|
+| Lever `defer` | 94.24 | 84.68 (runs 62.43, 87.77, 84.68) | 38,003 | false (gate: check-removed, then v2-unit FAIL in run 3) |
+| Lever `m2`, `origin/impl/final-m2` at `1a8e9b74` | 94.26 | 82.91 (runs 79.82, 82.91, 86.41) | 38,179 | false (gate: check-removed) |
+
+Neither lever beats the v2-design median M2 of 87.23. Lever `defer` run 1 had json-1 at -61.43 %. Lever `m2` is below 90 and varies with json-1 and big-json. Both needed `npm install --no-package-lock` because the repo has no lockfile.
 
 ## Memory
 
