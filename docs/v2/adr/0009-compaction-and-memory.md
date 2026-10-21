@@ -245,6 +245,7 @@ Sources: `docs/v2/review/DECISIONS-r7.md`; `tickets/memory-retrieval/eval/result
 
 ## Changes
 
+- 2026-10-21 (DECISIONS-r11): push, not pull. §3/§4: decision rows score (`WEIGHT.decision` 700) and are the `decisions` section of the state block, after edited files (supersedes DECISIONS-r6 D3 and the r9 F2/F8 "decision never a candidate" clause). New turn-boundary recall: after a compaction, each `UserPromptSubmit` injects whole journal rows ranked by BM25 against the prompt (`RECALL_MIN_SCORE`, `RECALL_BUDGET_BYTES`, no repeat per session, §8 scope rules); zero bytes when the session had no compaction.
 - 2026-10-16 (DECISIONS-r9): §3 names which sections/kinds score (F2/F8: `cmd`/`toolerr` with `ok=0` feed `open_errors`, `cost`/`decision` never candidates); §6 adds the T-CMP fail-back for Claude Code and the per-release, per-agent flip rule (V9, V27); §8.1 `after` fixed to an epoch-ms cursor, not `seq` (M18), with the paging line to match (M22); §8.3 tie-break fixed to `seq` desc then `ord` asc (M19).
 - 2026-10-14 (fix-r4, owners.adr-b): added the single journal write path, §0 (A4); added the byte-identical-per-turn rule (A49); scoped the "only re-injection point" claim to Claude Code/Codex/Qwen/ZCode and named the Gemini/Copilot CLI/VS Code second path (B26); resolved Kiro as unsupported with a documented gap, and clarified Qwen's delivery path (B12, B23).
 - 2026-10-15: status set to Accepted. Folded r3's Q12 into the OpenCode 2 delivery row and Q2 into the budget line in §4; removed the standalone r3 section.
