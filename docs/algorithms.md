@@ -140,8 +140,10 @@ Past a size line the write moves off the hook's critical path because of the hoo
 **Source:** `docs/v2/review/DECISIONS-r10.md`; `docs/v2/impl/05-tools-index.md` §5 `selectChunksInMemory`
 (DECISIONS-r9 F1); `docs/v2/impl/DEVIATIONS.md` D-M7-RR-1..3, D-M7-SV-1..5.
 
-**Measured:** saving loop (`bench/saving-score-last.json`, 2026-10-20): offline M1 94.12, live M2 88.9, guards pass,
-head 1d55d561f4cf62e5f8584c4958ee60522b012bd5. Rounds are in `docs/v2/benchmarks.md` "Saving loop". Sweeps of
+**Measured:** saving score, median of 3 runs (`bench/saving-score.mjs`, v2-design `980272a5`, 2026-10-21): offline M1 94.21,
+live M2 87.23 (runs 89.32, 85.83, 87.23); target 90, M2 not met; `guardsOk` false in all 3 runs (gate guard, layer
+`check-removed`). Live proof: outputs of 8,893 to 60,090 bytes reached the model as 152 to 190 chars, answer right 16 of 16
+(2026-10-21). Rounds are in `docs/v2/benchmarks.md` "Saving loop". Sweeps of
 the return and chunk sizes (offline replay, same corpus) are in D-M7-SV-2 and D-M7-SV-3. Hook-path cost:
 `docs/performance.md`.
 
@@ -198,11 +200,11 @@ The old v1 savings numbers (from the removed `BENCHMARK.md`) are gone: no file i
 
 | Metric | Value | Source, date, agent |
 |---|---|---|
-| Final A/B, median session tokens (54 sessions, 3 runs x 6 tasks x 3 arms, 18/18 pass per arm) | off 36,217; v1 42,557; v2 38,252 | `bench/live/results/ab-final.json`, `docs/v2/benchmarks.md`, 2026-10-20, Claude Code 2.1.303, claude-sonnet-5-5 low |
-| Final A/B, saving vs off (median / min / max) | v1 -17.5 / -61.3 / -15.1 %; v2 -5.5 / -5.7 / +30.4 % | same |
-| Final A/B, v2 vs v1 (median / min / max) | +10.2 / +10.0 / +56.9 % | same |
-| Final A/B, median tool_result bytes | off 46.5; v1 46.5; v2 31 | same |
-| Saving loop score | M1 94.12, M2 88.9, guards pass | `bench/saving-score-last.json`, 2026-10-20 |
+| Live proof, bytes the model saw (4 sizes x git/non-git x 2 = 16 runs) | full 8,893 / 19,998 / 28,003 / 60,090 bytes; model saw 152 / 187 / 182 / 190 chars; correct 16/16 | `docs/v2/benchmarks.md` "Replace live proof (final)", `980272a5`, 2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low |
+| Final A/B, large tasks, median tool_result bytes | off 4,694.5; v1 2,436.5; v2 734.5 | `bench/live/results/ab-final2.json`, `docs/v2/benchmarks.md`, 2026-10-21 |
+| Final A/B, large tasks (36 sessions), median session tokens | off 55,897; v1 65,599; v2 60,390 (v2 -19.6 % vs off, -2.7 % vs v1); 12/12 pass per arm | same |
+| Final A/B, small tasks (45 sessions), median session tokens | off 36,184; v1 42,493; v2 38,210 (v2 -5.7 % vs off, +10.2 % vs v1); 15/15 pass per arm; fixed plugin cost about 2,000 tokens (v2), 6,300 (v1) | same |
+| Saving score, median of 3 runs | M1 94.21, M2 87.23, `guardsOk` false (gate guard) | `bench/saving-score.mjs`, `980272a5`, 2026-10-21 |
 | Offline replay, corpus byte saving (23175 tool calls, 820 sessions; old policy with hints) | 1.1%; -1.5% with the re-run bound | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
 | Offline replay, Read byte saving (28 denies of large unranged reads) | 21.2%; 10.4% with the re-run bound | same |
 | Live routing, run 4, under / over (new rule, `ROUTE_BYTES` 2048) | under 0/20 all models; over 0, 0, 1 of 20 | `docs/v2/prompt/results.md`, 2026-10-19, Claude Code 2.1.303 |

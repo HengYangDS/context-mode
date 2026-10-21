@@ -50,6 +50,9 @@ MCP server process can both read and write it without stepping on each other (`0
    Chunks are ranked by BM25 against the tool intent and the session's last user prompt. Nothing is cut and no
    regex filters the text (`docs/algorithms.md` §7). There are no size hints: a Bash call is not denied for a size
    guess, because the real size is known after the run (DECISIONS-r10).
+   Measured (2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low): outputs of 8,893 to 60,090 bytes reached the model
+   as 152 to 190 chars and the answer was right in 16 of 16 runs. On small tasks the plugin adds a fixed prompt cost of
+   about 2,000 tokens (`docs/v2/benchmarks.md`).
 
 ## Search: scope, ranking, and time
 

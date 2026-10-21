@@ -25,9 +25,10 @@ runs, search results, docs.
 
 ## Business value
 
-- Aims at less tool output in context per turn. Measured so far: a saving on large
-  outputs only; on small single-task sessions v2 uses more tokens than no plugin
-  (see "Measured numbers").
+- Aims at less tool output in context per turn. Measured so far: the model reads
+  84% fewer tool_result bytes on large-output tasks (734.5 vs 4,694.5 median), and a
+  60 KB output shows as 190 chars. Session tokens are not lower yet: v2 uses more
+  tokens than no plugin on small and on large tasks (see "Measured numbers").
 - No text is thrown away: output is indexed, not deleted, so the agent can
   always search back for the exact bytes it needs.
 - One shared store per project, so work survives a context compaction.
@@ -68,13 +69,13 @@ file in this repo measures them now.
 
 | Number | Value | Source, date, agent |
 |---|---|---|
-| Final A/B: sessions and pass | 54 sessions (3 runs x 6 tasks x 3 arms), all pass 18/18 per arm | `bench/live/results/ab-final.json`, `docs/v2/benchmarks.md`, 2026-10-20, Claude Code 2.1.303, claude-sonnet-5-5 low |
-| Final A/B: median session tokens | off 36,217; v1 42,557; v2 38,252 | same |
-| Final A/B: saving vs off (median / min / max) | v1 -17.5 / -61.3 / -15.1 %; v2 -5.5 / -5.7 / +30.4 % | same |
-| Final A/B: v2 vs v1 (median / min / max) | +10.2 / +10.0 / +56.9 % | same |
-| Final A/B: median tool_result bytes; ctx calls | bytes: off 46.5, v1 46.5, v2 31; calls: v1 2, v2 3 | same |
-| Final A/B: cost (list price, estimate) | off 0.534, v1 0.747, v2 0.687, total 1.97 USD | same |
-| Saving loop score | M1 94.12, M2 88.9, guards pass (head 1d55d561f4cf62e5f8584c4958ee60522b012bd5) | `bench/saving-score-last.json`, 2026-10-20 |
+| Large output, what the model saw | full output 8,893 / 19,998 / 28,003 / 60,090 bytes; model saw 152 / 187 / 182 / 190 chars; answer correct 16 of 16 (4 sizes x git and non-git cwd x 2), no error | `docs/v2/benchmarks.md` "Replace live proof (final)", v2-design `980272a5`, 2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low |
+| Final A/B, large tasks: median tool_result bytes | off 4,694.5; v1 2,436.5; v2 734.5 (36 sessions: multi-1, big-tests, big-json, json-1; 3 runs x 3 arms) | `bench/live/results/ab-final2.json`, `docs/v2/benchmarks.md`, 2026-10-21, claude-sonnet-5-5 low |
+| Final A/B, large tasks: median session tokens | off 55,897; v1 65,599; v2 60,390; v2 -19.6 % vs off, -2.7 % vs v1; pass 12/12 per arm; cost 0.607 / 0.754 / 0.391 USD | same |
+| Final A/B, small tasks: median session tokens | off 36,184; v1 42,493; v2 38,210; v2 -5.7 % vs off, +10.2 % vs v1; pass 15/15 per arm; median tool_result bytes 31 / 31 / 8; cost 0.330 / 0.537 / 0.359 USD (45 sessions, log-1 json-1 tests-1 file-1 git-1) | same |
+| Final A/B, per task tokens (off / v1 / v2) | big-tests 53,104 / 59,478 / 38,359; multi-1 108,290 / 125,342 / 140,110; big-json 56,707 / 66,559 / 98,955 | same |
+| Saving score, median of 3 runs | M1 94.21, M2 87.23; target 90 (M1 met, M2 not met); `guardsOk` false in all 3 runs (only the gate guard failed: layer `check-removed`); lock hashes match | `bench/saving-score.mjs`, v2-design `980272a5`, 2026-10-21; `docs/v2/benchmarks.md` "Saving loop" |
+| Final A/B total cost, all 81 sessions | 2.68 USD (list price, estimate) | `bench/live/results/ab-final2.json`, 2026-10-21 |
 | Offline replay (old policy with hints): bytes v2 would return vs bytes the model got | 1.1% saving; -1.5% with the re-run bound (23175 tool calls, 820 sessions) | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283, Node v26.8.1 |
 | Earlier live A/B (20 tasks x 3 runs, before the replace changes), session input saving (median, min, max) | -6.7%, -6.9%, +29.7%; pass on 60/60, off 60/60 | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code 2.1.303 |
 | Live routing, run 4 (new rule) | under 0/20 on all 3 models; over 0/20 opus-5-5, 0/20 sonnet-5-5, 1/20 haiku-5-5; correct 40/40 each | `docs/v2/prompt/results.md`, 2026-10-19, Claude Code 2.1.303 |
@@ -85,18 +86,25 @@ file in this repo measures them now.
 | 64 KB PostToolUse hook p95 (`T-F1` Case B) | 62 ms; budget `HOOK_COMBINED_P95_MS` 60 ms: FAIL | same |
 | v2 issue backlog resolved | 329 deduplicated rows (from 357 open issues/PRs), one outcome each | `PRD-v2.md` §1, `docs/v2/review/ISSUE-OUTCOMES-r4.md` |
 
-What these runs show: on tasks with a small output the plugin adds a fixed prompt cost
-(about +2.0k tokens for v2, +6.3k for v1), so the median saving is negative. v2 saves
-where the output is large (json-1 +30.4% vs off, v1 -61.3%). v2 uses fewer tokens than
-v1 on every task. The model called a ctx tool in few sessions (v1 2, v2 3 of 18).
-Caveats: n=3 per cell, one date, list-price cost. Full caveats are in
+What these runs show: v2 cuts the bytes the model reads when the output is large
+(median tool_result bytes 734.5 against 4,694.5 with no plugin; a 60 KB output became
+190 chars and the answer stayed right in 16 of 16 runs). It does not yet cut session
+tokens. On small tasks the plugin adds a fixed prompt cost (about +2.0k tokens for v2,
++6.3k for v1), so v2 uses 5.7 % more tokens than no plugin there. On large tasks the
+median is 19.6 % more, because multi-1 (+29 %) and big-json (+74 %) need extra turns for
+`ctx_*` calls; big-tests saves 28 %. Those two tasks are not tuned yet. v2 uses fewer
+tokens than v1 on small tasks (+10.2 %) and 2.7 % more on large ones.
+Caveats: n=3 per cell, one model, one date, list-price cost. Full caveats are in
 `docs/v2/benchmarks.md`. More hook numbers: `docs/performance.md`.
 
 ## Claims we do not make
 
-- We do not claim v2 saves tokens on every session. The final A/B shows a
-  median saving of -5.5% against no plugin (v2 used more); a saving appears
-  only on large outputs (`docs/v2/benchmarks.md`).
+- We do not claim v2 saves session tokens. The final A/B (2026-10-21) shows
+  -5.7% on small tasks and -19.6% on large tasks against no plugin (v2 used
+  more); only big-tests saved tokens (28%). What v2 cuts is the bytes the model
+  reads from large output (`docs/v2/benchmarks.md`).
+- We do not claim the saving score reached its target. M2 is 87.23 (median of 3
+  runs) against 90, and `guardsOk` was false in all 3 runs.
 - We do not claim the compaction pointer works. In `T-CMP` the model never
   called `ctx_resume` or `ctx_search` from it (0/10 in every arm).
 - We do not claim v2 meets its hook latency budget. GS6 is FAIL
