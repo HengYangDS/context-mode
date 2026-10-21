@@ -72,7 +72,8 @@ test("resolveProject reads piCwd for pi", () => {
 
 test("resolveProject throws NO_PROJECT with the missing source kind when the project source is missing", () => {
   assert.throws(
-    () => resolveProject("claude-code", { env: {}, argv: [], cwd: tmpdir() }),
+    // D-FU-PS-1: claude-code now falls to the payload cwd, then process.cwd(); vscode keeps one source.
+    () => resolveProject("vscode", { env: {}, argv: [], cwd: tmpdir() }),
     (err) => {
       assert.ok(err instanceof CtxError);
       assert.equal(err.code, "NO_PROJECT");
