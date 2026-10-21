@@ -323,3 +323,63 @@ Reading:
 - The result is the same in every arm: the model never called `ctx_resume` or `ctx_search` from the pointer line, so no arm returned a byte. The arms do not differ on this case.
 - Arm a stays below its gates (correct 7/10 < 0.80, call rate 0/10 < 0.70). GS11 stays FAIL. This section does not decide the compaction policy; that is an open owner decision (`.impl/BLOCKED-M7.md` item 3).
 - n = 10 per arm, one model, one date, one fixture set. The 15 misses come from one fixture, so they say little about other sessions.
+
+## Replace live root cause
+
+Measured 2026-10-21. Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--max-budget-usd 0.25`, keyless, env ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1. Build: v2-design 96caa8a7, `node build/build.mjs --out release-out`, `--plugin-dir release-out`. Task: `seq 1 N` with Bash, then the last line.
+
+Step 1, registration. `release-out/.claude-plugin/plugin.json` points to `hooks/claude-code.json`. PostToolUse is registered: matcher `^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__plugin_context-mode_context-mode__ctx_.*)$`, command `node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent claude-code`, timeout 5 s. The `--debug-file` log shows `Loading hooks from plugin: context-mode`.
+
+Step 2, hook log. A wrapper around the hook command wrote stdin, stdout, exit code and wall time for every event (temporary, not committed). In every session PostToolUse:Bash ran, exit 0, 75 to 96 ms, with `tool_response` keys `stdout, stderr, interrupted, isImage, noOutputExpected`. The hook returned `updatedToolOutput: {stdout, stderr: "", interrupted: false}`. The debug log then says `Hook PostToolUse (...) replaced tool output`.
+
+Step 3, seen by the model (`tool_result` length in stream-json):
+
+| Full output (bytes) | Sessions | tool_result seen (chars) | Replaced |
+|---:|---:|---|---|
+| 8893 (N 2000) | 4 | 152, 152, 152, 152 | yes |
+| 19998 (N 4221) | 9 | 187 in all 9 | yes |
+| 28003 (N 5822) | 4 | 182, 182, 182, 182 | yes |
+| 13893 (N 3000) | 1 | 157 | yes |
+
+The 19998 rows include runs with the bench flags (`--setting-sources project`, `--no-session-persistence`, `--allowedTools ...`, minimal env), each alone and all together: all 187. One more N 4221 session is not in the table: the model ran `seq 1 4221 | tail -n 1` (4 bytes, under the trigger).
+
+Root cause of the two earlier "not replaced" tables:
+- The plugin under test returned `updatedToolOutput` as a plain string. A build of 3f4a4d0b (before D-M7-SV-1) reproduces the old result exactly: seen 19997 for N 4221, and the debug log says `PostToolUse hook returned updatedToolOutput that does not match Bash's output shape: reason=schema_invalid issues=invalid_type`. Claude Code then keeps the original output. The code on v2-design since 52b01705 sends the Bash shape and works live, so the "after r1 shape fix" table most likely ran a release-out built before that commit.
+- "stream-json showed SessionStart only" is not evidence that PostToolUse did not run. Without `--include-hook-events`, stream-json lists SessionStart hook events only; a session run that way here replaced (seen 187) and still showed SessionStart only.
+
+Regression guard: `tests/v2/hooks/replace-live-golden.test.mjs` runs the real captured payload (`e2e/fixtures/claude-code/2.1.303/PostToolUse-Bash-large.json`) through `src/entries/hook.ts` and checks the Bash shape and a result under 1/10 of the full output. It fails on 3f4a4d0b and passes on this branch.
+
+## Replace live proof (impl/replace-live)
+
+Independent re-run, 2026-10-21. Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--max-budget-usd 0.25`, keyless, same env as above, `--include-hook-events`, `--allowedTools Bash`, `--plugin-dir release-out` built from this branch (a972e852). Task: Bash `seq 1 N`, then the last number. Two runs per size. Cwd is a git repo.
+
+| Full output (bytes) | Runs | tool_result seen (chars) | Answer correct |
+|---:|---:|---|---|
+| 8893 (N 2000) | 2 | 152, 152 | 2 of 2 |
+| 19998 (N 4221) | 2 | 187, 187 | 2 of 2 |
+| 28003 (N 5822) | 2 | 182, 182 | 2 of 2 |
+
+The root cause in the section above is confirmed.
+
+Caveat found: the hook returns nothing when the session cwd is not inside a git repo (hook run by hand with a non-git cwd gives empty stdout; with a git cwd and `CLAUDE_PROJECT_DIR` set it gives the replace). In a non-git cwd the model saw the full output: 8892, 19997, 28002 chars, answers still correct. Not changed here (src/ is out of scope); it needs its own fix and DEVIATIONS row.
+
+Gate fix: `e2e/golden/GP3/fixture-replay-claude-code-PostToolUse-Bash-large.json` was missing, so gp-cases failed on the new fixture and the saving-score gate guard was false (M2 73.71). With the golden added, gp-cases passes (GP3 21 of 21), and `tests/v2/` passes 1079 of 1079.
+
+`node bench/saving-score.mjs` (lock ok, score files match `bench/saving-score.lock`): M1 94.21, M2 86.18, guards success true, small1k true (-0.32), tokens true, gate true. M2 is below the 90 target; it is inside the 2-run noise range noted above.
+
+## Replace live proof, non-git cwd
+
+Independent check of D-M7-NG-1, 2026-10-21. Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--max-budget-usd 0.25`, keyless, same env as above, `--include-hook-events`, `--allowedTools Bash`, `--plugin-dir release-out` built from this branch after the rebase on v2-design 6f467b75. Task: run `seq 1 N` with no pipe, then give the last number. Two runs per cell. (a) cwd is a temp dir outside any git repo. (b) cwd is a temp git repo.
+
+| Cwd | Full output (bytes) | Runs | tool_result seen (chars) | Answer correct |
+|---|---:|---:|---|---|
+| (a) non-git | 8893 (N 2000) | 2 | 152, 152 | 2 of 2 |
+| (a) non-git | 19998 (N 4221) | 2 | 187, 187 | 2 of 2 |
+| (b) git | 8893 (N 2000) | 2 | 152, 152 | 2 of 2 |
+| (b) git | 19998 (N 4221) | 2 | 187, 187 | 2 of 2 |
+
+A first pass with a looser prompt let the model run `seq 1 N | tail -n 1` (4 bytes) in 6 of 8 runs. Those runs do not test the hook and are not counted. Before D-M7-NG-1 the non-git cell gave the full output (8892, 19997, 28002 chars, see above); now it gives the same replace as a git cwd.
+
+Rebase finding: after rebasing on v2-design 6f467b75, `tests/v2/ops/project-dir-ported.test.mjs` still asserted NO_GIT_DIR for a non-git cwd, and the saving-score gate guard failed (M2 78.22, gate false). The test now asserts the D-M7-NG-1 rule (DEVIATIONS row added). `node --test tests/v2/`: 1196 tests, 1194 pass, 0 fail, 2 skip.
+
+`node bench/saving-score.mjs` (lock ok): M1 94.21, M2 84.02, guards success true, small1k true (-0.32), tokens true, gate true. M2 is below the 90 target; it moves 78 to 86 between runs of the same code, which is the 2-run noise noted above.

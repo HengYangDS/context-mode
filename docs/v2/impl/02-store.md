@@ -55,6 +55,8 @@ Steps:
 5. Run `git rev-parse --path-format=absolute --show-toplevel` with the same cwd for `worktree`; realpath it.
 6. Return `{ gitCommonDir, projectKey, worktree }`.
 
+Non-git dir (D-M7-NG-1, owner decision 2026-10-21): one fixed rule, not a fallback path. When no `.git` is found walking up from the project dir to the filesystem root, the project is `realpath(dir)`: `projectKey = sha256(realpath(dir))[0..PROJECT_KEY_HEX_LEN)`, `worktree = containmentRoot = realpath(dir)`, no git process runs. A nested non-git dir is its own project. The home dir and the filesystem root are projects too (no rule in this doc or ADR-0005 forbids it). `NO_GIT_DIR` stays only for a project dir that does not exist. The project source per agent (PRD §5) is unchanged.
+
 E2E: GP7 (scope — identity shared per repo, two worktrees resolve the same `projectKey`). ADR-0017 `covers`: `src/core/project/`.
 
 ## 3. `src/core/project/contain.ts`
