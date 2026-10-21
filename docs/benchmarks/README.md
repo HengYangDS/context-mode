@@ -4,6 +4,10 @@ What Context Mode v2 does: when a tool result is large, the model gets the best-
 
 Setup for all live runs unless a section says otherwise: Claude Code 2.1.303, model `claude-sonnet-5-5`, effort `low`, keyless `claude -p`, `--max-budget-usd 0.25` per session, env `ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`. Build step: `npm install --no-package-lock` then `node build/build.mjs --out release-out`.
 
+## Cost per task: direct vs v1 vs v2 vs the gateway (Opus 5.5)
+
+Six short tasks from the published gateway benchmark, 8 pairs per task, 2026-10-21, Claude Code 2.1.303, `claude-opus-5-5`, plan pushed first. Summed over 48 pairs, v1 cost 34.6% more than direct and v2 cost 2.2% more. The published gateway rows (2026-09-29, Claude Code 2.1.283) cost 24.5% less over 88 pairs. Full tables, intervals, losses and the bridge drift check: [v1-v2-gateway/README.md](v1-v2-gateway/README.md). Evidence: [v1-v2-gateway/ab.json](v1-v2-gateway/ab.json).
+
 ## Headline: bytes the model sees, and cost
 
 Large-output tasks (multi-1, big-tests, big-json, json-1), 3 runs per task and arm, 2026-10-21. Source: [data/ab-final2.json](data/ab-final2.json).
