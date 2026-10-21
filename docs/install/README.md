@@ -1,39 +1,15 @@
-# Install guides — status
+# Install guides
 
-Ten guides, one per agent. Each guide gives install, update, upgrade-from-v1,
-rollback, uninstall and troubleshooting steps for context-mode v2. "Status"
-below says how far each guide was checked against the live agent, as of
-2026-10-17. No v2 MCP server build exists on `v2-design` yet, so every
-"Verified" step used a stand-in stdio server or a placeholder command in its
-place; no guide below confirms the real context-mode tools end to end yet.
-
-| Agent | Guide | Status |
-|---|---|---|
-| Claude Code | [claude-code.md](./claude-code.md) | Blocked — plugin marketplace add step needs owner login; CLI-on-PATH check only. |
-| Codex | [codex.md](./codex.md) | Partial — `codex mcp add` and `mcp list` verified with a placeholder command; no real server run. |
-| Copilot CLI | [copilot-cli.md](./copilot-cli.md) | Docs-only — built from public docs; not run against a live CLI. |
-| Gemini CLI | [gemini.md](./gemini.md) | Blocked — extension install needs owner login and the `release` ref, which does not exist yet. |
-| Kiro | [kiro.md](./kiro.md) | Docs-only — built from public docs; not run against a live CLI. |
-| OpenCode | [opencode.md](./opencode.md) | Partial — install and MCP/hook config verified with a stand-in server. |
-| Pi | [pi.md](./pi.md) | Partial — install verified against the `v2-design` ref (the `release` ref does not exist yet). |
-| Qwen Code | [qwen.md](./qwen.md) | Partial — CLI install and `extensions --help` shape verified; real extension install not run (no v2 build). |
-| VS Code | [vscode.md](./vscode.md) | Docs-only — built from public docs; not run against a live install. |
-| ZCode | [zcode.md](./zcode.md) | Partial — install verified with a stand-in server; found the config file the guide named is not the one the CLI reads (see Deviations). |
+One guide per agent. Every command block runs as copied, with no edit: no user path, no placeholder.
+`build/check-install-docs.mjs` checks this in CI.
 
 ## Get the files
 
-The `release` ref appears with the first v2 release. Until then the
-commands below fail with "Remote branch release not found". `v2-design`
-holds source, not built files, so it does not work as a stand-in.
-
-Codex, OpenCode, Kiro, VS Code and ZCode run a local copy of the built files.
-Use one folder for all of them: `~/.context-mode-app` (Windows:
-`%USERPROFILE%\.context-mode-app`). The folder `~/.context-mode/` is not
-used: v1 keeps data there and `/ctx-upgrade` deletes it (ADR-0011).
+Most agents run a local copy of the built files from the `release` branch, in one fixed folder.
 
 macOS / Linux:
 
-```bash
+```sh
 git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
 ```
 
@@ -43,31 +19,50 @@ Windows (PowerShell):
 git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
 ```
 
-Update: `git -C ~/.context-mode-app pull` (Windows: `git -C "$env:USERPROFILE\.context-mode-app" pull`).
+Pi does not need this folder: it installs from the release branch itself.
 
-The `release` branch holds built files only (ADR-0013). Files used by the guides:
+## Update
 
-| File | Use |
-|---|---|
-| `server.mjs` | MCP server. Start: `node ~/.context-mode-app/server.mjs --agent <id>` |
-| `hook.mjs` | Hook command. `node ~/.context-mode-app/hook.mjs --agent <id>` |
-| `hooks/<agent>.json` | Hook entries per agent |
+macOS / Linux:
 
-`<id>` is the agent id of the guide (`codex`, `opencode`, `kiro`, `vscode`, `zcode`).
-Claude Code, Copilot CLI, Gemini, Qwen and Pi install from their own
-marketplace or extension command and do not need this folder.
+```sh
+git -C ~/.context-mode-app pull
+```
 
-Some config files do not expand `~`. The guides then show `/Users/you/...`:
-change `/Users/you` to your home folder.
+Windows (PowerShell):
 
-## What "Partial" and "Blocked" mean
+```powershell
+git -C "$env:USERPROFILE\.context-mode-app" pull
+```
 
-- **Partial**: the agent CLI and its config-file steps were run and checked, but the real context-mode v2 server was not, because no build exists on `v2-design` yet.
-- **Blocked**: a step needs the repo owner's own login/auth, so it could not be run here.
-- **Docs-only**: no isolated live run; the guide follows the agent's public docs only.
+Then restart the agent. Every config entry points at this folder, so nothing else changes.
 
-## Deviations found
+## Methods
 
-Open items each guide's "Differences from the v2 spec" section raised are
-copied into [`docs/v2/impl/DEVIATIONS.md`](../v2/impl/DEVIATIONS.md) as open
-rows for the M3 adapter work.
+Order of preference: 1. the agent's own plugin or extension install; 2. the agent's own `mcp add` command (your shell expands `$HOME` or `$env:USERPROFILE`); 3. a config value with a variable the agent expands itself; 4. one `node` command that writes the config with the real path.
+
+"Verified" means the command ran on macOS with a temporary HOME against the release branch (commit 0438537), and the agent listed the server. No guide is checked on Windows yet, and no run had a live, logged-in agent session fire the hooks.
+
+| Agent | Guide | Method | Verified |
+|---|---|---|---|
+| Claude Code | [claude-code.md](./claude-code.md) | 2 (`claude mcp add`) + 4 (hooks) | yes, 2026-10-21, 2.1.274 |
+| Codex | [codex.md](./codex.md) | 2 (`codex mcp add`) + 4 (hooks) | yes, 2026-10-21, 0.163.0 |
+| Copilot CLI | [copilot-cli.md](./copilot-cli.md) | 2 (`copilot mcp add`) + 4 (hooks) | yes, 2026-10-21, 1.0.102 |
+| Gemini CLI | [gemini.md](./gemini.md) | 2 (`gemini mcp add`), no hooks | yes, 2026-10-21, 0.65.0 |
+| Kiro | [kiro.md](./kiro.md) | 4 (MCP and hooks) | no: command ran, Kiro not installed |
+| OpenCode | [opencode.md](./opencode.md) | 3 (`{env:HOME}`), written by 4; no hooks | yes, 2026-10-21, 1.19.3 |
+| Pi | [pi.md](./pi.md) | 1 (`pi install git:...@release`) | partly, 2026-10-21, 1.3.0: installed, not loaded in a session |
+| Qwen Code | [qwen.md](./qwen.md) | 2 (`qwen mcp add`), no hooks | yes, 2026-10-21, 0.25.3 |
+| VS Code | [vscode.md](./vscode.md) | 4 (MCP and hooks, per project) | no: command ran, VS Code not run |
+| ZCode | [zcode.md](./zcode.md) | 4 (MCP), no hooks | no: command ran, ZCode not installed |
+
+## Release build fixes needed for method 1
+
+Each of these would let the agent's own install replace the steps above:
+
+- Claude Code, Copilot CLI: a `.claude-plugin/marketplace.json` on the release branch.
+- Codex: `.agents/plugins/marketplace.json` and `.codex-plugin/plugin.json`.
+- Gemini CLI: `gemini-extension.json` args `${extensionPath}${/}server.mjs`, and a `hooks/hooks.json` with `node "${extensionPath}${/}hook.mjs" --agent gemini`.
+- Qwen Code: `qwen-extension.json` args `${extensionPath}${/}server.mjs`, a `"hooks"` key, and hook commands with `${CLAUDE_PLUGIN_ROOT}`.
+- OpenCode: `opencode/plugin.js` must export a plain function; no OpenCode build loads it today.
+- All `hooks/*.json`: the command `node hook.mjs` is relative and fails from a project folder.

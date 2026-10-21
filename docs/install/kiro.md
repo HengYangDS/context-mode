@@ -1,84 +1,101 @@
-# context-mode v2 for Kiro
+# Install context-mode v2 on Kiro
 
-This guide is for Kiro CLI V3 users. Checked 2026-10-17 against the live kiro.dev docs.
+This guide writes the MCP entry to `~/.kiro/settings/mcp.json` and the hook file `~/.kiro/hooks/context-mode.json` with one command. Both hold the real path to the context-mode files.
 
 ## Install
 
-Kiro has no git-ref power install command yet (see "Differences" below). Use the local-folder path.
+Get the files first. See [Get the files](./README.md#get-the-files).
 
-1. Get the built files (no build step): see [Get the files](./README.md#get-the-files). They land in `~/.context-mode-app`.
-2. Add the MCP server to your user config at `~/.kiro/settings/mcp.json` (checked 2026-10-17, kiro.dev/docs/mcp/configuration/):
-   ```json
-   {
-     "mcpServers": {
-       "context-mode": {
-         "command": "node",
-         "args": ["/Users/you/.context-mode-app/server.mjs", "--agent", "kiro"]
-       }
-     }
-   }
-   ```
-   Change `/Users/you` to your home folder (Windows: `C:\\Users\\you\\.context-mode-app\\server.mjs`).
-3. Add the hook file at `~/.kiro/hooks/context-mode.json` (checked 2026-10-17, kiro.dev/docs/hooks/). context-mode's build step writes this file for you from the adapter table.
-4. Start (or restart) `kiro-cli` in your project.
+macOS / Linux:
+
+```sh
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
+node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=p.join(h,".kiro","settings"),f=p.join(d,"mcp.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcpServers=c.mcpServers||{};c.mcpServers["context-mode"]={command:"node",args:[p.join(a,"server.mjs"),"--agent","kiro"]};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n");const k=JSON.parse(fs.readFileSync(p.join(a,"hooks","kiro.json"),"utf8"));for(const x of k.hooks)x.action.command="node "+q+p.join(a,"hook.mjs")+q+" --agent kiro";fs.mkdirSync(p.join(h,".kiro","hooks"),{recursive:true});fs.writeFileSync(p.join(h,".kiro","hooks","context-mode.json"),JSON.stringify(k,null,2)+"\n")'
+```
+
+Windows (PowerShell), not run on Windows yet:
+
+```powershell
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
+@'
+const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=p.join(h,".kiro","settings"),f=p.join(d,"mcp.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcpServers=c.mcpServers||{};c.mcpServers["context-mode"]={command:"node",args:[p.join(a,"server.mjs"),"--agent","kiro"]};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n");const k=JSON.parse(fs.readFileSync(p.join(a,"hooks","kiro.json"),"utf8"));for(const x of k.hooks)x.action.command="node "+q+p.join(a,"hook.mjs")+q+" --agent kiro";fs.mkdirSync(p.join(h,".kiro","hooks"),{recursive:true});fs.writeFileSync(p.join(h,".kiro","hooks","context-mode.json"),JSON.stringify(k,null,2)+"\n")
+'@ | node -
+```
+
+The command keeps your other MCP servers. Restart Kiro.
 
 ## Verify
 
-Run:
-```bash
-kiro-cli doctor -a
-```
-This checks Kiro itself. For context-mode's own checks, ask Kiro to call the `ctx_doctor` MCP tool, then run the shell command it prints. Source: kiro.dev/docs/reference/cli-commands/, checked 2026-10-17.
+Run `/ctx-doctor` in Kiro. Run `kiro-cli doctor -a` if the tools do not show.
 
 ## Update
 
-```bash
-kiro-cli update        # updates Kiro CLI itself
+macOS / Linux:
+
+```sh
+git -C ~/.context-mode-app pull
 ```
-For context-mode, pull the latest `v2`/`release` commit in your clone and rebuild, or ask Kiro to call `ctx_upgrade`. Source: kiro.dev/docs/reference/cli-commands/, checked 2026-10-17.
+
+Windows (PowerShell):
+
+```powershell
+git -C "$env:USERPROFILE\.context-mode-app" pull
+```
+
+Restart Kiro.
 
 ## Upgrade from v1
 
-1. Install v2 as above (steps 1-4).
-2. Ask Kiro to run `ctx_doctor` so it lists any v1 leftovers in `~/.kiro/agents/default.json` and `~/.kiro/context-mode/`.
-3. Ask Kiro to run `ctx_upgrade` to remove them.
-4. Only then run `npm uninstall -g context-mode`. Running it earlier breaks any v1 hook until step 3 finishes.
+Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
 
-## Roll back to v1
+1. Install v2 (see above).
+2. In Kiro, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
+3. Then remove the v1 package:
 
-1. Remove the v2 entry from `~/.kiro/settings/mcp.json` and the v2 hook file.
-2. Reinstall v1: `npm install -g context-mode@<last-v1-version>`.
-3. Re-run v1's own Kiro setup step.
+```sh
+npm uninstall -g context-mode
+```
 
-## Uninstall context-mode
+## Rollback to v1
 
-1. Remove the `context-mode` block from `~/.kiro/settings/mcp.json`.
-2. Delete `~/.kiro/hooks/context-mode.json`.
-3. Delete the data directory `~/.kiro/context-mode/`.
-4. Restart `kiro-cli`.
+Do the Uninstall steps below. Then install v1 again:
 
-## Troubleshooting
+```sh
+npm install -g context-mode
+```
 
-- **Kiro does not see the MCP tools.** Check `~/.kiro/settings/mcp.json` is valid JSON, then restart `kiro-cli`. A workspace `.kiro/settings/mcp.json` entry with the same name wins over the user file (kiro.dev/docs/mcp/configuration/, checked 2026-10-17).
-- **Hooks do not fire.** Confirm `~/.kiro/hooks/context-mode.json` has `"version": "v1"` and each hook has a `trigger` and an `action`. Run `kiro-cli doctor -a` first to rule out a Kiro-side problem.
-- **Old camelCase hooks still present.** If you see `agentSpawn`/`preToolUse`/`postToolUse` keys from an old setup, run Kiro's own `/upgrade-agent` command first, then redo this guide's hook step.
-- **Compaction loses context.** Kiro has no PreCompact hook today. This is a known, documented gap, not a bug (DECISIONS-r3 Q24 item 6) — context-mode's compaction block does not fire for Kiro yet.
+Then add the v1 entry for Kiro as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
-Still broken? Run `/ctx-doctor` and open a [bug report](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) with its full report.
+## Uninstall
 
-## Differences from the v2 spec
+macOS / Linux:
 
-These are gaps between the live Kiro docs and `docs/v2/impl/10-adapters.md` row "kiro" and ADR-0011. The impl file is not edited here.
+```sh
+node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),f=p.join(h,".kiro","settings","mcp.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcpServers["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n");fs.rmSync(p.join(h,".kiro","hooks","context-mode.json"),{force:true})'
+rm -rf ~/.context-mode-app
+```
 
-1. **Plugin-from-git-ref.** ADR-0011's release table lists Kiro among the agents marked "test first, then document" for release updates, with no command given. The live docs confirm why: Kiro's GitHub import (IDE) and `kiro-cli powers install <name|path>` (CLI) both take a name or a local path, never a git URL or a ref. There is no "install power from this exact commit" command. The only way to pin a ref is clone, `git checkout <ref>`, then install from that local folder. This guide's step 1 uses that path-based route, not a one-line git command.
-2. **Config paths confirmed.** `impl/10-adapters.md` row "kiro" names `.kiro/hooks/<id>.json` and `~/.kiro/hooks/` for hooks, and the Kiro v1-footprint row in ADR-0011 names `~/.kiro/agents/default.json`. Both match the live docs. The MCP config path (`~/.kiro/settings/mcp.json`, workspace `.kiro/settings/mcp.json`) is not named in `impl/10-adapters.md` or ADR-0011; it is added here from the live docs only, not a disagreement.
-3. **Hook format is current, not legacy.** The live docs show two current hook shapes: standalone files under `.kiro/hooks/*.json` (matches `impl/10-adapters.md`'s row) and a `hooks` array inside an agent profile file. CLI V3 still reads the old camelCase shape (`agentSpawn`, `preToolUse`, `postToolUse`) for backward compatibility only; `/upgrade-agent` converts it. `impl/10-adapters.md` and ADR-0011's Kiro row already assume the current PascalCase trigger names and the `.kiro/hooks/` file path, so no correction is needed there — this item records that the legacy shape still exists on a user's machine and the troubleshooting section above covers it.
-4. **No command for "which power version is installed".** The docs show `/powers install` and "Check for updates" in the Powers panel, but no `kiro-cli powers list --version` style command. This guide's "Update" and "Upgrade from v1" sections rely on context-mode's own `ctx_doctor`/`ctx_upgrade` for version awareness instead of a Kiro-native one. Nothing in `impl/10-adapters.md` or ADR-0011 claims otherwise.
+Windows (PowerShell), not run on Windows yet:
+
+```powershell
+@'
+const fs=require("fs"),p=require("path"),h=require("os").homedir(),f=p.join(h,".kiro","settings","mcp.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcpServers["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n");fs.rmSync(p.join(h,".kiro","hooks","context-mode.json"),{force:true})
+'@ | node -
+Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
+```
+
+
+## Report a problem
+
+Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
 
 ## Verified
 
-| Step | Result | Agent version | Date |
+Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+
+| Command | Kiro version | Date | Result |
 |---|---|---|---|
-| `node ~/.context-mode-app/server.mjs --agent kiro`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
-| `node ~/.context-mode-app/hook.mjs --agent kiro`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
-| Agent CLI | not installed on this machine; only the server and hook commands were run | n/a | 2026-10-21 |
+| install command (sh) | not installed | 2026-10-21 | Pass: mcp.json and hook file written with the real path, other servers kept |
+| uninstall command (sh) | not installed | 2026-10-21 | Pass |
+
+Not run: Kiro itself. Kiro has no npm package we could put in a temporary folder, so no run showed Kiro load the server or fire the hooks. Windows commands.

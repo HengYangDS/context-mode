@@ -1,81 +1,105 @@
 # Install context-mode v2 on ZCode
 
-ZCode is Z.ai's coding agent. It has a desktop app and a CLI. This guide covers both.
-All facts below carry a source link and the date checked.
+This guide covers the ZCode CLI. It writes the MCP entry to `~/.zcode/cli/config.json` with one command, with the real path to the context-mode files.
 
 ## Install
 
-### Desktop app (official)
-1. Open a workspace.
-2. Go to **Settings → Plugins → Personal**.
-3. The Claude Code marketplace is already listed. Add `mksglu/context-mode` as a marketplace, then install the `context-mode` plugin.
-   Source: https://zcode.z.ai/en/docs/plugin (checked 2026-10-17)
-4. Plugins are on by default after install.
-   Source: https://zcode.z.ai/en/docs/plugin (checked 2026-10-17)
+Get the files first. See [Get the files](./README.md#get-the-files).
 
-### CLI (`zcode`)
-1. Install a server entry by hand. The CLI does not read a plugin's `.mcp.json` unless the plugin is enabled, so add context-mode directly under `mcp.servers` in `~/.zcode/cli/config.json`:
-   ```json
-   { "mcp": { "servers": {
-     "context-mode": { "type": "stdio", "command": "node", "args": ["/Users/you/.context-mode-app/server.mjs", "--agent", "zcode"] }
-   }}}
-   ```
-   Change `/Users/you` to your home folder (Windows: `C:\\Users\\you\\.context-mode-app\\server.mjs`). Get the files first: see [Get the files](./README.md#get-the-files).
-   Source: GitHub `zai-org/ZCode`, `apps/zcode-cli` README (checked 2026-10-17)
-2. Check it loaded: `/mcp list`, then `/mcp status`.
-   Source: same README (checked 2026-10-17)
+macOS / Linux:
 
-## Verify with /ctx-doctor
+```sh
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
+node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),d=p.join(h,".zcode","cli"),f=p.join(d,"config.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcp=c.mcp||{};c.mcp.servers=c.mcp.servers||{};c.mcp.servers["context-mode"]={type:"stdio",command:"node",args:[p.join(h,".context-mode-app","server.mjs"),"--agent","zcode"]};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+```
 
-Run `ctx_doctor` from inside ZCode (desktop or CLI chat). It reports v1 leftovers under `~/.zcode/cli/config.json` and `~/.zcode/cli/hooks.json`, per ADR-0011's v1-cleanup table.
+Windows (PowerShell), not run on Windows yet:
+
+```powershell
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
+@'
+const fs=require("fs"),p=require("path"),h=require("os").homedir(),d=p.join(h,".zcode","cli"),f=p.join(d,"config.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcp=c.mcp||{};c.mcp.servers=c.mcp.servers||{};c.mcp.servers["context-mode"]={type:"stdio",command:"node",args:[p.join(h,".context-mode-app","server.mjs"),"--agent","zcode"]};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
+'@ | node -
+```
+
+The command keeps your other settings. Restart ZCode.
+
+## Verify
+
+In ZCode, run `/mcp list`. `context-mode` must be listed. Then run `/ctx-doctor`.
 
 ## Update
 
-- Desktop: **Settings → Plugins**, update the plugin from its marketplace entry.
-- CLI (unofficial `zcode-app-cli` package): `npm install -g zcode-app-cli@latest` (always add `@latest`; version strings are not simple semver, so a plain install may not fetch the newest build).
-  Source: npm page for `zcode-app-cli` (checked 2026-10-17)
-- context-mode plugin itself: `zcode plugins enable context-mode` after a marketplace refresh, same as other marketplace-based agents.
+macOS / Linux:
+
+```sh
+git -C ~/.context-mode-app pull
+```
+
+Windows (PowerShell):
+
+```powershell
+git -C "$env:USERPROFILE\.context-mode-app" pull
+```
+
+Restart ZCode.
 
 ## Upgrade from v1
 
-Same order as every other agent (ADR-0017 R3): install v2 first, run `ctx_doctor` then `ctx_upgrade`, and only then run `npm uninstall -g context-mode` if it was ever installed that way for ZCode. ZCode's v1 footprint is a real one, not zero (ADR-0011 fixed this claim): `~/.zcode/cli/config.json` and `~/.zcode/cli/hooks.json`, scanned for any context-mode-tagged entry.
+Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
+
+1. Install v2 (see above).
+2. In ZCode, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
+3. Then remove the v1 package:
+
+```sh
+npm uninstall -g context-mode
+```
 
 ## Rollback to v1
 
-ZCode has no built-in rollback command for a marketplace plugin. Remove the v2 marketplace entry and MCP server block by hand, then re-add the v1 entry the same way v1 was installed. There is no automated path; this is the same limitation ADR-0011 records for Gemini and Qwen.
+Do the Uninstall steps below. Then install v1 again:
+
+```sh
+npm install -g context-mode
+```
+
+Then add the v1 entry for ZCode as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-- Plugin: `zcode plugins uninstall context-mode --force`.
-  Source: npm page for `zcode-app-cli` describing plugin commands (checked 2026-10-17)
-- CLI itself (only if the unofficial `zcode-app-cli` package was used to run ZCode at all): `npm uninstall -g zcode-app-cli`, then delete `~/.zcode/cli/` for a full clean-up. Do **not** delete `~/.zcode/v2/` — ZCode Desktop keeps its own provider settings there.
-  Source: npm page for `zcode-app-cli` (checked 2026-10-17)
+macOS / Linux:
 
-## Troubleshooting
+```sh
+node -e 'const fs=require("fs"),p=require("path"),f=p.join(require("os").homedir(),".zcode","cli","config.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcp.servers["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+rm -rf ~/.context-mode-app
+```
 
-- **Tools don't show up.** ZCode names MCP tools `mcp__<server>__<tool>`, so context-mode's tools appear as `mcp__context-mode__ctx_*`. Run `/mcp status` to confirm the server connected.
-  Source: GitHub `zai-org/ZCode` README (checked 2026-10-17)
-- **Hooks never fire.** The ZCode CLI reads a plugin's `plugin.json` but skips its `hooks`, `agents` and `outputStyles` fields, and prints a warning for each. A plugin-installed context-mode on the CLI will not get PreToolUse/PostToolUse/SessionStart hooks at all; only the MCP tools work. This is a CLI-only limit; the desktop app's hook behavior is not documented and is still open as spike S-ZCODE / G25 in the v2 spec.
-  Source: GitHub `zai-org/ZCode`, `apps/zcode-cli` README (checked 2026-10-17)
-- **Plugin install from a git ref fails.** Set `ref` and `path` inside the marketplace's `marketplace.json` entry (`{"source":"github","repo":"owner/repo","ref":"...","path":"..."}`), not in the Add-marketplace dialog. The docs confirm a branch name works; they do not say whether a tag or a commit hash also works, so test with the exact ref before relying on one.
-  Source: ZCode plugin docs, https://www.zcode.network/en/docs/plugin/ (checked 2026-10-17)
+Windows (PowerShell), not run on Windows yet:
 
-Still broken? Run `/ctx-doctor` and open a [bug report](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) with its full report.
+```powershell
+@'
+const fs=require("fs"),p=require("path"),f=p.join(require("os").homedir(),".zcode","cli","config.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcp.servers["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
+'@ | node -
+Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
+```
 
-## Differences from the v2 spec
 
-This section lists facts that disagree with `docs/v2/impl/10-adapters.md`'s `zcode` row and ADR-0011. It does not edit that file.
+## Report a problem
 
-1. **Hooks do not run from a plugin on the CLI, at all.** `impl/10-adapters.md` §1.3a assumes ZCode's hook events (`SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`) fire the same way as other hooks+mcp agents, gated only by live test T-ZC on the matcher *shape*. The CLI README states the CLI skips a plugin's `hooks` field outright. If context-mode ships to ZCode as a plugin, the CLI gets MCP tools only — no hook-based context injection, no compaction block, no SessionStart routing text. This is a bigger gap than "matcher unverified"; it may mean ZCode's `installMode` should read `"mcp-only"` for the CLI, with `"hooks+mcp"` true only for the desktop app once that is confirmed live.
-2. **The MCP tool-name prefix assumption is confirmed, not just unverified.** `impl/10-adapters.md` marks `toolNamePrefix` for `zcode` as `"mcp__context-mode__"` `[unverified, T-ZC]`. The official README states tools show up as `mcp__<server>__<tool>`, which matches the assumed value exactly. T-ZC's live fixture capture is still needed to close the row formally, but the public docs do not contradict it.
-3. **The config path is confirmed for MCP servers, not shown for hooks.** `~/.zcode/cli/config.json` is correct and matches `impl/10-adapters.md` §1.5's assumed path, under `mcp.servers`. The docs do not show a `hooks.events.<Event>` key shape anywhere, because the CLI does not run plugin hooks (see point 1); no confirmation either way for a non-plugin, hand-written hook entry.
-4. **There is no official npm CLI package.** Z.ai's own install path is the desktop app only; the CLI source lives in `zai-org/ZCode` and must be built from source. The `zcode` command most installers get comes from an unofficial third-party package, `zcode-app-cli` on npm, not a Z.ai release. ADR-0011's update-command table should flag ZCode's CLI row as community-maintained if v2 ever documents an update command for it.
-5. **Git-ref plugin installs are confirmed possible**, supporting ADR-0011's "ZCode: test first, then document" line for the `release` branch update path: a marketplace entry's `source` object takes `ref` (tested: branch name) and `path` (subfolder). Tag/commit-hash support is undocumented, so ADR-0011's release step should still test the exact ref it plans to use before publishing docs that claim it works.
+Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
 
 ## Verified
 
-| Step | Result | Agent version | Date |
+Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+
+| Command | ZCode version | Date | Result |
 |---|---|---|---|
-| `node ~/.context-mode-app/server.mjs --agent zcode`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
-| `node ~/.context-mode-app/hook.mjs --agent zcode`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
-| Agent CLI | not installed on this machine; only the server and hook commands were run | n/a | 2026-10-21 |
+| install command (sh) | not installed | 2026-10-21 | Pass: entry written with the real path |
+| uninstall command (sh) | not installed | 2026-10-21 | Pass |
+
+Not run: ZCode itself (no package we could put in a temporary folder). Hooks: this guide does not add them yet. The ZCode desktop app. Windows commands.
+
+## Sources
+
+- https://github.com/zai-org/ZCode (apps/zcode-cli README)

@@ -1,106 +1,119 @@
-# Codex install guide (context-mode v2)
+# Install context-mode v2 on Codex
 
-All commands checked on 2026-10-17 against the latest Codex CLI (`0.163.0`, npm `@openai/codex`).
+This guide adds the MCP server with `codex mcp add` and writes the hooks to `~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`) with one command. A Codex plugin install does not work yet: the release branch has no `.agents/plugins/marketplace.json`.
 
 ## Install
 
-1. Install Codex itself if you do not have it yet.
-   ```
-   npm install -g @openai/codex
-   ```
-   Source: [openai/codex README](https://github.com/openai/codex) — checked 2026-10-17.
+Get the files first. See [Get the files](./README.md#get-the-files).
 
-2. Add the context-mode MCP server. Either run the add command:
-   ```
-   codex mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent codex
-   ```
-   Windows PowerShell: `codex mcp add context-mode -- node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent codex`. Get the files first: see [Get the files](./README.md#get-the-files).
-   or write the block by hand in `~/.codex/config.toml` (user scope) or `<project>/.codex/config.toml` (project scope, trusted projects only):
-   ```toml
-   [mcp_servers.context-mode]
-   command = "node"
-   args = ["/Users/you/.context-mode-app/server.mjs", "--agent", "codex"]
-   startup_timeout_sec = 20
-   ```
-   Change `/Users/you` to your home folder (Linux `/home/you`; Windows `C:\\Users\\you\\.context-mode-app\\server.mjs`). `config.toml` does not expand `~`, so use the full path.
-   Source: [developers.openai.com/codex/mcp](https://developers.openai.com/codex/mcp) — checked 2026-10-17.
+macOS / Linux:
 
-3. Install the hooks file. Context-mode writes `$CODEX_HOME/hooks.json` (default `~/.codex/hooks.json`), same shape as the Claude Code hooks file. Restart Codex so it picks up both the MCP entry and the hooks file.
-   Source: [developers.openai.com/codex/hooks](https://developers.openai.com/codex/hooks) — checked 2026-10-17.
+```sh
+npm install -g @openai/codex
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
+codex mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent codex
+node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=process.env.CODEX_HOME||p.join(h,".codex"),f=p.join(d,"hooks.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.hooks=c.hooks||{};const s=JSON.parse(fs.readFileSync(p.join(a,"hooks","codex.json"),"utf8")).hooks;for(const k in s){c.hooks[k]=(c.hooks[k]||[]).filter(e=>!JSON.stringify(e).includes(".context-mode-app"));for(const e of s[k]){for(const x of e.hooks)x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent codex";c.hooks[k].push(e)}}fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+```
 
-4. Set the approval mode so context-mode's tools do not stop and ask for approval on every call:
-   ```toml
-   default_tools_approval_mode = "auto"
-   ```
-   Source: [developers.openai.com/codex/mcp](https://developers.openai.com/codex/mcp) — checked 2026-10-17.
+Windows (PowerShell), not run on Windows yet:
 
-## Verify with /ctx-doctor
+```powershell
+npm install -g @openai/codex
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
+codex mcp add context-mode -- node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent codex
+@'
+const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=process.env.CODEX_HOME||p.join(h,".codex"),f=p.join(d,"hooks.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.hooks=c.hooks||{};const s=JSON.parse(fs.readFileSync(p.join(a,"hooks","codex.json"),"utf8")).hooks;for(const k in s){c.hooks[k]=(c.hooks[k]||[]).filter(e=>!JSON.stringify(e).includes(".context-mode-app"));for(const e of s[k]){for(const x of e.hooks)x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent codex";c.hooks[k].push(e)}}fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
+'@ | node -
+```
 
-Run `/ctx-doctor` inside a Codex session. It checks the MCP entry, the hooks file, and reports any old v1 files it finds. It does not edit anything.
+The last command writes the hooks with the real path to `hook.mjs`. It keeps your other hooks and adds no duplicates. Start Codex and approve the context-mode hooks once in the trust prompt.
+
+## Verify
+
+```sh
+codex mcp list
+```
+
+`context-mode` must show as enabled. Then run `/ctx-doctor` in Codex.
 
 ## Update
 
-Codex has no "upgrade this MCP server" command for a git-installed server. Update means: rewrite the `[mcp_servers.context-mode]` block in `config.toml` to the new entry, then restart Codex to pick it up. Run `/ctx-upgrade` to do this step for you.
+macOS / Linux:
+
+```sh
+git -C ~/.context-mode-app pull
+```
+
+Windows (PowerShell):
+
+```powershell
+git -C "$env:USERPROFILE\.context-mode-app" pull
+```
+
+Restart Codex.
 
 ## Upgrade from v1
 
-Order: install v2 first, then run `/ctx-upgrade`, then remove the old npm package last:
-```
+Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
+
+1. Install v2 (see above).
+2. In Codex, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
+3. Then remove the v1 package:
+
+```sh
 npm uninstall -g context-mode
 ```
-Running the uninstall first breaks the v1 hooks (they call the global `context-mode` bin) until `/ctx-upgrade` runs. Do not skip the order.
 
 ## Rollback to v1
 
-1. `npm install -g context-mode` (the v1 package).
-2. Re-add the v1 MCP entry by hand in `config.toml`:
-   ```toml
-   [mcp_servers.context-mode]
-   command = "context-mode"
-   args = ["mcp"]
-   ```
-3. Restore the v1 `hooks.json` entries context-mode's uninstall step removed.
+Do the Uninstall steps below. Then install v1 again:
 
-Codex has no one-command rollback for this; do the three steps above in order.
+```sh
+npm install -g context-mode
+```
+
+Then add the v1 entry for Codex as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-Run `/ctx-upgrade`'s cleanup step, or remove by hand:
-- Delete the `[mcp_servers.context-mode*]` block from `config.toml`.
-- Delete the `context-mode hook codex` entries and `hooks/codex/*.mjs` files from `hooks.json`. Keep the `[features] hooks` line — that is a Codex setting, not ours.
-- Delete the data folder: `$CODEX_HOME/context-mode/`.
+macOS / Linux:
 
-## Troubleshooting
+```sh
+codex mcp remove context-mode
+node -e 'const fs=require("fs"),p=require("path"),f=p.join(process.env.CODEX_HOME||p.join(require("os").homedir(),".codex"),"hooks.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));for(const k in c.hooks){c.hooks[k]=c.hooks[k].filter(e=>!JSON.stringify(e).includes(".context-mode-app"));if(!c.hooks[k].length)delete c.hooks[k]}fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+rm -rf ~/.context-mode-app
+```
 
-**"MCP tool call requires approval, but approval policy is never"**
-Set `default_tools_approval_mode = "auto"` (or mark the tool `readOnlyHint` at the server, which context-mode already does for `ctx_execute`). Approval modes come from `approval_policy` and `default_tools_approval_mode`.
-Source: [developers.openai.com/codex/config-reference](https://developers.openai.com/codex/config-reference) — checked 2026-10-17.
+Windows (PowerShell), not run on Windows yet:
 
-**Hooks do not fire**
-Check `[features] hooks` is on in `config.toml`, and that the project is trusted — Codex skips project-level hooks and config for untrusted projects.
-Source: [developers.openai.com/codex/hooks](https://developers.openai.com/codex/hooks) — checked 2026-10-17.
+```powershell
+codex mcp remove context-mode
+@'
+const fs=require("fs"),p=require("path"),f=p.join(process.env.CODEX_HOME||p.join(require("os").homedir(),".codex"),"hooks.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));for(const k in c.hooks){c.hooks[k]=c.hooks[k].filter(e=>!JSON.stringify(e).includes(".context-mode-app"));if(!c.hooks[k].length)delete c.hooks[k]}fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
+'@ | node -
+Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
+```
 
-**Tool name looks different from what you typed**
-Codex turns the server name into a tool-name-safe string: anything that is not a letter, digit or underscore becomes an underscore. So a server named `context-mode` shows up to the model as `mcp__context_mode__ctx_execute`, not `mcp__context-mode__...`. This is normal.
 
-Still broken? Run `/ctx-doctor` and open a [bug report](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) with its full report.
+## Report a problem
 
-## Differences from the v2 spec
-
-`docs/v2/impl/10-adapters.md` and ADR-0011 describe Codex install as a plain config file edit: write `config.toml` and `hooks.json` by hand, no install command. Current Codex docs (checked 2026-10-17) add two things the spec does not mention:
-
-1. **A CLI add command exists now**: `codex mcp add <name> -- <command>` writes the `config.toml` block for you, instead of hand-editing the file. The spec's "config-mcp" install mode still works (hand-editing is still supported), but this guide uses the add command as the simpler first option.
-2. **A plugin system exists now**: `codex plugin marketplace add owner/repo --ref <ref>` can install a plugin from a git ref, and a plugin manifest can ship its own MCP servers and hooks. The spec's ADR-0011 release table says "Codex has no marketplace-upgrade command for a git-sourced plugin" — that was true for a bare MCP server entry, but Codex's plugin system (separate from the MCP-server-only path the spec assumes) now has one. This guide does not switch Codex to the plugin path; it keeps the spec's config.toml + hooks.json path, and only notes the plugin system exists as a future option.
-
-Neither difference changes the `toolNamePrefix`, matcher, or event-map rows in `impl/10-adapters.md` — this file is not edited.
+Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
 
 ## Verified
 
-| Step | Result | Agent version | Date |
+Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+
+| Command | Codex version | Date | Result |
 |---|---|---|---|
-| CLI on PATH | worked | codex-cli 0.156.1 | 2026-10-17 |
-| `codex mcp add context-mode -- node <HOME>/.context-mode-app/server.mjs --agent codex` (temp HOME, built `release-out` copied there) | worked, wrote `command = "node"` and the `args` array to `config.toml` | codex-cli 0.156.1 | 2026-10-21 |
-| `codex mcp list` | worked | codex-cli 0.156.1 | 2026-10-17 |
-| Real server command, MCP `initialize` + `tools/list` over stdio | worked: server `context-mode`, 9 tools (`ctx_execute` to `ctx_purge`) | node 26.8.1 | 2026-10-21 |
-| `node .../hook.mjs --agent codex` with a SessionStart payload | worked, exit 0, returned `hookSpecificOutput` JSON | node 26.8.1 | 2026-10-21 |
-| `default_tools_approval_mode = "auto"` | not run, config-only change, deferred to the real server test | codex-cli 0.156.1 | 2026-10-17 |
+| `codex mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent codex` | 0.163.0 | 2026-10-21 | Pass: config.toml has the real path |
+| `codex mcp list` | 0.163.0 | 2026-10-21 | Pass: context-mode enabled |
+| hooks command (sh), then the written hook command from another folder | 0.163.0 | 2026-10-21 | Pass: exit 0, hook JSON returned |
+| `codex mcp remove context-mode` and hooks cleanup | 0.163.0 | 2026-10-21 | Pass |
+
+Not run: a live Codex session that fires the hooks and shows the trust prompt (needs a login). Windows commands.
+
+## Sources
+
+- https://learn.chatgpt.com/docs/extend/mcp?surface=cli
+- https://learn.chatgpt.com/docs/hooks
+- https://github.com/openai/codex/blob/main/codex-rs/hooks/src/engine/command_runner.rs

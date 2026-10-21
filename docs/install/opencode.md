@@ -1,109 +1,115 @@
-# OpenCode install guide (context-mode v2)
+# Install context-mode v2 on OpenCode
 
-All commands checked on 2026-10-17 against the current OpenCode build (`1.19.3`, npm `opencode-ai`, repo `github.com/anomalyco/opencode`). This repo's docs and ADR-0011 call this agent "OpenCode 2" (the `opencode` command, current major line). OpenCode 1 and OpenCode 2 share the same `opencode` command and cannot be installed side by side — see [opencode.ai/docs](https://opencode.ai/docs/) — checked 2026-10-17.
+This guide adds the MCP server to `~/.config/opencode/opencode.json` with one command. On macOS and Linux the entry uses OpenCode's own `{env:HOME}` variable. On Windows it holds the real path.
+
+The context-mode hooks plugin for OpenCode is not part of this guide yet: no OpenCode build on npm loads the release `opencode/plugin.js` ("Plugin export is not a function").
 
 ## Install
 
-1. Install OpenCode itself if you do not have it yet.
-   ```
-   npm install -g opencode-ai
-   ```
-   or `curl -fsSL https://opencode.ai/install | bash`, or Homebrew (`brew install anomalyco/tap/opencode`).
-   Source: [opencode.ai/docs](https://opencode.ai/docs/) — checked 2026-10-17.
+Get the files first. See [Get the files](./README.md#get-the-files).
 
-2. Add the context-mode MCP server. Run the guided command:
-   ```
-   opencode mcp add
-   ```
-   or write the block by hand in the config file (global `~/.config/opencode/opencode.json`, or project `opencode.json`):
-   ```jsonc
-   {
-     "$schema": "https://opencode.ai/config.json",
-     "mcp": {
-       "context-mode": {
-         "type": "local",
-         "command": ["node", "/Users/you/.context-mode-app/server.mjs", "--agent", "opencode"],
-         "enabled": true
-       }
-     }
-   }
-   ```
-   Change `/Users/you` to your home folder (Windows: `C:\\Users\\you\\.context-mode-app\\server.mjs`). Get the files first: see [Get the files](./README.md#get-the-files).
-   Source: [opencode.ai/docs/mcp-servers](https://opencode.ai/docs/mcp-servers/) — checked 2026-10-17.
+macOS / Linux:
 
-3. Install the hooks. OpenCode has no separate hooks file — hooks are a plugin. context-mode writes its plugin file to `.opencode/plugins/context-mode.js` (project) or `~/.config/opencode/plugins/context-mode.js` (global); OpenCode loads files in those directories at startup, no extra config line needed.
-   Source: [opencode.ai/docs/plugins](https://opencode.ai/docs/plugins/) — checked 2026-10-17.
+```sh
+npm install -g opencode-ai
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
+node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),d=p.join(h,".config","opencode"),f=p.join(d,"opencode.json"),s=process.platform==="win32"?p.join(h,".context-mode-app","server.mjs"):"{env:HOME}/.context-mode-app/server.mjs";let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcp=c.mcp||{};c.mcp["context-mode"]={type:"local",command:["node",s,"--agent","opencode"],enabled:true};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+```
 
-4. Restart OpenCode (or start a new session) so it picks up both the MCP entry and the plugin.
+Windows (PowerShell), not run on Windows yet:
 
-## Verify with /ctx-doctor
+```powershell
+npm install -g opencode-ai
+git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
+@'
+const fs=require("fs"),p=require("path"),h=require("os").homedir(),d=p.join(h,".config","opencode"),f=p.join(d,"opencode.json"),s=process.platform==="win32"?p.join(h,".context-mode-app","server.mjs"):"{env:HOME}/.context-mode-app/server.mjs";let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcp=c.mcp||{};c.mcp["context-mode"]={type:"local",command:["node",s,"--agent","opencode"],enabled:true};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
+'@ | node -
+```
 
-Run `/ctx-doctor` inside an OpenCode session. It checks the MCP entry, the plugin file, and reports any old v1 files it finds. It does not edit anything.
+The command keeps your other settings.
+
+## Verify
+
+```sh
+opencode mcp list
+```
+
+`context-mode` must show as connected. The first run can take 30 seconds. Then run `/ctx-doctor` in OpenCode.
 
 ## Update
 
-- Update the OpenCode app itself: `opencode upgrade` (add `--method npm|brew|curl|bun|pnpm` to match how you installed it).
-- Update context-mode: run `/ctx-upgrade`. It rewrites the `mcp.context-mode` block and refreshes the plugin file in place; no OpenCode command re-installs an MCP entry or a plugin file for you.
-  Source: [opencode.ai/docs/cli](https://opencode.ai/docs/cli/) — checked 2026-10-17.
+macOS / Linux:
+
+```sh
+git -C ~/.context-mode-app pull
+```
+
+Windows (PowerShell):
+
+```powershell
+git -C "$env:USERPROFILE\.context-mode-app" pull
+```
+
+Restart OpenCode.
 
 ## Upgrade from v1
 
-Order: install v2 first, then run `/ctx-upgrade`, then remove the old npm package last:
-```
+Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
+
+1. Install v2 (see above).
+2. In OpenCode, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
+3. Then remove the v1 package:
+
+```sh
 npm uninstall -g context-mode
 ```
-v1's OpenCode footprint is the bare npm spec `"context-mode"` inside the config's `plugin` array. `/ctx-upgrade` removes that entry and adds the v2 entry (MCP block + plugin file, above). Running `npm uninstall -g` first breaks nothing here (OpenCode's own plugin loader, not the global bin, runs the v1 hook code), but do the steps in this order anyway — it is the same order every other agent uses, and it keeps `ctx_doctor`'s evidence trail simple.
 
 ## Rollback to v1
 
-1. `npm install -g context-mode` (the v1 package).
-2. Remove the v2 entries: delete `mcp.context-mode` from the config, and delete the plugin file from `.opencode/plugins/` or `~/.config/opencode/plugins/`.
-3. Add the v1 bare npm spec back to the config's `plugin` array:
-   ```jsonc
-   { "plugin": ["context-mode"] }
-   ```
-OpenCode has no one-command rollback for this; do the three steps above in order.
+Do the Uninstall steps below. Then install v1 again:
+
+```sh
+npm install -g context-mode
+```
+
+Then add the v1 entry for OpenCode as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-Run `/ctx-upgrade`'s cleanup step, or remove by hand:
-- Delete `mcp.context-mode` from the config (global and project, if both have it).
-- Delete the plugin file: `.opencode/plugins/context-mode.js` and/or `~/.config/opencode/plugins/context-mode.js`.
-- Delete the data folder: `~/.config/opencode/context-mode/` (or wherever `OPENCODE_CONFIG_DIR` points, if set).
+macOS / Linux:
 
-To remove OpenCode itself: `opencode uninstall` (flags `--keep-config`, `--keep-data`, `--dry-run` available).
-Source: [opencode.ai/docs/cli](https://opencode.ai/docs/cli/) — checked 2026-10-17.
+```sh
+node -e 'const fs=require("fs"),p=require("path"),f=p.join(require("os").homedir(),".config","opencode","opencode.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcp["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+rm -rf ~/.context-mode-app
+```
 
-## Troubleshooting
+Windows (PowerShell), not run on Windows yet:
 
-**MCP tools do not show up**
-Config files are merged, not replaced, across five-plus layers (remote, global, custom, project, `.opencode/` dirs, inline, managed) — a disabled or overridden `mcp.context-mode.enabled` further down the precedence chain wins. Check every config layer, not just the project file.
-Source: [opencode.ai/docs/config](https://opencode.ai/docs/config/) — checked 2026-10-17.
+```powershell
+@'
+const fs=require("fs"),p=require("path"),f=p.join(require("os").homedir(),".config","opencode","opencode.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcp["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
+'@ | node -
+Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
+```
 
-**Plugin does not load**
-Confirm the file sits directly in `.opencode/plugins/` or `~/.config/opencode/plugins/` (not a subfolder) and exports a named plugin function. Run `opencode --print-logs` to see plugin load errors on stderr. `--pure` starts OpenCode with all external plugins disabled — use it to confirm a problem is plugin-related.
-Source: [opencode.ai/docs/plugins](https://opencode.ai/docs/plugins/), [opencode.ai/docs/cli](https://opencode.ai/docs/cli/) — checked 2026-10-17.
 
-**Two context-mode entries fighting each other**
-If both the v1 bare npm spec and the v2 git spec are present in `plugin`, OpenCode loads both; remove the v1 entry (`ctx_doctor` flags it).
+## Report a problem
 
-Still broken? Run `/ctx-doctor` and open a [bug report](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) with its full report.
-
-## Differences from the v2 spec
-
-`docs/v2/impl/10-adapters.md` §11 and ADR-0011 describe OpenCode's hook names as session hooks `"context"`, `"prompt"`, `"compaction"`, and tool hooks `"execute.before"`/`"execute.after"`. Current OpenCode plugin docs (checked 2026-10-17) name the hooks differently:
-
-1. **Tool hooks are namespaced**: the live names are `"tool.execute.before"` and `"tool.execute.after"` (with the `tool.` prefix), not bare `"execute.before"`/`"execute.after"`. Same mechanism the spec describes, different string.
-2. **No named `"context"` or `"prompt"` hook exists.** The current plugin API exposes a single generic `event` hook (`event: async ({ event }) => ...`) that receives every event in a documented list (Session Events include `session.created`, `session.idle`, `session.updated`, etc.; there is no `session.started`-as-"context"-on-every-request shape the spec assumes). There is also no dedicated user-prompt-submit hook name in the current docs. This guide's step 3 (plugin file, above) still works for `tool.execute.before`/`after` and for compaction (next point); the spec's per-request "context" hook and its "prompt" hook have no confirmed live counterpart as of this check — flagged here, not resolved, because this file does not edit `impl/10-adapters.md`.
-3. **Compaction uses a different name.** The live hook is `"experimental.session.compacting"` (input/output with `output.context.push(...)` or `output.prompt = "..."`), not a session hook literally named `"compaction"`.
-4. **Plugin distribution is file-drop or npm-module-string, not a documented git-ref install.** `opencode plugin <module>` and the config's `plugin: [...]` array are documented only for npm package names (plain or scoped); ADR-0011's planned v2 OpenCode entry (`"git+https://github.com/mksglu/context-mode.git#release"`) relies on OpenCode's installer (Bun) accepting a git specifier in that same string slot. No OpenCode doc page shows a git-ref example for `plugin`, so this is this guide's own inference from "Bun installs the array's entries," not a confirmed-live install path — test it against a real `release` branch before relying on it.
-
-None of these change `toolNamePrefix`, `installMode`, or the `eventMap`/matcher rows in `impl/10-adapters.md` — this file is not edited.
+Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
 
 ## Verified
 
-| Step | Result | Agent version | Date |
+Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+
+| Command | OpenCode version | Date | Result |
 |---|---|---|---|
-| `node ~/.context-mode-app/server.mjs --agent opencode`, MCP `initialize` + `tools/list` over stdio (temp HOME, built `release-out` copied) | worked: server `context-mode`, 9 tools | node 26.8.1 | 2026-10-21 |
-| `node ~/.context-mode-app/hook.mjs --agent opencode`, SessionStart sample payload | worked, exit 0 | node 26.8.1 | 2026-10-21 |
-| Agent CLI | not installed on this machine; only the server and hook commands were run | n/a | 2026-10-21 |
+| entry with `{env:HOME}/.context-mode-app/server.mjs`, then `opencode mcp list` | 1.19.3 | 2026-10-21 | Pass: connected, path expanded |
+| install command (sh) | n/a | 2026-10-21 | Pass: entry written, other keys kept |
+| release `opencode/plugin.js` as a plugin | 1.19.3 | 2026-10-21 | Fail: does not load |
+
+Not run: hooks (no working plugin). Windows commands.
+
+## Sources
+
+- https://opencode.ai/docs/config/
+- https://opencode.ai/docs/mcp-servers/
