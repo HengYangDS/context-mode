@@ -468,3 +468,26 @@ Result, plainly:
 - v2 cuts the tool_result bytes the model saw (LARGE: 734.5 vs 4694.5 off), but the extra turns spent on the 5 context-mode calls cost more tokens than the bytes saved on multi-1 and big-json.
 - v1 made 0 context-mode calls in all sessions, so its overhead is schema cost only. The session token count (input + cache creation + cache read) counts cached prefix reads on each turn; extra turns raise it.
 - Not tuned after the run. Follow-up: look at multi-1 and big-json v2 transcripts for the cause of the extra turns.
+
+## Compaction push recall
+
+Measured 2026-10-21 on branch `impl/compact-push` (DECISIONS-r11). Agent: Claude Code 2.1.303, keyless `claude -p`, effort low, `--max-budget-usd 0.25`, clean isolation (`ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`). Runner: `e2e/live/compact/run.mjs` with the case-insensitive scorer. `src/` not changed.
+
+| Run | Model | Sessions | Correct | `ctx_resume`/`ctx_search` calls | Cost USD |
+|---|---|---|---|---|---|
+| Shipped policy (arm a) | claude-sonnet-5-5 | 10 | 10/10 | 0 | 0.9797 |
+| Shipped policy (arm a) | claude-opus-5-5 | 5 | 4/5 | 0 | 1.0264 |
+| Old full block (arm b) baseline | claude-sonnet-5-5 | 10 | 10/10 | 0 | 0.9595 |
+
+- Sonnet: no miss. Opus: one miss, session 2 (`session-02`). `resume_seq` true in all 25 sessions.
+- Injected bytes: the runner does not record hook `additionalContext`. The median is not measured. The upper bound is `STATE_BUDGET` 2048 B (state block) plus `RECALL_BUDGET_BYTES` 2048 B per prompt after compaction. Tool-result bytes returned by the read tools: 0 in every session.
+- n is 10 and 5, one date, three fixtures. Shipped and baseline arms tie on Sonnet, so this run does not separate them.
+
+### No-compaction check (bench/live/ab-quick.mjs, v2 arm, 2 runs, 5 tasks)
+
+| Arm | Pass | Median tokens | Cost USD |
+|---|---|---|---|
+| off | 10/10 | 36182 | 0.2368 |
+| v2 | 10/10 | 38202 | 0.6993 |
+
+v2 pass equals off. The token delta (+5.7% median) is present without compaction; the recall path adds zero hook bytes before a compaction (unit-tested), so the delta comes from the tool definitions, not from this change. Not isolated by a separate arm. Raw output: `bench/live/results/ab-quick-cmp-push.json`.
