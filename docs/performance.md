@@ -23,5 +23,9 @@ The misses at 64 KB and in `T-GS6` are 1 to 2 ms over the budget. The 1 MiB case
 
 ## Context bytes
 
-See `docs/v2/benchmarks.md` for the offline replay (byte count over real transcripts) and the live A/B run, and `docs/v2/prompt/results.md` for live routing.
+Final A/B (`bench/live/results/ab-final.json`, `docs/v2/benchmarks.md`, 2026-10-20, Claude Code 2.1.303, claude-sonnet-5-5 low, 54 sessions): median tool_result bytes off 46.5, v1 46.5, v2 31. On multi-1 the tool_result bytes drop from 6,819 to 583 with v2. Median session tokens: off 36,217; v1 42,557; v2 38,252.
+
+Saving loop score (`bench/saving-score-last.json`, 2026-10-20): M1 94.12, M2 88.9.
+
+See `docs/v2/benchmarks.md` for the offline replay (byte count over real transcripts) and the live runs, and `docs/v2/prompt/results.md` for live routing.
 A short summary is in the README "Benchmarks" section and in `docs/v2/LAUNCH.md`.

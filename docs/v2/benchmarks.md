@@ -302,3 +302,24 @@ Reading:
 - v2 uses fewer tokens than v1 on every task (min +10.0%).
 - The model called ctx tools rarely (v1 2, v2 3 of 18 sessions). Task results are small on 4 of 6 tasks: Claude Code already shortens large Bash output, so the tool_result byte medians are small (a few bytes on several tasks).
 - Caveat: n=3 per cell, one date, list-price cost estimate. No number is a target. No owner decision (hook budget, T-F1, compaction) is made here.
+
+## Compaction pointer (T-CMP)
+
+Measured 2026-10-21. Agent: Claude Code. Model: Sonnet 5.5 (claude-sonnet-5-5), effort low, clean isolation (keyless `claude -p`, `ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`, `--max-budget-usd 0.25` per session). Case: `e2e/live/cases/compact-arms.json`. The earlier T-CMP runs (50 and 60 sessions) are in D-M7-CL-1 and D-M7-CL-2 in `docs/v2/impl/DEVIATIONS.md`.
+
+10 sessions per arm, all arms (a to e), 50 sessions.
+
+| Arm | Correct | `ctx_resume` / `ctx_search` call rate | Bytes returned by those tools | Cost USD |
+|---|---|---|---|---|
+| a | 7/10 | 0/10 | 0 | 0.8682 |
+| b | 7/10 | 0/10 | 0 | 0.9114 |
+| c | 7/10 | 0/10 | 0 | 0.9014 |
+| d | 7/10 | 0/10 | 0 | 0.8898 |
+| e | 7/10 | 0/10 | 0 | 0.9514 |
+
+Total cost 4.5222 USD. `resume_seq` 50/50. 0 of 50 sessions touched host memory. All 15 misses are fixture session-03 (case-sensitive exactMatch).
+
+Reading:
+- The result is the same in every arm: the model never called `ctx_resume` or `ctx_search` from the pointer line, so no arm returned a byte. The arms do not differ on this case.
+- Arm a stays below its gates (correct 7/10 < 0.80, call rate 0/10 < 0.70). GS11 stays FAIL. This section does not decide the compaction policy; that is an open owner decision (`.impl/BLOCKED-M7.md` item 3).
+- n = 10 per arm, one model, one date, one fixture set. The 15 misses come from one fixture, so they say little about other sessions.
