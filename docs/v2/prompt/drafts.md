@@ -19,7 +19,7 @@ Use normal tools for small output and edits. A large file's Read is denied: use 
 
 <!-- id: ctx_execute -->
 ```text
-Runs code in a sandboxed subprocess in the project directory and returns only what the code prints. Languages: shell, powershell, javascript, typescript, python, and other runtimes found on PATH. Use it when output may be long, for example tests, builds, logs, git history or API responses, and print just the lines or numbers you need. For a large file, set `file` to its local path instead of reading it: the code gets the path in the CTX_FILE environment variable, and only what the code prints comes back. Set `intent` to a short phrase when output may be large: the matching sections come back and the full output is indexed for ctx_search. Stops after `timeoutMs` (default and maximum 600000) and kills the whole process tree.
+Runs code in a sandbox in the project directory and returns only what it prints: shell, javascript, python or any runtime on PATH. Use it when output may be long (tests, builds, logs, git history, big JSON) and print just the answer. For a large file, set `file`; the code gets its path in CTX_FILE. With `intent`, long output is indexed and the best-matching parts come back. Default and max `timeoutMs` 600000.
 ```
 
 <!-- id: ctx_batch -->
@@ -34,7 +34,7 @@ Stores content so it can be searched later: a local file or folder (nested .giti
 
 <!-- id: ctx_search -->
 ```text
-Searches content stored with ctx_index and earlier sandbox output in this project. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.
+Searches output indexed in this project (ctx_execute, ctx_index, replaced tool results). Pass several queries in one call. `scope`: worktree (default), project or session. `sort: timeline` pages oldest first with `after`; `offset` pages relevance order. `source: decision` finds user answers.
 ```
 
 <!-- id: ctx_resume -->
