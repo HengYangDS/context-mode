@@ -16,7 +16,7 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 // D-M7-SV-1: the PostToolUse replace path has its own sizes, separate from OUTPUT_CAP (which stays the cap for
 // replies and the Read deny threshold). A result over REPLACE_TRIGGER_BYTES is indexed whole and the model gets
 // whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
-export const REPLACE_TRIGGER_BYTES = 4096;
+export const REPLACE_TRIGGER_BYTES = 1024; // D-M7-SV-6: was 4096 (D-M7-SV-1); offline sweep in DEVIATIONS
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
