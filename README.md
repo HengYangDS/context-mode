@@ -137,39 +137,44 @@ Context Mode has two parts that run inside one agent session:
 - **Hooks.** Four hooks: `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`. They watch each tool call and log what happens.
 - **MCP server.** The nine tools above. The agent calls them to do the same work without the flood.
 - **One database per project.** One `context.db` file per project holds the index and the session log.
-- **Hard deny by size.** A tool call whose output would be too large is denied. The deny message names the `ctx_*` tool to use instead.
+- **Run, then replace.** A host tool result over the cap is indexed whole. The agent gets the best-matching whole chunks and a `ctx_search` line for the rest (DECISIONS-r10). A `Read` of a file over the cap with no range is denied, and the deny message names the ways to read it.
 - **State after compaction.** After a compaction, the agent gets a state block of at most 2 KB. It is built from the session log.
 
 Read more: [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](docs/algorithms.md) (search and ranking),
 [docs/tools.md](docs/tools.md) (tool inputs). Size limits and deny rules are in docs/algorithms.md §1, §2 and §7.
 
-**Codex `PreToolUse` matcher.** `release-out/hooks/codex.json` (built from the adapter table) wires this matcher to `context-mode hook codex pretooluse`:
-
-```json
-{
-  "hooks": {
-    "PreToolUse": [{
-      "matcher": "local_shell|shell|shell_command|exec_command|Bash|Shell|apply_patch|Edit|Write|grep_files|ctx_execute|ctx_execute_file|ctx_batch_execute|ctx_fetch_and_index|ctx_search|ctx_index|mcp__",
-      "hooks": [{ "type": "command", "command": "context-mode hook codex pretooluse" }]
-    }]
-  }
-}
-```
-
 ## Benchmarks
 
-Only measured numbers. Full method, caveats and sources: [docs/v2/benchmarks.md](docs/v2/benchmarks.md), [docs/v2/prompt/results.md](docs/v2/prompt/results.md), [docs/performance.md](docs/performance.md).
+Only measured numbers. Each row names its source file and date. Full method and caveats: [docs/v2/benchmarks.md](docs/v2/benchmarks.md), [docs/v2/prompt/results.md](docs/v2/prompt/results.md), [docs/performance.md](docs/performance.md). Agent: Claude Code 2.1.303, claude-sonnet-5-5, effort low, unless a row says otherwise.
 
-| What | Result | Source, date, agent |
+**Final A/B** (`bench/live/results/ab-final.json`, 2026-10-20). 54 sessions (3 runs x 6 tasks x 3 arms), all pass 18/18 per arm. Median session tokens: off 36,217; v1 42,557; v2 38,252.
+
+| Arm | Pass | Saving vs off (median / min / max) | Median tool_result bytes | ctx calls | Cost USD |
+|---|---|---|---|---|---|
+| off | 18/18 | - | 46.5 | 0 | 0.534 |
+| v1 | 18/18 | -17.5 / -61.3 / -15.1 % | 46.5 | 2 | 0.747 |
+| v2 | 18/18 | -5.5 / -5.7 / +30.4 % | 31 | 3 | 0.687 |
+
+v2 vs v1: +10.2 / +10.0 / +56.9 % (median / min / max). Total cost 1.97 USD. A negative saving means the arm used more tokens than off. On tasks where the model made no ctx call, the plugin adds a fixed prompt cost. v2 saves where the output is large (json-1 -30.4% vs off).
+
+**Other measured rows**
+
+| What | Result | Source, date |
 |---|---|---|
-| Offline replay, bytes v2 would return vs bytes the model got (23175 tool calls, 820 sessions) | 1.1% saving; -1.5% with the re-run bound | benchmarks.md, 2026-10-19, Claude Code transcripts, mostly 2.1.149 to 2.1.283 |
-| Live A/B, 20 tasks x 3 runs per arm, session input saving (median over tasks) | -6.7% (min -6.9, max +29.7); the plugin arm read more | benchmarks.md, 2026-10-19, Claude Code 2.1.303, claude-sonnet-5-5 low |
-| Live A/B success | on 60/60, off 60/60 | same |
-| Live routing, under / over-routing (new rule, run 4, 20 large + 20 small per model) | under 0/20 on all 3 models; over 0/20, 0/20, 1/20 (opus-5-5, sonnet-5-5, haiku-5-5) | prompt/results.md, 2026-10-19, Claude Code 2.1.303 |
+| Saving loop score (M1 offline, M2 live) | M1 94.12, M2 88.9, guards pass; head 1d55d561f4cf62e5f8584c4958ee60522b012bd5. The 90 target was reached for M1, not for M2 | `bench/saving-score-last.json`, 2026-10-20 |
+| Offline replay, bytes v2 would return vs bytes the model got (23175 tool calls, 820 sessions) | 1.1% saving; -1.5% with the re-run bound | benchmarks.md, 2026-10-19, Claude Code 2.1.149 to 2.1.283 transcripts |
+| Live A/B, 20 tasks x 3 runs, session input saving (median) | -6.7% (min -6.9, max +29.7); pass on 60/60, off 60/60. Earlier v2 build, before the 2026-10-20 replace changes | benchmarks.md, 2026-10-19 |
+| Live routing, under / over (run 4, 20 large + 20 small per model) | under 0/20 on all 3 models; over 0/20, 0/20, 1/20 (opus-5-5, sonnet-5-5, haiku-5-5) | prompt/results.md, 2026-10-19 |
 | Claude Code hook p95 (GS6) | 41 ms, budget 40 ms: FAIL | TECH-SPEC §1.1, 2026-10-20, macOS, Node 26 |
 | 64 KB PostToolUse hook p95 (`T-F1`) | 62 ms, budget 60 ms: FAIL | TECH-SPEC §1.1, 2026-10-20 |
 
-On these runs v2 shows no token saving on single-task sessions. Only three JSON tasks (json-1 to json-3), where the model called a ctx tool, saved 29.6 to 29.7% session input.
+**Memory** (`e2e/live/run.mjs --only`, one case per run, 2026-10-21): all 4 cases PASS.
+- `memory-r6-eval-local`: PASS. The last-request seq matches ground truth in both fixtures. No model call.
+- `memory-retrieval-local`: PASS. R2 recall@5 = 1.000 (6 of 6 queries), MRR 0.653. Timeline order-correct 2/2, paging-complete 2/2. Decision tag D3 precision 1.000, recall 1.000, 0 false positives. This is a fixture smoke gate (N = 6), not a real recall estimate.
+- `memory-r6-resume-quality`: PASS (reply `TESTS`, 0.0075 USD). `decision-q3-applied`: PASS (reply `PASS`, 0.0435 USD). Total model spend 0.0510 USD for 2 sessions, under the 0.25 cap each.
+- Stored real-data numbers, not re-run (private journals): R2 recall@5 0.743, MRR 0.671 (148 queries); R2 decision recall@5 0.744 (39 queries); timeline 43/47 order-correct; compaction v2 block open-error hit 11/12.
+
+**Compaction pointer (`T-CMP`, 2026-10-21, Sonnet 5.5 low).** Clean isolation, 10 sessions per arm, all arms (a-e). Correct: 7/10 in every arm. `ctx_resume`/`ctx_search` call rate: 0/10 in every arm. Bytes returned by those tools: 0 in all 50 sessions. Cost per arm: a 0.8682, b 0.9114, c 0.9014, d 0.8898, e 0.9514 USD; total 4.5222 USD. The 15 misses are all fixture session-03 (case-sensitive exactMatch). This gate is still open: see TECH-SPEC §1.1 (GS11).
 
 ## Privacy
 
