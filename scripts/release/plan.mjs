@@ -5,11 +5,15 @@
 //   default:    prints "version=<v>\nnotes<<EOF\n<notes>\nEOF\n" for $GITHUB_OUTPUT
 //   --dry-run:  prints "version: <v>\n\n<notes>\n" as text (the /release skill preview)
 //   --skip-live: adds the line "Live E2E skipped for this release." to the notes
-// Range: commits since the `Source-Commit: <sha>` trailer of the `release` branch head.
-// No `release` branch: first release, version 2.0.0 over all history (A11).
+// Last release = the newest annotated v2+ tag pushed to origin whose commit is in the `release` branch
+// (D-FU-RF-1). Range: commits since the `Source-Commit: <sha>` trailer of that commit; version bumps from
+// the manifest at that commit. No such tag (no `release` branch, or a `release` branch that holds only
+// untagged rehearsal commits): first release, version 2.0.0 over all history (A11).
+// A tagged release that `release` does not contain: refuse.
 // Failure: one stderr line `release failed: <reason>` and exit 1 (impl/13 §1).
 import { spawnSync } from "node:child_process";
-import { RELEASE_BRANCH } from "../../src/core/contracts/constants.ts";
+import { GIT_REMOTE_NAME, RELEASE_BRANCH } from "../../src/core/contracts/constants.ts";
+import { parseTaggedReleases } from "./release-tags.mjs";
 
 const FIRST_VERSION = "2.0.0";
 const TRAILER = "Source-Commit: ";
@@ -61,18 +65,30 @@ function parseSubject(subject) {
 
 function bump(version, rank) {
   const parts = version.split(".").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n) || n < 0)) fail(`bad version ${version} in ${RELEASE_BRANCH}:${MANIFEST}`);
+  if (parts.length !== 3 || parts.some((n) => !Number.isInteger(n) || n < 0)) fail(`bad version ${version} in ${MANIFEST} of the last release`);
   const [major, minor, patch] = parts;
   if (rank === MAJOR) return `${major + 1}.0.0`;
   if (rank === 2) return `${major}.${minor + 1}.0`;
   return `${major}.${minor}.${patch + 1}`;
 }
 
-function sourceCommit() {
-  const body = mustGit("log", "-1", "--format=%B", RELEASE_BRANCH, "--");
+function sourceCommit(commit) {
+  const body = mustGit("log", "-1", "--format=%B", commit, "--");
   const line = body.split("\n").find((l) => l.startsWith(TRAILER));
-  if (!line) fail(`no ${TRAILER.trim()} trailer on ${RELEASE_BRANCH} head`);
+  if (!line) fail(`no ${TRAILER.trim()} trailer on tagged release commit ${commit}`);
   return line.slice(TRAILER.length).trim();
+}
+
+// The newest tagged release (origin tags) that the local `release` branch contains; null when origin has none.
+function lastRelease() {
+  const ls = git("ls-remote", "--tags", GIT_REMOTE_NAME);
+  if (!ls.ok) fail(`git ls-remote ${GIT_REMOTE_NAME}: ${ls.err.split("\n")[0]}`);
+  const tagged = parseTaggedReleases(ls.out);
+  if (tagged.length === 0) return null;
+  const hasRelease = git("rev-parse", "--verify", "--quiet", `refs/heads/${RELEASE_BRANCH}`).ok;
+  const found = hasRelease && tagged.find((t) => git("merge-base", "--is-ancestor", t.commit, `refs/heads/${RELEASE_BRANCH}`).ok);
+  if (!found) fail(`tagged release ${tagged[0].tag} (${tagged[0].commit}) is not in ${RELEASE_BRANCH}; refusing`);
+  return found;
 }
 
 function notesFor(subjects, skipLive) {
@@ -96,14 +112,14 @@ function main() {
   const dryRun = args.includes("--dry-run");
   const skipLive = args.includes("--skip-live");
 
-  const hasRelease = git("rev-parse", "--verify", "--quiet", `refs/heads/${RELEASE_BRANCH}`).ok;
+  const last = lastRelease();
   let version;
   let subjects;
-  if (!hasRelease) {
+  if (last === null) {
     version = FIRST_VERSION;
     subjects = mustGit("log", "--format=%s", "HEAD").split("\n").filter((s) => s.length > 0);
   } else {
-    const src = sourceCommit();
+    const src = sourceCommit(last.commit);
     subjects = mustGit("log", "--format=%s", `${src}..HEAD`).split("\n").filter((s) => s.length > 0);
     let rank = 0;
     for (const s of subjects) {
@@ -112,10 +128,10 @@ function main() {
       rank = Math.max(rank, c.breaking ? MAJOR : (RANK_BY_TYPE[c.type] ?? 0));
     }
     if (rank === 0) fail(`no releasable commits since ${src}`);
-    const manifest = mustGit("show", `${RELEASE_BRANCH}:${MANIFEST}`);
+    const manifest = mustGit("show", `${last.commit}:${MANIFEST}`);
     let current;
-    try { current = JSON.parse(manifest).version; } catch { fail(`${RELEASE_BRANCH}:${MANIFEST} is not JSON`); }
-    if (typeof current !== "string") fail(`${RELEASE_BRANCH}:${MANIFEST} has no version`);
+    try { current = JSON.parse(manifest).version; } catch { fail(`${last.tag}:${MANIFEST} is not JSON`); }
+    if (typeof current !== "string") fail(`${last.tag}:${MANIFEST} has no version`);
     version = bump(current, rank);
   }
 

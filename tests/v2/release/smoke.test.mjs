@@ -73,12 +73,14 @@ function fixture(t, { stubs = [], serverName = "context-mode" } = {}) {
     .find((d) => d !== "" && ["git", "git.exe"].some((n) => existsSync(path.join(d, n))));
   assert.ok(gitDir, "git on PATH");
   const PATH = [bin, gitDir].join(path.delimiter);
-  return { root, repo: pathToFileURL(bare).href, tmp, PATH };
+  return { root, repo: pathToFileURL(bare).href, tmp, PATH, stubs };
 }
 
 function smoke(fx, ...args) {
+  // The claude stubs are scripts, not binaries: name the stub explicitly (D-FU-RF-2); PATH resolution has its own tests.
+  const override = fx.stubs.includes("claude") ? { CONTEXT_MODE_SMOKE_CLAUDE: path.join(fx.root, "bin", "claude") } : {};
   const r = spawnSync(process.execPath, [SCRIPT, ...args], { cwd: REPO, encoding: "utf8",
-    env: { PATH: fx.PATH, HOME: process.env.HOME, TMPDIR: fx.tmp } });
+    env: { PATH: fx.PATH, HOME: process.env.HOME, TMPDIR: fx.tmp, ...override, ...(fx.env ?? {}) } });
   return { status: r.status, out: r.stdout, err: r.stderr };
 }
 const smokeHomes = (fx) => readdirSync(fx.tmp).filter((n) => n.startsWith("context-mode-smoke-"));
@@ -145,7 +147,76 @@ test("[M6] release/smoke: claude-code FAIL names the first failing command (bad 
   const fx = fixture(t, { stubs: ["claude"] });
   const r = smoke(fx, "--ref", "no-such-branch", "--agent", "claude-code", "--repo", fx.repo);
   assert.equal(r.status, 1);
-  assert.ok(r.err.startsWith("claude-code: FAIL: claude plugin install context-mode@context-mode"), r.err);
+  assert.ok(r.err.startsWith(`claude-code: FAIL: ${realpathSync(path.join(fx.root, "bin", "claude"))} plugin install context-mode@context-mode`), r.err);
   const probe = JSON.parse(readFileSync(path.join(fx.tmp, "probe-claude.json"), "utf8"));
   assert.equal(probe.argv[1], "install", "no later step ran");
+});
+
+// D-FU-RF-2: smoke runs the real claude binary (Mach-O/ELF/PE magic), never a shim script on PATH.
+// A real binary for the test: a symlink to node. `claude plugin ...` then fails inside node, which proves which file ran.
+function claudeOnPath(t, { shim, real }) {
+  const fx = fixture(t);
+  const dirs = [];
+  if (shim) {
+    const d = path.join(fx.root, "shimbin");
+    mkdirSync(d);
+    writeFileSync(path.join(d, "claude"), `#!/bin/sh\necho shim-ran > ${JSON.stringify(path.join(fx.root, "shim-ran"))}\nexit 0\n`);
+    chmodSync(path.join(d, "claude"), 0o755);
+    dirs.push(d);
+  }
+  if (real) {
+    const d = path.join(fx.root, "realbin");
+    mkdirSync(d);
+    symlinkSync(process.execPath, path.join(d, "claude"));
+    dirs.push(d);
+  }
+  fx.PATH = [...dirs, fx.PATH].join(path.delimiter);
+  return fx;
+}
+
+test("[M6] release/smoke: claude-code skips a shim script on PATH and runs the real binary behind it", { skip: !POSIX }, (t) => {
+  const fx = claudeOnPath(t, { shim: true, real: true });
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "claude-code", "--repo", fx.repo);
+  assert.equal(r.status, 1, "the symlinked node is not a claude, so the first plugin command fails");
+  assert.ok(r.err.startsWith(`claude-code: FAIL: ${realpathSync(process.execPath)} plugin marketplace add`), r.err);
+  assert.ok(!existsSync(path.join(fx.root, "shim-ran")), "the shim script never ran");
+});
+
+test("[M6] release/smoke: claude-code with only a shim script on PATH fails with a clear message", { skip: !POSIX }, (t) => {
+  const fx = claudeOnPath(t, { shim: true, real: false });
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "claude-code", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith("claude-code: FAIL: no real claude binary on PATH"), r.err);
+  assert.ok(r.err.includes("shim script"), r.err);
+  assert.ok(!existsSync(path.join(fx.root, "shim-ran")), "the shim script never ran");
+  assert.deepEqual(smokeHomes(fx), [], "throwaway HOME removed");
+});
+
+test("[M6] release/smoke: claude-code with no claude on PATH fails with the same clear message", (t) => {
+  const fx = fixture(t);
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "claude-code", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith("claude-code: FAIL: no real claude binary on PATH"), r.err);
+});
+
+test("[M6] release/smoke: CONTEXT_MODE_SMOKE_CLAUDE naming a missing file fails with a clear message", (t) => {
+  const fx = fixture(t);
+  fx.env = { CONTEXT_MODE_SMOKE_CLAUDE: path.join(fx.root, "nope") };
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "claude-code", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith("claude-code: FAIL: CONTEXT_MODE_SMOKE_CLAUDE "), r.err);
+});
+
+test("[M6] release/smoke: claude-code finds the native claude.exe under node_modules beside a shim (npm on Windows layout)", { skip: !POSIX }, (t) => {
+  const fx = fixture(t);
+  const d = path.join(fx.root, "npmbin");
+  mkdirSync(path.join(d, "node_modules", "@anthropic-ai", "claude-code", "bin"), { recursive: true });
+  writeFileSync(path.join(d, "claude"), "#!/bin/sh\ntouch " + JSON.stringify(path.join(fx.root, "shim-ran")) + "\n");
+  chmodSync(path.join(d, "claude"), 0o755);
+  symlinkSync(process.execPath, path.join(d, "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"));
+  fx.PATH = [d, fx.PATH].join(path.delimiter);
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "claude-code", "--repo", fx.repo);
+  assert.equal(r.status, 1);
+  assert.ok(r.err.startsWith(`claude-code: FAIL: ${realpathSync(process.execPath)} plugin marketplace add`), r.err);
+  assert.ok(!existsSync(path.join(fx.root, "shim-ran")));
 });

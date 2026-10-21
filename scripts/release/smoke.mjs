@@ -17,6 +17,43 @@ import {
 
 class StepFailed extends Error {}
 
+// The real claude binary, the way bench/live/run.mjs realClaude() finds it (D-FU-RF-2): the first claude on PATH
+// whose resolved file starts with a native-binary magic (Mach-O, ELF, PE). A shim script is skipped, because a
+// shim may call a wrapper or the wrong version. CONTEXT_MODE_SMOKE_CLAUDE names the file directly (test seam).
+const BINARY_MAGICS = Object.freeze(["cffaedfe", "cefaedfe", "7f454c46", "4d5a"]);
+// npm on Windows puts only claude.cmd (a shim) in the PATH dir; the native claude.exe sits under node_modules there.
+const CLAUDE_CANDIDATES = Object.freeze([["claude"], ["claude.exe"], ["node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"]]);
+const CLAUDE_OVERRIDE_ENV = "CONTEXT_MODE_SMOKE_CLAUDE";
+
+function isNativeBinary(file) {
+  const head = Buffer.alloc(4);
+  const fd = fs.openSync(file, "r");
+  try { fs.readSync(fd, head, 0, 4, 0); } finally { fs.closeSync(fd); }
+  const hex = head.toString("hex");
+  return BINARY_MAGICS.some((m) => hex.startsWith(m));
+}
+
+function realClaude(pathVar) {
+  const override = process.env[CLAUDE_OVERRIDE_ENV];
+  if (override) {
+    if (!fs.existsSync(override)) throw new StepFailed(`${CLAUDE_OVERRIDE_ENV} ${override} does not exist`);
+    return fs.realpathSync(override);
+  }
+  const shims = [];
+  for (const dir of pathVar.split(path.delimiter)) {
+    if (dir === "") continue;
+    for (const parts of CLAUDE_CANDIDATES) {
+      const candidate = path.join(dir, ...parts);
+      if (!fs.existsSync(candidate)) continue;
+      const real = fs.realpathSync(candidate);
+      if (isNativeBinary(real)) return real;
+      shims.push(candidate);
+    }
+  }
+  const seen = shims.length > 0 ? `; found only shim script(s): ${shims.join(", ")}` : "";
+  throw new StepFailed(`no real claude binary on PATH${seen}`);
+}
+
 // One spawned step. A missing binary (ENOENT) has status null and its error on r.error.
 function run(env, cwd, cmd, args, input) {
   const r = spawnSync(cmd, args, { cwd, env, input, encoding: "utf8", timeout: UPGRADE_GIT_TIMEOUT_MS });
@@ -33,21 +70,22 @@ function must(step) {
 // marketplace.json (ADR-0011 b keeps it on main), so the throwaway HOME gets a one-entry marketplace whose
 // plugin source is <repo>@<ref> — the same source shape main's marketplace.json uses (D-M6-P3-1).
 function claudeCode(env, home, a) {
+  const claude = realClaude(env.PATH);
   const mkt = path.join(home, PLUGIN_MARKETPLACE_NAME);
   fs.mkdirSync(path.join(mkt, ".claude-plugin"), { recursive: true });
   const manifest = { name: PLUGIN_MARKETPLACE_NAME, owner: { name: SERVER_KEY },
     plugins: [{ name: PLUGIN_NAME, source: { source: "url", url: a.repo, ref: a.ref } }] };
   fs.writeFileSync(path.join(mkt, ".claude-plugin", "marketplace.json"), JSON.stringify(manifest));
   const id = PLUGIN_NAME + PLUGIN_KEY_SEPARATOR + PLUGIN_MARKETPLACE_NAME;
-  must(run(env, home, "claude", ["plugin", "marketplace", "add", mkt]));
-  must(run(env, home, "claude", ["plugin", "install", id]));
-  const listed = JSON.parse(must(run(env, home, "claude", ["plugin", "list", "--json"])).out);
+  must(run(env, home, claude, ["plugin", "marketplace", "add", mkt]));
+  must(run(env, home, claude, ["plugin", "install", id]));
+  const listed = JSON.parse(must(run(env, home, claude, ["plugin", "list", "--json"])).out);
   const entry = listed.find((p) => p.id === id);
   if (!entry) throw new StepFailed(`claude plugin list --json: ${id} not listed`);
   if (!fs.existsSync(path.join(entry.installPath, SERVER_ENTRY_FILE))) {
     throw new StepFailed(`installed plugin dir has no ${SERVER_ENTRY_FILE}: ${entry.installPath}`);
   }
-  must(run(env, home, "claude", ["plugin", "validate", entry.installPath]));
+  must(run(env, home, claude, ["plugin", "validate", entry.installPath]));
   return `installed ${id} at ${entry.installPath}; validate passed`;
 }
 

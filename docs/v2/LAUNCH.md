@@ -133,9 +133,16 @@ on any of 10 supported agents, with one code path and no fallback chains.
 
 ## Before the first real release
 
-A `release` branch now exists on GitHub (rehearsal, 2026-10-21). `plan.mjs` reads the `Source-Commit` trailer of that branch. With the branch present it plans a patch or minor bump, or fails with "no releasable commits". It does not plan 2.0.0.
-Before the real first release, run:
+Two owner steps. Neither touches a rehearsal branch by hand.
 
-    git push origin --delete release release-staging
+1. A `release` branch from the rehearsal (2026-10-21) may still exist on GitHub. Leave it. `plan.mjs` takes the last release from the newest annotated `v2+` tag pushed to `origin`, not from the branch head. A `release` or `release-staging` commit with no pushed tag is a rehearsal: `plan.mjs` plans `2.0.0` over all history, and `publish.mjs --promote` replaces that branch with the staged commit. Promote still refuses to drop any tagged release (D-FU-RF-1).
+2. `release.yml` can only be dispatched from `main`: GitHub lists a `workflow_dispatch` workflow only if the file is on the default branch. It is not on `main` yet. The owner step is: land `.github/workflows/release.yml` on `main` together with the v2 merge, then run `/release` (it calls `gh workflow run release`). Until that merge, run the same scripts locally, in this order, as in the rehearsal:
 
-Then `plan.mjs` takes the "first release" path again (version 2.0.0, notes over all history). Checked locally: with a `release` branch the plan failed; after deleting it the plan printed `version: 2.0.0`.
+        node scripts/release/plan.mjs --dry-run
+        node build/build.mjs --out release-out --sha <sha> --version <version>
+        node scripts/release/publish.mjs --stage --version <version> --source-commit <sha>
+        node scripts/release/smoke.mjs --ref release-staging --agent claude-code
+        node scripts/release/smoke.mjs --ref release-staging --agent codex
+        node scripts/release/publish.mjs --promote --version <version> --notes "<notes>"
+
+`smoke.mjs` needs the real `claude` binary on `PATH` (a native file, not a shim script). It prints `no real claude binary on PATH` if none is found.

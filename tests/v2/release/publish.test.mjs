@@ -163,3 +163,61 @@ test("[M6] publish/promote-no-staging and bad arguments: one 'release failed:' l
   }
   assert.equal(readFileSync(path.join(work, "source.txt"), "utf8"), "dev tree", "a failed stage changes no file");
 });
+
+// D-FU-RF-1: a release branch with only untagged (rehearsal) commits is replaced; a tagged release is never dropped.
+// root/work has a commit pushed as `release` on the bare remote; `tagged` also pushes an annotated v2.0.0 tag on it.
+function seedRelease(work, bare, tagged) {
+  writeFileSync(path.join(work, "rehearsal.txt"), "old");
+  git(work, "add", "-A");
+  git(work, "commit", "-qm", "rehearsal build");
+  git(work, "push", "-q", bare, "HEAD:refs/heads/release");
+  if (tagged) {
+    git(work, "tag", "-a", "v2.0.0", "-m", "v2.0.0");
+    git(work, "push", "-q", bare, "refs/tags/v2.0.0");
+  }
+  return git(work, "rev-parse", "HEAD");
+}
+
+test("[M6] publish/promote-rehearsal: an untagged release branch is replaced by the staged commit", (t) => {
+  const { root, bare, work } = fixture(t);
+  const rehearsal = seedRelease(work, bare, false);
+  const fresh = path.join(root, "fresh");
+  git(root, "clone", "-q", bare, fresh);
+  artifact(fresh, "real build");
+  assert.equal(publish(fresh, "--stage", "--version", "2.0.0", "--source-commit", SRC, "--remote", bare).status, 0);
+  const staged = remoteRef(bare, "refs/heads/release-staging");
+  const r = publish(fresh, "--promote", "--version", "2.0.0", "--remote", bare);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(remoteRef(bare, "refs/heads/release"), staged);
+  assert.notEqual(remoteRef(bare, "refs/heads/release"), rehearsal);
+  assert.equal(git(bare, "cat-file", "-t", "refs/tags/v2.0.0"), "tag");
+});
+
+test("[M6] publish/promote-tagged: a tagged release that the staged commit does not contain is not dropped", (t) => {
+  const { root, bare, work } = fixture(t);
+  const tagged = seedRelease(work, bare, true);
+  // release-staging was built without that history (an unrelated orphan).
+  const other = path.join(root, "other");
+  git(root, "init", "-q", "-b", "main", other);
+  artifact(other, "unrelated");
+  assert.equal(publish(other, "--stage", "--version", "2.0.1", "--source-commit", SRC, "--remote", bare).status, 0);
+  const r = publish(other, "--promote", "--version", "2.0.1", "--remote", bare);
+  assert.equal(r.status, 1);
+  assert.ok(r.stderr.startsWith(`release failed: tagged release v2.0.0 (${tagged}) is not in release-staging; refusing`), r.stderr);
+  assert.equal(r.stderr.trim().split("\n").length, 1);
+  assert.equal(remoteRef(bare, "refs/heads/release"), tagged, "release untouched");
+  assert.equal(remoteRef(bare, "refs/tags/v2.0.1"), "", "no tag pushed");
+});
+
+test("[M6] publish/promote-tagged-ok: a staged commit that contains the tagged release is promoted", (t) => {
+  const { root, bare, work } = fixture(t);
+  const tagged = seedRelease(work, bare, true);
+  git(work, "push", "-q", bare, "HEAD:refs/heads/release-staging");
+  const next = path.join(root, "next");
+  git(root, "clone", "-q", "--branch", "release-staging", bare, next);
+  artifact(next, "next build");
+  assert.equal(publish(next, "--stage", "--version", "2.0.1", "--source-commit", SRC, "--remote", bare).status, 0);
+  const r = publish(next, "--promote", "--version", "2.0.1", "--remote", bare);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(git(bare, "rev-parse", "release^"), tagged);
+});

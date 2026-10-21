@@ -9,6 +9,8 @@
 //   --promote --version <x.y.z> [--notes <text>] [--remote <name-or-path>]
 //     Moves `release` to the exact `release-staging` commit (--force-with-lease), pushes the tag,
 //     and on the default remote runs `gh release create` with release-out/SHA256SUMS.
+//     A `release` branch that holds only untagged (rehearsal) commits is replaced. A pushed annotated v2+
+//     tag whose commit is in `release` must be in the staged commit too, else refuse (D-FU-RF-1).
 //
 // A failure writes one line "release failed: <reason>" to stderr and exits 1 (impl/13 §1, §10).
 // Node built-ins only; no regex (TECH-SPEC §11): arguments and git output are read with plain
@@ -24,6 +26,7 @@ import {
   RELEASE_BRANCH,
   RELEASE_SUMS_FILE,
 } from "../../src/core/contracts/constants.ts";
+import { parseTaggedReleases } from "./release-tags.mjs";
 
 // Release-script values with no src/ reader (D-M6-P2-1; same pattern as plan.mjs, M6-P1).
 const RELEASE_STAGING_BRANCH = "release-staging";
@@ -119,11 +122,32 @@ function stage({ version, sourceCommit, remote }) {
   console.log(`staged ${tag} on ${RELEASE_STAGING_BRANCH} at ${git("rev-parse", "HEAD")} (tag local, not pushed)`);
 }
 
+// 0 = ancestor, 1 = not, anything else = the commit is not in this clone (so not in the fetched branch).
+const isAncestor = (commit, of) => spawnSync("git", ["merge-base", "--is-ancestor", commit, of], { encoding: "utf8" }).status === 0;
+
+// Refuse to drop a tagged release: every pushed release tag (but the one being promoted) whose commit
+// is in the current `release` branch must also be in the staged commit. Untagged commits may go.
+function refuseDroppedRelease(remote, tag, staged) {
+  const current = remoteHead(remote, RELEASE_BRANCH);
+  if (current === "") return;
+  // A shallow checkout lacks the release history: deepen only the fetched branch.
+  const shallow = git("rev-parse", "--is-shallow-repository") === "true" ? ["--depth=2147483647"] : [];
+  git("fetch", "--no-tags", ...shallow, remote, `refs/heads/${RELEASE_BRANCH}`);
+  const tip = git("rev-parse", "FETCH_HEAD");
+  for (const t of parseTaggedReleases(git("ls-remote", "--tags", remote))) {
+    if (t.tag === tag) continue;
+    if (isAncestor(t.commit, tip) && !isAncestor(t.commit, staged)) {
+      fail(`tagged release ${t.tag} (${t.commit}) is not in ${RELEASE_STAGING_BRANCH}; refusing`);
+    }
+  }
+}
+
 function promote({ version, notes, remote }) {
   const tag = RELEASE_TAG_PREFIX + version;
   if (remoteHead(remote, RELEASE_STAGING_BRANCH) === "") fail(`${RELEASE_STAGING_BRANCH} does not exist on ${remote}`);
   git("fetch", remote, `refs/heads/${RELEASE_STAGING_BRANCH}`);
   const staged = git("rev-parse", "FETCH_HEAD");
+  refuseDroppedRelease(remote, tag, staged);
 
   // The draft tag is local to the stage job's checkout; a fresh promote checkout makes the same
   // annotated tag on the staged commit (D-M6-P2-1). An existing tag must already point there.
