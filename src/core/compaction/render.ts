@@ -44,7 +44,7 @@ export function renderState(rows: readonly JournalRow[], turn: number): string {
   // ratio = score * RATIO_SECTION_DECAY^k / bytes (k = lines already taken from that section); ties go to
   // the higher seq (M25). A line that does not fit is skipped; smaller ones may still fit (D-M4-S1-4).
   const remaining: Scored[] = scoreCandidates(
-    [...set.openErrors, ...set.changedFiles, ...set.earlierRequests, ...set.indexedSources],
+    [...set.openErrors, ...set.changedFiles, ...set.decisions, ...set.earlierRequests, ...set.indexedSources],
     turn,
   );
   const k = new Map<CandidateSection, number>();
@@ -72,10 +72,11 @@ export function renderState(rows: readonly JournalRow[], turn: number): string {
     }
   }
 
-  // step 6: fixed section order, seq ascending inside a section.
+  // step 6: fixed section order, seq ascending inside a section. DECISIONS-r11 (A): goal (now:), open errors,
+  // edited files, decisions, then earlier requests and indexed sources.
   const lines: string[] = [openTag];
   if (pinnedLine !== null) lines.push(pinnedLine);
-  for (const section of ["open_errors", "changed_files", "earlier_requests", "indexed_sources"] as const) {
+  for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"] as const) {
     for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c));
   }
 

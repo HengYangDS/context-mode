@@ -32,3 +32,14 @@ export function readLastPrompt(db: DbHandle, sessionId: string): string {
     .get(sessionId) as { body: string } | undefined;
   return row === undefined ? "" : row.body;
 }
+
+/**
+ * DECISIONS-r11 (B): recall candidates, newest first. This session's rows plus the same worktree's rows of
+ * prior sessions (ADR-0009 §8 rule 2: always filter by the current worktree). Cost rows carry no text.
+ */
+export function readRecallRows(db: DbHandle, sessionId: string, worktree: string, limit: number): JournalRow[] {
+  if (sessionId === "") return [];
+  return db.raw
+    .prepare("SELECT * FROM events WHERE kind <> 'cost' AND (session_id = ? OR worktree = ?) ORDER BY seq DESC LIMIT ?")
+    .all(sessionId, worktree, limit) as unknown as JournalRow[];
+}

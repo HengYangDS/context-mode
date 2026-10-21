@@ -108,6 +108,14 @@ export function hasReplace(row: AdapterRow): boolean {
   return REPLACE_ROWS.has(row.id);
 }
 
+// DECISIONS-r11 (B): rows whose encode carries a UserPromptSubmit hint as additionalContext. Only these rows
+// get turn-boundary recall after a compaction; kiro, pi and opencode keep their one compact path (ADR-0001).
+const RECALL_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "zcode"]);
+
+export function hasRecall(row: AdapterRow): boolean {
+  return RECALL_ROWS.has(row.id);
+}
+
 // impl/10 §1.2: AGENT_IDS (contracts) is exhaustive, every AgentId has exactly one row.
 export function getAdapter(id: AgentId): AdapterRow {
   return BY_ID.get(id) as AdapterRow;

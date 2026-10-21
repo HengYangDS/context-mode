@@ -44,7 +44,10 @@ test("constants carry the impl/00 §3.2 values", () => {
     PROJECT_DEAD_IDLE_DAYS: 14, MS_PER_DAY: 86400000,
   };
   for (const [k, v] of Object.entries(want)) assert.equal(C[k], v, k);
-  assert.deepEqual({ ...C.WEIGHT }, { toolerr: 900, prompt: 500, edit: 400, index: 200 });
+  // DECISIONS-r11 (A), D-FU-CMP-PUSH-1: decision rows are scored (700, between toolerr and prompt).
+  assert.deepEqual({ ...C.WEIGHT }, { toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
+  assert.equal(C.RECALL_BUDGET_BYTES, 2048);
+  assert.equal(C.RECALL_MIN_SCORE, 5);
   assert.ok(Object.isFrozen(C.WEIGHT));
   assert.equal(C.COMPACT_POINTER_LINE, 'context-mode: earlier work of this session is in ctx_resume (state block) and ctx_search(scope:"session", sort:"timeline").');
   assert.equal("READ_HINT_BYTES" in C, false, "READ_HINT_BYTES is retired (DECISIONS-r8)");

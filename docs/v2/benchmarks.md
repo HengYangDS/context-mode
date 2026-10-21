@@ -469,6 +469,7 @@ Result, plainly:
 - v1 made 0 context-mode calls in all sessions, so its overhead is schema cost only. The session token count (input + cache creation + cache read) counts cached prefix reads on each turn; extra turns raise it.
 - Not tuned after the run. Follow-up: look at multi-1 and big-json v2 transcripts for the cause of the extra turns.
 
+<<<<<<< HEAD
 ## Final A/B 3 (after the replace and threshold work)
 
 Date 2026-10-21. Agent 2.1.303 (Claude Code), model claude-sonnet-5-5, effort low, keyless `claude -p`, `--max-budget-usd 0.25`. Arms: off, v1 (branch main, 1.0.169, local plugin dir), v2 (build of v2-design). 3 runs per task and arm, all sessions in parallel. Total cost $2.9539 (limit 6). Data: `bench/live/results/ab-final3.json`.
@@ -491,3 +492,27 @@ node bench/live/ab-quick.mjs --v1 <v1 dir> --runs 3 --tasks multi-1,json-1,big-t
 ```
 
 Reading: all 81 sessions pass in every arm. On LARGE, v2 shows the model 564.5 median bytes against 4,608 (off) and 4,717.5 (v1), and costs the least. v2 tokens are 3.8 % below off and 17.6 % below v1 (median over tasks). On SMALL, v2 uses 5.6 % more tokens than off (plugin overhead) and 10.2 % fewer than v1. json-1 is the weak task: v2 tokens stay above off (58,197 / 58,110 vs 55,036 / 55,113) because the model makes a check call. Raw rows stay private.
+=======
+## Compaction push recall
+
+Measured 2026-10-21 on branch `impl/compact-push` (DECISIONS-r11). Agent: Claude Code 2.1.303, keyless `claude -p`, effort low, `--max-budget-usd 0.25`, clean isolation (`ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`). Runner: `e2e/live/compact/run.mjs` with the case-insensitive scorer. `src/` not changed.
+
+| Run | Model | Sessions | Correct | `ctx_resume`/`ctx_search` calls | Cost USD |
+|---|---|---|---|---|---|
+| Shipped policy (arm a) | claude-sonnet-5-5 | 10 | 10/10 | 0 | 0.9797 |
+| Shipped policy (arm a) | claude-opus-5-5 | 5 | 4/5 | 0 | 1.0264 |
+| Old full block (arm b) baseline | claude-sonnet-5-5 | 10 | 10/10 | 0 | 0.9595 |
+
+- Sonnet: no miss. Opus: one miss, session 2 (`session-02`). `resume_seq` true in all 25 sessions.
+- Injected bytes: the runner does not record hook `additionalContext`. The median is not measured. The upper bound is `STATE_BUDGET` 2048 B (state block) plus `RECALL_BUDGET_BYTES` 2048 B per prompt after compaction. Tool-result bytes returned by the read tools: 0 in every session.
+- n is 10 and 5, one date, three fixtures. Shipped and baseline arms tie on Sonnet, so this run does not separate them.
+
+### No-compaction check (bench/live/ab-quick.mjs, v2 arm, 2 runs, 5 tasks)
+
+| Arm | Pass | Median tokens | Cost USD |
+|---|---|---|---|
+| off | 10/10 | 36182 | 0.2368 |
+| v2 | 10/10 | 38202 | 0.6993 |
+
+v2 pass equals off. The token delta (+5.7% median) is present without compaction; the recall path adds zero hook bytes before a compaction (unit-tested), so the delta comes from the tool definitions, not from this change. Not isolated by a separate arm. Raw output: `bench/live/results/ab-quick-cmp-push.json`.
+>>>>>>> origin/impl/compact-push

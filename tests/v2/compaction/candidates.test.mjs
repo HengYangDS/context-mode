@@ -62,20 +62,26 @@ test("[M4] candidates/empty-session-id-injects-nothing", () => {
   assert.deepStrictEqual(out.earlierRequests, []);
 });
 
-test("[M4] candidates/decision-rows-never-a-candidate", () => {
+// DECISIONS-r11 (A) supersedes DECISIONS-r6 D3 (DEVIATIONS D-FU-CMP-PUSH-1): decision rows are the
+// "decisions" section, one candidate per key, the latest row wins, never in another section.
+test("[M7] candidates/decision-rows-are-the-decisions-section-latest-per-key", () => {
   const rows = [
     row({ seq: 1, kind: "decision", key: "Q", body: "A: yes" }),
     row({ seq: 2, kind: "prompt", body: "hi" }),
+    row({ seq: 3, kind: "decision", key: "Q", body: "A: no\nref: #1" }),
+    row({ seq: 4, kind: "decision", key: "R", body: "Q: R? → A: later" }),
   ];
   const out = buildCandidates(rows, "s1");
-  const allSeqs = [
+  assert.deepEqual(out.decisions.map((c) => [c.seq, c.text, c.repeatCount, c.query]),
+    [[3, "decided #3: A: no", 2, "Q"], [4, "decided #4: Q: R? → A: later", 1, "R"]]);
+  const others = [
     out.lastRequest?.seq,
     ...out.openErrors.map((r) => r.seq),
     ...out.changedFiles.map((r) => r.seq),
     ...out.earlierRequests.map((r) => r.seq),
     ...out.indexedSources.map((r) => r.seq),
   ];
-  assert.ok(!allSeqs.includes(1));
+  assert.ok(!others.includes(1) && !others.includes(3) && !others.includes(4));
 });
 
 test("[M4] candidates/section-capped-at-85", () => {

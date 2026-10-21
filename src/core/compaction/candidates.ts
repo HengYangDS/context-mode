@@ -1,4 +1,5 @@
-// ADR-0009 §2, impl/06 §1, DECISIONS-r9 M1-M5/M9, DECISIONS-r6 D3 (a decision row is never a candidate).
+// ADR-0009 §2, impl/06 §1, DECISIONS-r9 M1-M5/M9. DECISIONS-r11 (A) supersedes DECISIONS-r6 D3: decision rows
+// are now the "decisions" section of the anchored block (last row per key wins, ADR-0009 §8.2 update-beats-duplicate).
 // Pure over JournalRow[] (DEVIATIONS D-M4-arch-2): no DB handle here; callers pass readSessionEvents rows.
 // The per-section line formats (DECISIONS-r9 M4) live here, not in render.ts: render.ts imports this file,
 // so a format import back from render.ts would make an import cycle (DEVIATIONS D-M4-S1-3).
@@ -17,6 +18,7 @@ export interface CandidateSet {
   lastRequest: SectionCandidate | null;
   openErrors: SectionCandidate[];
   changedFiles: ChangedFileCandidate[];
+  decisions: SectionCandidate[];
   earlierRequests: SectionCandidate[];
   indexedSources: SectionCandidate[];
 }
@@ -39,7 +41,7 @@ function capSection<T>(list: T[]): T[] {
 }
 
 function emptySet(): CandidateSet {
-  return { lastRequest: null, openErrors: [], changedFiles: [], earlierRequests: [], indexedSources: [] };
+  return { lastRequest: null, openErrors: [], changedFiles: [], decisions: [], earlierRequests: [], indexedSources: [] };
 }
 
 export function buildCandidates(rows: readonly JournalRow[], sessionId: string): CandidateSet {
@@ -86,6 +88,18 @@ export function buildCandidates(rows: readonly JournalRow[], sessionId: string):
   }
   changedFiles.sort((a, b) => a.seq - b.seq);
 
+  // DECISIONS-r11 (A): one candidate per decision key, the latest row wins, repeatCount = rows of that key.
+  // The line is the body's first line ("Q: ... → A: ..." or "A: <label>"); the key is the more: query.
+  const decided = new Map<string, { row: JournalRow; count: number }>();
+  for (const r of own) {
+    if (r.kind !== "decision" || r.body === "") continue;
+    const key = r.key ?? r.body;
+    decided.set(key, { row: r, count: (decided.get(key)?.count ?? 0) + 1 });
+  }
+  const decisions: SectionCandidate[] = [];
+  for (const [key, d] of decided) decisions.push(make("decisions", d.row, "decided #" + d.row.seq + ": " + firstLine(d.row.body), d.count, key));
+  decisions.sort((a, b) => a.seq - b.seq);
+
   // step 6: one candidate per index row.
   const indexedSources = own
     .filter((r) => r.kind === "index")
@@ -96,10 +110,11 @@ export function buildCandidates(rows: readonly JournalRow[], sessionId: string):
     lastRequest,
     openErrors: capSection(openErrors),
     changedFiles: capSection(changedFiles),
+    decisions: capSection(decisions),
     earlierRequests: capSection(earlierRequests),
     indexedSources: capSection(indexedSources),
   };
-  const rest = [...set.openErrors, ...set.changedFiles, ...set.earlierRequests, ...set.indexedSources];
+  const rest = [...set.openErrors, ...set.changedFiles, ...set.decisions, ...set.earlierRequests, ...set.indexedSources];
   const total = rest.length + (lastRequest === null ? 0 : 1);
   if (total <= MAX_CANDIDATES_TOTAL) return set;
   const drop = new Set(rest.map((c) => c.seq).sort((a, b) => a - b).slice(0, total - MAX_CANDIDATES_TOTAL));
@@ -107,6 +122,7 @@ export function buildCandidates(rows: readonly JournalRow[], sessionId: string):
     lastRequest,
     openErrors: set.openErrors.filter((c) => !drop.has(c.seq)),
     changedFiles: set.changedFiles.filter((c) => !drop.has(c.seq)),
+    decisions: set.decisions.filter((c) => !drop.has(c.seq)),
     earlierRequests: set.earlierRequests.filter((c) => !drop.has(c.seq)),
     indexedSources: set.indexedSources.filter((c) => !drop.has(c.seq)),
   };

@@ -11,8 +11,9 @@ import { DatabaseSync } from "node:sqlite";
 
 import { handleHook } from "../../../src/core/hooks/dispatch.ts";
 import {
-  COMPACT_POINTER_LINE, DECISION_OPTION_KEY, DECISION_SOURCE, STATE_BUDGET,
+  COMPACT_POINTER_LINE, DECISION_OPTION_KEY, DECISION_SOURCE, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_OPEN_TAG, STATE_BUDGET,
 } from "../../../src/core/contracts/constants.ts";
+import { ADAPTERS, hasRecall } from "../../../src/adapters/table.ts";
 
 let root;
 let repo;
@@ -132,6 +133,73 @@ test("[M4] GP6/no-resume-hint-mid-session: a prompt with no compact signal is al
   const s = sid();
   assert.deepEqual(await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: "hi" }), env), { stdout: "", exitCode: 0 });
   assert.deepEqual(await handleHook("gemini", payload(s, { hook_event_name: "BeforeAgent", prompt: "hi" }), env), { stdout: "", exitCode: 0 });
+});
+
+// ---------- turn-boundary recall (DECISIONS-r11 B) ----------
+
+// A compaction happens in a long session: fill the journal so BM25 IDF is that of a real session.
+const FILLER = [
+  "rename the config loader", "update the changelog for the release", "bump the version in package.json",
+  "add a retry to the http client", "write docs for the cli flags", "move the date helpers to utils",
+  "check the coverage report", "split the large router file", "tidy the readme headings",
+  "add a test for the date parser", "remove the unused logger import", "sort the imports in main",
+];
+
+async function longSession(agent, s, promptEvent) {
+  for (const p of [...FILLER, ...FILLER]) await handleHook(agent, payload(s, { hook_event_name: promptEvent, prompt: p }), env);
+  await handleHook(agent, payload(s, {
+    hook_event_name: "PostToolUse", tool_name: "Bash", tool_input: { command: "npm run migrate:zebraquux" },
+    tool_response: { stdout: "", stderr: "zebraquux migration failed: ETIMEDOUT connecting to db-replica-7", is_error: true },
+  }), env);
+  await waitRows("SELECT seq FROM events WHERE session_id = ?", [s], 2 * FILLER.length + 1);
+}
+
+const ASK_ERROR = "why did the zebraquux migration fail with ETIMEDOUT";
+
+test("[M7] recall/no-compaction-zero-bytes: a prompt naming an earlier error adds nothing before a compaction", async () => {
+  const s = sid();
+  await longSession("claude-code", s, "UserPromptSubmit");
+  const out = await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: ASK_ERROR }), env);
+  assert.deepEqual(out, { stdout: "", exitCode: 0 });
+  assert.equal(query("SELECT 1 FROM meta WHERE key = ?", "compacted:" + s).length, 0);
+});
+
+test("[M7] recall/after-compaction: the prompt naming an earlier error gets that row, once, within budget", async () => {
+  const s = sid();
+  await longSession("claude-code", s, "UserPromptSubmit");
+  const state = context(await handleHook("claude-code", payload(s, { hook_event_name: "SessionStart", source: "compact" }), env));
+  assert.ok(state !== null && isStateBlock(state), String(state)); // (A) block unchanged
+  const err = query("SELECT seq FROM events WHERE session_id = ? AND kind = 'toolerr'", s)[0];
+  const text = context(await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: ASK_ERROR }), env));
+  assert.ok(text !== null && text.startsWith(RECALL_OPEN_TAG + "\n") && text.endsWith("\n" + RECALL_CLOSE_TAG), String(text));
+  assert.ok(text.includes("#" + err.seq + " toolerr Bash: "), text);
+  assert.ok(text.includes("zebraquux migration failed: ETIMEDOUT connecting to db-replica-7"), text);
+  assert.ok(Buffer.byteLength(text, "utf8") <= RECALL_BUDGET_BYTES);
+  // no repeat: the same question again does not re-inject the row
+  const again = context(await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: ASK_ERROR }), env));
+  assert.ok(again === null || !again.includes("#" + err.seq + " "), String(again));
+  // below threshold: an unrelated prompt adds nothing
+  const off = await handleHook("claude-code", payload(s, { hook_event_name: "UserPromptSubmit", prompt: "what is the weather" }), env);
+  assert.deepEqual(off, { stdout: "", exitCode: 0 });
+});
+
+test("[M7] recall/pending-flag row (gemini): state block on the first BeforeAgent, recall on a later one", async () => {
+  const s = sid();
+  await longSession("gemini", s, "BeforeAgent");
+  await handleHook("gemini", payload(s, { hook_event_name: "PreCompress" }), env);
+  const state = context(await handleHook("gemini", payload(s, { hook_event_name: "BeforeAgent", prompt: "go on" }), env));
+  assert.ok(state !== null && isStateBlock(state), String(state));
+  const text = context(await handleHook("gemini", payload(s, { hook_event_name: "BeforeAgent", prompt: ASK_ERROR }), env));
+  assert.ok(text !== null && text.includes("zebraquux migration failed"), String(text));
+});
+
+test("[M7] recall/per-agent rows follow the adapter table: recall only where UserPromptSubmit carries additionalContext", () => {
+  for (const r of ADAPTERS) {
+    const ev = { event: "UserPromptSubmit", agent: r.id, sessionId: "s", cwd: "/w", turn: 1, prompt: "p" };
+    const out = r.encode(ev, { kind: "hint", text: "RECALL-PROBE", onceKey: "recall" });
+    assert.equal(hasRecall(r), JSON.stringify(out).includes("RECALL-PROBE"), r.id);
+  }
+  assert.deepEqual(ADAPTERS.filter((r) => !hasRecall(r)).map((r) => r.id), ["kiro", "pi", "opencode"]);
 });
 
 // ---------- decision rows (ADR-0009 §8.2) ----------
