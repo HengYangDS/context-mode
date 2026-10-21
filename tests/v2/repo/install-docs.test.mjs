@@ -31,9 +31,17 @@ test("install-docs: config blocks need an agent variable, not $HOME or ~", () =>
 });
 
 test("install-docs: allowed path forms pass", () => {
-  const ok = ["```sh", "git clone x ~/.context-mode-app", 'node "$HOME/.context-mode-app/server.mjs"', 'git -C "$env:USERPROFILE\\.context-mode-app" pull',
-    '"{env:HOME}/.context-mode-app/server.mjs"', 'a=p.join(h,".context-mode-app")', "```"].join("\n");
+  const ok = ["```sh", "git clone x ~/.context-mode-app", 'node "$HOME/.context-mode-app/server.mjs"',
+    '"{env:HOME}/.context-mode-app/server.mjs"', 'a=p.join(h,".context-mode-app")', "```",
+    "```powershell", 'git -C "$env:USERPROFILE\\.context-mode-app" pull', "```"].join("\n");
   assert.deepEqual(checkLines("b.md", ok), []);
+});
+
+test("install-docs: forms that do not expand as copied fail", () => {
+  const bad = ["```sh", 'node "~/.context-mode-app/server.mjs"', 'git clone x "$env:USERPROFILE\\.context-mode-app"', "# change this part to your path", "```",
+    "```powershell", "git clone x ~/.context-mode-app", 'node "%USERPROFILE%\\.context-mode-app\\server.mjs"', "```"].join("\n");
+  const out = checkLines("e.md", bad).join("\n");
+  for (const s of ["e.md:2 quoted ~", "e.md:3 Windows variable", "e.md:4 edit step", "e.md:7 ~ does not expand", "e.md:8 %USERPROFILE%"]) assert.ok(out.includes(s), s);
 });
 
 test("install-docs: the real docs pass", () => {

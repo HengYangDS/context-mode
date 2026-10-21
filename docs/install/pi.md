@@ -24,8 +24,10 @@ pi list
 ## Update
 
 ```sh
-pi update
+pi update --extensions
 ```
+
+Plain `pi update` skips packages: it updates only Pi itself.
 
 
 ## Upgrade from v1
@@ -67,8 +69,11 @@ Tested on macOS with a temporary HOME, against the release branch, commit 043853
 
 | Command | Pi version | Date | Result |
 |---|---|---|---|
-| `pi install git:github.com/mksglu/context-mode@release` | 1.3.0 | 2026-10-21 | Pass: cloned and added |
-| `pi list` | 1.3.0 | 2026-10-21 | Pass: package listed |
-| `pi remove git:github.com/mksglu/context-mode@release` | 1.3.0 | 2026-10-21 | Pass |
+| `npm install -g @earendil-works/pi-coding-agent` | 1.3.0 | 2026-10-22 | Pass |
+| `pi install git:github.com/mksglu/context-mode@release` | 1.3.0 | 2026-10-22 | Pass: cloned and added |
+| `pi list` | 1.3.0 | 2026-10-22 | Pass: package listed |
+| `pi update --extensions` (checkout set one commit back first) | 1.3.0 | 2026-10-22 | Pass: moved to 0438537 |
+| `pi update` | 1.3.0 | 2026-10-21 | Fail: "Extensions are skipped", checkout did not move |
+| `pi remove git:github.com/mksglu/context-mode@release` | 1.3.0 | 2026-10-22 | Pass |
 
-Not run: a live Pi session (needs a login), so no run showed Pi load `pi/index.js`. The release branch has no `package.json` with a `pi` key and no `extensions/` folder, so Pi may not find the extension. `pi update` and Windows commands.
+Not run: a live Pi session (needs a login), so no run showed Pi load `pi/index.js` or list the context-mode tools. The release branch has no `package.json` and no `extensions/` folder, so Pi may install the package and load nothing. Windows commands.
