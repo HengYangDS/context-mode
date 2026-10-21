@@ -177,7 +177,7 @@ v2 cuts the bytes the model reads on large output (734.5 vs 4,694.5, 84 % fewer)
 | Claude Code hook p95 (GS6) | 41 ms, budget 40 ms: FAIL | TECH-SPEC §1.1, 2026-10-20, macOS, Node 26 |
 | 64 KB PostToolUse hook p95 (`T-F1`) | 62 ms, budget 60 ms: FAIL | TECH-SPEC §1.1, 2026-10-20 |
 | Memory live cases (`e2e/live/run.mjs --only`) | 4 of 4 PASS; fixture recall@5 1.000 on 6 queries (smoke gate, not an estimate); 0.0510 USD | benchmarks.md "Memory", 2026-10-21 |
-| Compaction pointer (`T-CMP`, 10 sessions x 5 arms) | correct 7/10 in every arm; the model made 0 `ctx_resume`/`ctx_search` calls; gate open (GS11) | benchmarks.md, TECH-SPEC §1.1, 2026-10-21 |
+| Compaction pointer (`T-CMP`, 10 sessions x 5 arms) | correct 10/10 in every arm after case-insensitive re-score (7/10 before); the model made 0 `ctx_resume`/`ctx_search` calls; gate open (GS11) | benchmarks.md, TECH-SPEC §1.1, 2026-10-21 |
 
 ## Privacy
 

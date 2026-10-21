@@ -103,11 +103,11 @@ The recall figure is a smoke gate on 6 synthetic queries. It is not an estimate 
 
 Date 2026-10-21. 10 sessions per arm, arms a to e, 50 sessions, cost 4.5222 USD. Source: [data/t-cmp.json](data/t-cmp.json). Reproduce: `node e2e/live/compact/run.mjs --runs 10 --model claude-sonnet-5-5 --effort low`.
 
-Result: correct 7/10 in every arm. The model made 0 `ctx_resume` or `ctx_search` calls from the pointer. Arm a misses its gates (correct 0.70 < 0.80, call rate 0 < 0.70), so the gate is open. All 15 misses come from one fixture.
+Result (re-scored with a case-insensitive answer key, commit 6abd2114): correct 10/10 in every arm. The first scoring was case-sensitive and gave 7/10; the 15 misses were one fixture (session-03) and were a scoring error. The model made 0 `ctx_resume` or `ctx_search` calls from the pointer, so the call-rate gate (0 < 0.70) still fails for arm a and the gate is open. The model answered right without the pointer on this fixture set, so this run cannot show that the pointer helps.
 
 ## Honest caveats
 
-- Small n: 3 runs per cell in the A/B, 2 per cell in the replace proof and the score, 10 per arm in T-CMP, 1 per memory case. One model, one agent version.
+- Small n: 3 runs per cell in the A/B, 2 per cell in the replace proof and the score, 10 per arm in T-CMP (one fixture set), 1 per memory case. One model, one agent version.
 - M2 noise: the same code scored 78 to 89 in different runs. A gap of 1 to 2 points is not a result. big-json moves most (74.51 to 86.6).
 - Fixed cost: on tasks with tiny output the plugin adds about 2,000 tokens for v2 and about 6,300 for v1 (tool schemas and hooks). So v2 is 5.7 % above off on small tasks.
 - v2 does not cut session tokens on large tasks in this run (+19.6 % vs off). multi-1 and big-json used extra turns for `ctx_*` calls. Not tuned yet.
