@@ -1,6 +1,7 @@
 // impl/02 §2, impl/00 §3.1 ProjectContext + §4, docs/v2/PRD-v2.md §5, ADR-0007 decision 4,
 // DEVIATIONS D-M1-1, D-M1-5, D-M1-T3-2, D-M1-T3-3, D-M1-T3-5.
-// One project source per host, no fallback chain; a missing source is never guessed.
+// One project source per host. Claude Code has one fixed order (D-FU-PS-1, ADR-0001): CLAUDE_PROJECT_DIR,
+// then the hook payload cwd, then process.cwd(). Every other host: its one source; missing -> NO_PROJECT.
 import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import type { AgentId } from "../contracts/agents.ts";
@@ -50,7 +51,8 @@ function present(v: string | undefined): string | undefined {
 function dirOf(kind: ProjectSourceKind, src: ProjectSourceInput): string | undefined {
   switch (kind) {
     case "env:CLAUDE_PROJECT_DIR":
-      return present(src.env.CLAUDE_PROJECT_DIR);
+      // D-FU-PS-1: cwd is a common Claude Code hook input field (code.claude.com/docs/en/hooks).
+      return present(src.env.CLAUDE_PROJECT_DIR) ?? present(src.cwd) ?? process.cwd();
     case "arg:--agent+cwd":
     case "spawn-cwd":
       return present(src.cwd);

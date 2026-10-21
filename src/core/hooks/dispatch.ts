@@ -51,7 +51,10 @@ function str(v: unknown): string {
 
 /** impl/09 §4.2. Never throws: decode, project and dispatch failures all end in this agent's allow shape. */
 export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.ProcessEnv): Promise<HookOutput> {
-  if (!isAgentId(agent)) return EMPTY; // step 1, A22
+  if (!isAgentId(agent)) {
+    process.stderr.write("hooks: unknown agent " + JSON.stringify(agent) + "\n"); // step 1, A22, D-FU-PS-1
+    return EMPTY;
+  }
   const row = getAdapter(agent);
   let ev: CanonicalHookEvent;
   try {
@@ -63,8 +66,10 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   let project: ProjectContext;
   try {
     project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd }); // step 3
-  } catch {
-    return row.encode(ev, ALLOW); // no project: never deny, never hint, no DB
+  } catch (err) {
+    // D-FU-PS-1: no project: never deny, never hint, no DB; one stderr line, never a silent drop.
+    process.stderr.write("hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n");
+    return row.encode(ev, ALLOW);
   }
   let decision: Decision;
   try {
