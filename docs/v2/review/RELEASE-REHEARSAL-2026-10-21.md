@@ -35,3 +35,17 @@ Goal: put a `release` branch with built files on GitHub and test it. No tag, no 
 - Put release.yml on main, then run `git push origin --delete release release-staging`.
 - Re-run gate once check-removed is fixed.
 - Gemini smoke not covered here.
+
+## Re-run after fixes
+Same steps on the fixed v2-design (bcda6561), with the old `release` and `release-staging` branches left in place.
+- plan.mjs: 2.0.0 with the rehearsal branch present (problem 4 fixed, D-FU-RF-1).
+- Build: 13 top-level entries, SHA256SUMS all OK, prompt lint OK.
+- Stage: `release-staging` = 04385377f6bccaacb6e7566a3eadc9a472965113, tag v2.0.0 local only.
+- Smoke on release-staging: claude-code PASS with the real binary found without PATH reorder (problem 2 fixed, D-FU-RF-2); codex PASS; gemini SKIPPED (not installed).
+- Promote to a local bare clone: `release` and tag v2.0.0 moved, `gh release` skipped (remote not origin).
+- GitHub `release` updated with `git push --force-with-lease origin <sha>:refs/heads/release --no-follow-tags` (rehearsal branch only): 152f63b8 -> 04385377.
+- Install from GitHub in a temp HOME (`git clone --depth 1 --branch release`): SHA256SUMS OK; server.mjs initialize ok, tools/list 9 tools.
+- Hook, hand-written PostToolUse Bash payload (documented fields only, 12 KB stdout): replace, 284 B ({stdout, stderr, interrupted}). The golden payload also replaces (285 B). Problem 3 is fixed on the payload side. The hook returns empty when `CLAUDE_PROJECT_DIR` is not set; Claude Code sets it for hooks, so a manual test must set it.
+- End state: no refs/tags/v2*, no v2 GitHub Release, main stays a92cf6a77ac02971fb5fafe2155e5ee229491884.
+- Notes: `publish.mjs --stage` leaves the clone on `release-staging` and removes node_modules; check out v2-design and reinstall before smoke.
+- Still open: release.yml on main, delete `release`/`release-staging` before the real release, gemini smoke.
