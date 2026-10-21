@@ -80,13 +80,16 @@ test("matrix: no host reads a foreign workspace or identification variable, even
 test("matrix: a host whose own source is empty fails with NO_PROJECT and the source kind, whatever foreign variables exist", () => {
   const foreign = Object.fromEntries(FOREIGN_ENV.map((k) => [k, repo]));
   const cases = {
-    "claude-code": { env: { ...foreign, CLAUDE_PROJECT_DIR: "" }, argv: [], cwd: other },
     vscode: { env: foreign, argv: [], cwd: other },
     pi: { env: foreign, argv: [], cwd: other },
   };
   for (const [agent, input] of Object.entries(cases)) {
     assert.throws(() => resolveProject(agent, input), (e) => e instanceof CtxError && e.code === "NO_PROJECT", agent);
   }
+  // D-FU-PS-1: Claude Code's fixed order is CLAUDE_PROJECT_DIR, then the payload cwd, then process.cwd();
+  // an empty CLAUDE_PROJECT_DIR goes to the cwd, never to a foreign variable.
+  const cc = resolveProject("claude-code", { env: { ...foreign, CLAUDE_PROJECT_DIR: "" }, argv: [], cwd: other });
+  assert.equal(cc.worktree, realpathSync.native(other));
 });
 
 test("codex: the project is the spawn cwd; a Codex session log naming another cwd is never read (session-cwd resolution gone)", () => {
