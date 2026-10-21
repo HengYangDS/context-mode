@@ -59,3 +59,11 @@ for (const [name, mod] of [["ctx_doctor", ctxDoctor], ["ctx_upgrade", ctxUpgrade
     assert.equal(t.schema, mod.schema);
   });
 }
+
+// D-M7-FD-1: an alwaysLoad description sits in every Claude Code prompt prefix (deferred ones do not; measured on
+// 2.1.303: shortening the 8 deferred descriptions moved the first-call prefix by 1 token). Keep the always-loaded
+// text short; the measured cost of ctx_execute at 732 chars was 485 tokens per call (description plus schema).
+test("alwaysLoad descriptions total at most 512 chars (prefix cost, D-M7-FD-1)", () => {
+  const total = TOOLS.filter((t) => t.alwaysLoad).reduce((n, t) => n + t.description.length, 0);
+  assert.ok(total <= 512, `alwaysLoad descriptions are ${total} chars`);
+});
