@@ -155,7 +155,7 @@ Only measured numbers. Each row names its source file and date. Full method and 
 | v1 | 18/18 | -17.5 / -61.3 / -15.1 % | 46.5 | 2 | 0.747 |
 | v2 | 18/18 | -5.5 / -5.7 / +30.4 % | 31 | 3 | 0.687 |
 
-v2 vs v1: +10.2 / +10.0 / +56.9 % (median / min / max). Total cost 1.97 USD. A negative saving means the arm used more tokens than off. On tasks where the model made no ctx call, the plugin adds a fixed prompt cost. v2 saves where the output is large (json-1 -30.4% vs off).
+v2 vs v1: +10.2 / +10.0 / +56.9 % (median / min / max). Total cost 1.97 USD. A negative saving means the arm used more tokens than off. On tasks where the model made no ctx call, the plugin adds a fixed prompt cost. v2 saves where the output is large (json-1 +30.4% vs off).
 
 **Other measured rows**
 

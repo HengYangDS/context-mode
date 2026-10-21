@@ -180,7 +180,7 @@ Step 2, plugin arm. `--plugin-dir release-out` (built with `node build/build.mjs
 | 19998 | 3 | 19997 | no | no |
 | 28003 | 3 | 28002 | no | no |
 
-Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The main-agent replace did NOT reach the model at these sizes. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared in the stream, and the model used Bash, not a context-mode tool. This run does not say if the hook ran and chose not to replace, or if it did not run on the Bash result. That needs a hook log (`scripts/ctx-debug.sh`) in a follow-up.
+Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The main-agent replace did NOT reach the model at these sizes. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared in the stream, and the model used Bash, not a context-mode tool. This run does not say if the hook ran and chose not to replace, or if it did not run on the Bash result. That needs a hook log (the v1 `scripts/ctx-debug.sh`, deleted in D-M7-CLN-W2-root; `ctx_doctor` replaces it) in a follow-up.
 
 Consequence: the Quick A/B claim that v2 may be hidden by the persist threshold is not the cause for outputs of 20 to 28 KB. The plugin does not shrink them. Do not claim a live replace saving for the main agent until a session shows a shorter `tool_result` than the full output.
 
@@ -194,7 +194,7 @@ Build: v2-design, `node build/build.mjs --out release-out`. Live runs: `claude -
 | 19998 (N 4221) | 2 | 19997, 19997 | no | no |
 | 28003 (N 5822) | 2 | 28002, 28002 | no | no |
 
-Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The tool used was Bash each time. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared. So the main-agent replace still did not shrink any Bash result after the r1 shape fix. Do not claim a live replace saving for the main agent. Next step: capture a hook log (`scripts/ctx-debug.sh`) to see if the hook runs on the Bash result.
+Result: in all 6 sessions the model saw the full output (size minus the trailing newline). The tool used was Bash each time. stream-json showed hook events for `SessionStart` only; no PreToolUse or PostToolUse hook event appeared. So the main-agent replace still did not shrink any Bash result after the r1 shape fix. Do not claim a live replace saving for the main agent. Next step: capture a hook log (the v1 `scripts/ctx-debug.sh`, deleted in D-M7-CLN-W2-root; `ctx_doctor` replaces it) to see if the hook runs on the Bash result.
 
 ## Saving loop
 
@@ -298,7 +298,7 @@ Per task, median session tokens (off / v1 / v2):
 Reading:
 - Success is equal in all arms (18/18).
 - The plugin adds a fixed prompt cost: about +6.3k tokens for v1 and about +2.0k for v2 on tasks where the model made no ctx call (log-1, tests-1, file-1, git-1). Median saving is therefore negative for both.
-- v2 saves tokens where the output is large: json-1 -30.4% vs off (v1 -61.3%, worse), multi-1 -9.9% vs off, and tool_result bytes drop 6,819 to 583 on multi-1.
+- v2 saves tokens where the output is large: json-1 +30.4% vs off (v1 -61.3%, worse), multi-1 +9.9% vs off, and tool_result bytes drop 6,819 to 583 on multi-1.
 - v2 uses fewer tokens than v1 on every task (min +10.0%).
 - The model called ctx tools rarely (v1 2, v2 3 of 18 sessions). Task results are small on 4 of 6 tasks: Claude Code already shortens large Bash output, so the tool_result byte medians are small (a few bytes on several tasks).
 - Caveat: n=3 per cell, one date, list-price cost estimate. No number is a target. No owner decision (hook budget, T-F1, compaction) is made here.

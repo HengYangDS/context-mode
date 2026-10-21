@@ -87,7 +87,7 @@ file in this repo measures them now.
 
 What these runs show: on tasks with a small output the plugin adds a fixed prompt cost
 (about +2.0k tokens for v2, +6.3k for v1), so the median saving is negative. v2 saves
-where the output is large (json-1 -30.4% vs off, v1 -61.3%). v2 uses fewer tokens than
+where the output is large (json-1 +30.4% vs off, v1 -61.3%). v2 uses fewer tokens than
 v1 on every task. The model called a ctx tool in few sessions (v1 2, v2 3 of 18).
 Caveats: n=3 per cell, one date, list-price cost. Full caveats are in
 `docs/v2/benchmarks.md`. More hook numbers: `docs/performance.md`.
