@@ -1,7 +1,7 @@
 // bench/replay.mjs - offline context-saving replay (method: bench/README.md).
 // Streams ~/.claude/projects/*/*.jsonl, pairs tool_use with tool_result, and compares the bytes the model
 // received (before) with the bytes v2 would return (after). Uses the v2 source as a library (Node type stripping).
-// Usage: node bench/replay.mjs [--out <aggregate.json>] [--limit-files N]
+// Usage: node bench/replay.mjs [--out <aggregate.json>] [--limit-files N] [--trigger N]
 // Private per-session rows go to /private/tmp/cm-v2-impl-private/bench/sessions.json, never into the repo.
 import { createReadStream, statSync, mkdirSync, writeFileSync, readdirSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -21,6 +21,8 @@ const C = await lib("src/core/contracts/constants.ts");
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg("--out", path.join(ROOT, "bench", "offline-aggregate.json"));
 const LIMIT_FILES = Number(arg("--limit-files", "0"));
+// --trigger N: sweep only; replays the replace path with trigger N instead of C.REPLACE_TRIGGER_BYTES.
+const TRIGGER = Number(arg("--trigger", String(C.REPLACE_TRIGGER_BYTES)));
 const PRIVATE = "/private/tmp/cm-v2-impl-private/bench";
 const MAX_FILE = 200 * 1024 * 1024;
 const row = getAdapter("claude-code");
@@ -137,7 +139,7 @@ async function replayFile(file) {
           } else {
             // PostToolUse replace: main agent (D-M7-RR-1) and subagent case C, with the replace-path sizes of
             // src/core/hooks/dispatch.ts (D-M7-SV-1): trigger, chunk cap and return budget, not OUTPUT_CAP.
-            if (before > C.REPLACE_TRIGGER_BYTES) {
+            if (before > TRIGGER) {
               // Same intent order as dispatch (D-M7-RR-3) and the last-prompt ranking (D-M7-SV-5).
               const intent = [u.input.description, u.input.command, u.input.file_path, u.input.pattern, u.input.url].map((v) => (typeof v === "string" ? v : "")).find((v) => v.trim() !== "") ?? "";
               const rankQuery = lastPrompt.trim() === "" ? undefined : intent + " " + lastPrompt;
@@ -208,7 +210,7 @@ const total = {
 };
 const topN = (o, k) => Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, k);
 const agg = {
-  date: new Date().toISOString().slice(0, 10), node: process.version, outputCap: OUTPUT_CAP, mcpHintEvery: C.MCP_HINT_EVERY,
+  date: new Date().toISOString().slice(0, 10), node: process.version, outputCap: OUTPUT_CAP, replaceTriggerBytes: TRIGGER, mcpHintEvery: C.MCP_HINT_EVERY,
   corpus: { files: meta.files, skippedOver200MB: meta.skippedBig, sessions: meta.sessions, calls: meta.calls, imageBlocksNotCounted: meta.images, unpairedResults: meta.unpaired, decideErrors: meta.decideErrors, firstTs: meta.firstTs, lastTs: meta.lastTs, claudeCodeVersions: topN(meta.versions, 8), modelsOnToolUseTurns: topN(meta.models, 8) },
   total, tools, buckets,
 };

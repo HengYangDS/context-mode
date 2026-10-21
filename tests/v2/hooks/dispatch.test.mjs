@@ -387,7 +387,7 @@ test("D-M7-RR-1: main-agent replace above SYNC_INDEX_MAX_BYTES: in-memory select
 });
 
 test("D-M7-SV-1: a 4-16K Bash output is replaced by at most REPLACE_RETURN_BYTES of whole small chunks plus the more line", async () => {
-  const text = bigText(REPLACE_TRIGGER_BYTES * 2);
+  const text = bigText(8192); // D-M7-SV-6: a fixed 4-16K size; REPLACE_TRIGGER_BYTES * 2 is no longer in that bucket
   const p = mainBashPost(text);
   const out = parsed(await handleHook("claude-code", p, env));
   const replaced = replacedText(out.updatedToolOutput);
@@ -396,6 +396,19 @@ test("D-M7-SV-1: a 4-16K Bash output is replaced by at most REPLACE_RETURN_BYTES
   assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
   assert.ok(replaced.includes("needle target"));
   for (const c of chunkText(text, "text", REPLACE_CHUNK_BYTES)) assert.ok(c.bytes <= REPLACE_CHUNK_BYTES);
+});
+
+test("D-M7-SV-6: a 1-4K Bash output over REPLACE_TRIGGER_BYTES is replaced; one at the trigger is the empty allow", async () => {
+  assert.equal(REPLACE_TRIGGER_BYTES, 1024, "the trigger the offline sweep picked (DEVIATIONS D-M7-SV-6)");
+  const text = bigText(3000);
+  const out = parsed(await handleHook("claude-code", mainBashPost(text), env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
+  assert.ok(replaced.includes("needle target"));
+  const at = "y".repeat(REPLACE_TRIGGER_BYTES);
+  assert.deepEqual(await handleHook("claude-code", mainBashPost(at), env), { stdout: "", exitCode: 0 });
 });
 
 test("D-M7-SV-1: small chunks drop no byte: chunk bytes sum to the text bytes; the default chunking is unchanged", () => {
