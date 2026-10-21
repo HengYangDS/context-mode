@@ -153,6 +153,8 @@ function matchCommand(glob: string, text: string): boolean {
   return false;
 }
 
+const DRIVE_PREFIX = /^[A-Za-z]:(?=\/)/;
+
 function toSlash(p: string): string {
   return sep === "/" ? p : p.split(sep).join("/");
 }
@@ -166,12 +168,17 @@ function matchPath(glob: string, absPath: string, projectDir: string | undefined
     return globMatch(glob.slice(PROJECT_ANCHOR.length), toSlash(rel), true);
   }
   const target = toSlash(absPath);
-  if (glob.startsWith(ABS_ANCHOR)) return globMatch(glob.slice(ABS_ANCHOR.length - "/".length), target, true);
+  // Windows: the glob may be written with backslashes (v1 deny-policy rows); the target is already slashed.
+  if (glob.startsWith(ABS_ANCHOR)) {
+    const g = toSlash(glob.slice(ABS_ANCHOR.length - "/".length));
+    // Windows: "//tmp/x" is drive-less; resolve() put the current drive in front of the target.
+    return globMatch(g, target, true) || globMatch(g, target.replace(DRIVE_PREFIX, ""), true);
+  }
   if (glob.startsWith(HOME_ANCHOR)) {
     const home = homeDirOf(process.env);
     return home !== null && globMatch(toSlash(home) + glob.slice(HOME_ANCHOR.length - "/".length), target, true);
   }
-  return globMatch(glob, target, true);
+  return globMatch(toSlash(glob), target, true);
 }
 
 /**
