@@ -1,8 +1,7 @@
 # How context-mode works
 
-This page is for users and contributors. It describes the v2 design as written in
-`PRD-v2.md` and `docs/v2/`. Some modules named here are design-complete but not yet built at this
-commit; see `docs/v2/impl/DEVIATIONS.md` for open gaps.
+This page is for users and contributors. It describes v2 as built on `v2-design`, from `PRD-v2.md` and
+`docs/v2/`. `docs/v2/impl/DEVIATIONS.md` records each place where the code differs from the design docs.
 
 ## In one line
 
@@ -33,21 +32,24 @@ MCP server process can both read and write it without stepping on each other (`0
 
 - **Journal rows** (`events` table): one row per tool call — session, tool, path, byte count, exit code.
   Used to rebuild state after a context compaction (`docs/algorithms.md` §3).
-- **Content rows**: chunked, FTS5-indexed text from tool output over a size line, searchable later by
+- **Content rows**: chunked, FTS5-indexed text from tool output over `REPLACE_TRIGGER_BYTES`, searchable later by
   `ctx_search` (`docs/algorithms.md` §7).
 
 ## The three-step pattern on one tool call
 
 1. **Before the call** (`PreToolUse`): the hook parses the command (`docs/algorithms.md` §1), checks it
-   against deny rules, and checks any `Read` against the byte-size rule (`docs/algorithms.md` §2). A `Read`
+   against the user's deny rules, and checks any `Read` against the byte-size rule (`docs/algorithms.md` §2). A `Read`
    of a file that is too big is denied, with a message naming the real size and three ways to get
    the data without it landing whole in context.
 2. **During the call**: for `ctx_execute`/`ctx_batch`, code runs in a sandboxed child process, inside the
    project directory, with a kill switch on the whole process tree if it times out or is cancelled
    (`docs/algorithms.md` §9). Only what the code prints comes back, up to `OUTPUT_CAP` (16,384 bytes).
-3. **After the call** (`PostToolUse`): if the real output from a host tool (not `ctx_*`) is large, the hook
-   chunks it, indexes it, and replaces what the agent sees with the best-matching chunks plus a line it can
-   run to search for more (`docs/algorithms.md` §7).
+3. **After the call** (`PostToolUse`): if the real output from a host tool (not `ctx_*`) is over
+   `REPLACE_TRIGGER_BYTES` (4,096), the hook chunks it, indexes it whole, and replaces what the agent sees with
+   the best-matching whole chunks (at most `REPLACE_RETURN_BYTES`, 96) plus a line it can run to search for more.
+   Chunks are ranked by BM25 against the tool intent and the session's last user prompt. Nothing is cut and no
+   regex filters the text (`docs/algorithms.md` §7). There are no size hints: a Bash call is not denied for a size
+   guess, because the real size is known after the run (DECISIONS-r10).
 
 ## Search: scope, ranking, and time
 
@@ -74,7 +76,7 @@ will not fit whole becomes a one-line pointer into `ctx_search` instead (`docs/a
 agent asks for something
         |
         v
-  [PreToolUse hook] --deny (Read, policy)--> agent gets a message with a safe next step
+  [PreToolUse hook] --deny (Read over cap, user policy)--> agent gets a message with a safe next step
         |  allow
         v
   tool call runs (host tool, or an MCP ctx_* tool in its own sandbox)
@@ -82,12 +84,12 @@ agent asks for something
         v
   [PostToolUse hook / MCP handler]
         |
-        +-- output small enough --> returned to the agent as-is
+        +-- output <= 4096 B --> returned to the agent as-is
         |
-        +-- output large --> chunked + written to context.db (FTS5)
+        +-- output > 4096 B --> chunked + written to context.db (FTS5)
                                |
                                v
-                       agent sees: best-matching chunks + "ctx_search(...) for more"
+                       agent sees: best-matching whole chunks (<= 96 B) + "ctx_search(...) for more"
 ```
 
 ```
@@ -124,5 +126,6 @@ everywhere; only how a host is told about them changes.
 ## What is still open
 
 `docs/v2/impl/DEVIATIONS.md` is the one place a gap between the design docs and the code at a given commit
-is recorded — date, file, question, decision, reason. Nothing in this page states a number that is not in
-`BENCHMARK.md` or a `DECISIONS-r*.md` file; see `docs/algorithms.md` for the per-algorithm sources.
+is recorded — date, file, question, decision, reason. A number on this page comes from `src/core/contracts/constants.ts`
+or a `DECISIONS-r*.md` file; measured results are in `docs/v2/benchmarks.md`. See `docs/algorithms.md` for the
+per-algorithm sources.

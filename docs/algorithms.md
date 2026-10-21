@@ -2,8 +2,7 @@
 
 Each entry: what it does, why we chose it, source, measured result, constants, code location.
 Numbers come from `docs/v2/benchmarks.md`, `docs/v2/prompt/results.md` and the `docs/v2/review/DECISIONS-r*.md` files (see per-row source).
-`docs/v2/benchmarks.md`, named in the design docs as the number source, does not exist in this repo —
-recorded as a deviation in `docs/v2/impl/DEVIATIONS.md`.
+Every number has a source file and a date. A number with no measured source is not written here.
 
 ## 1. Shell parser + deny rules
 
@@ -20,8 +19,7 @@ parser recurses into those forms instead.
 
 **Constants:** none (no byte or time limit; rule is structural, not numeric).
 
-**Code:** `src/core/policy/` (per `00-architecture.md` §1, module not yet present at this commit — see
-`docs/v2/impl/DEVIATIONS.md`).
+**Code:** `src/core/policy/` (`lexer.ts`, `parse.ts`, `unwrap.ts`, `decide.ts`, `user-deny.ts`).
 
 ## 2. Read size rule
 
@@ -40,7 +38,7 @@ the rule denies rather than slices.
 
 **Constants:** `OUTPUT_CAP = 16384` B; `READ_MAX_LINES = 200` (example text only).
 
-**Code:** `src/core/policy/` (PreToolUse path, not yet present), `08-enforcement.md` §2.6/§5.3.
+**Code:** `src/core/policy/decide.ts` (PreToolUse path), `08-enforcement.md` §2.6/§5.3.
 
 ## 3. Compaction state selection (budgeted greedy)
 
@@ -62,8 +60,7 @@ Agents (recency decay + importance), JetBrains "The Complexity Trap" (arXiv 2508
 **Constants:** `STATE_BUDGET = 2048` B; `POINTER_MIN = 640` B; `MAX_CANDIDATES = 85` per section;
 `WEIGHT = {toolerr:900, prompt:500, edit:400, index:200}`; `DECAY_HALF_LIFE_TURNS = 4`.
 
-**Code:** `src/core/compaction/` (ADR-0009 §1-§7; not yet present at this commit — see
-`DEVIATIONS.md`).
+**Code:** `src/core/compaction/` (`candidates.ts`, `score.ts`, `render.ts`; ADR-0009 §1-§7).
 
 ## 4. BM25 per scope + RRF across scopes
 
@@ -119,24 +116,42 @@ measured at 27 ms.
 
 **Code:** `src/core/tools/search.ts`.
 
-## 7. Chunking + FTS5 indexing
+## 7. Replace path: chunk, index, select (run, then replace)
 
-**What:** Large tool output is split into chunks (`chunkText`), each chunk written as a row in SQLite's
-FTS5 full-text index. Output at or under `SYNC_INDEX_MAX_BYTES` is chunked and indexed inside the hook call
-(synchronous); above that size, chunks are scored in memory and the FTS5 write happens detached, after the
-hook has already returned a result.
+**What:** When a host tool result (not `ctx_*`) is larger than `REPLACE_TRIGGER_BYTES`, the PostToolUse hook
+splits it into line-aligned chunks of at most `REPLACE_CHUNK_BYTES` (`chunkText`), writes all chunks to the
+FTS5 index, and gives the model whole chunks only, picked by BM25, up to `REPLACE_RETURN_BYTES`, plus a
+`ctx_search(...)` line that reaches every chunk not shown. The same path serves subagent case C (ADR-0016).
+Output at or under `SYNC_INDEX_MAX_BYTES` is indexed inside the hook call; above that size the chunks are
+scored in memory and the FTS5 write is detached, after the hook has returned.
 
-**Why:** A hook has a hard wall-clock budget (`HOOK_COMBINED_P95_MS = 60` ms). Writing a very large output to
-disk inside that budget is not safe, so past a size line the write moves off the hook's critical path.
+**Ranking:** chunks are ranked by BM25 (`rankTexts`, the store's own tokenizer). The query is the tool intent
+(description, else command, file path, pattern or URL) plus the words of the session's last user prompt,
+matched by any word (`mode "any"`; D-M7-SV-5, D-M7-RR-3). With no prompt, the intent alone ranks. Equal score:
+the later chunk first. Selected chunks are shown in reading order. A chunk that does not fit is skipped and a
+smaller one may still fit. Nothing is cut and no regex filters the text (owner rule).
 
-**Source:** `docs/v2/impl/05-tools-index.md` §5 `selectChunksInMemory` (DECISIONS-r9 F1); `docs/v2/impl/00-architecture.md` §3.2.
+**Why:** A Bash size-guess deny costs more than it saves (offline replay of 820 sessions, DECISIONS-r10), and
+hints did not pay for themselves. After the run the real size is known. Claude Code ignores a replace that does
+not match the Bash output shape `{stdout, stderr, interrupted}`, so the adapter builds that shape (D-M7-SV-1).
+Past a size line the write moves off the hook's critical path because of the hook budget
+(`HOOK_COMBINED_P95_MS = 60` ms).
 
-**Measured:** threshold line `docs/v2/review/out/r9/perf-f1.md` (DECISIONS-r9 F1).
+**Source:** `docs/v2/review/DECISIONS-r10.md`; `docs/v2/impl/05-tools-index.md` §5 `selectChunksInMemory`
+(DECISIONS-r9 F1); `docs/v2/impl/DEVIATIONS.md` D-M7-RR-1..3, D-M7-SV-1..5.
 
-**Constants:** `SYNC_INDEX_MAX_BYTES = 65536` B; `MAX_CHUNK_BYTES = 4096` B; `INDEX_WRITE_CHUNK = 1048576` B;
-`SNIPPET_MAX_BYTES = 800` B (⌊`OUTPUT_CAP`/`SEARCH_PAGE_SIZE`⌋ = 819, minus room for the label).
+**Measured:** saving loop (`bench/saving-score-last.json`, 2026-10-20): offline M1 94.12, live M2 88.9, guards pass,
+head 1d55d561f4cf62e5f8584c4958ee60522b012bd5. Rounds are in `docs/v2/benchmarks.md` "Saving loop". Sweeps of
+the return and chunk sizes (offline replay, same corpus) are in D-M7-SV-2 and D-M7-SV-3. Hook-path cost:
+`docs/performance.md`.
 
-**Code:** `src/core/store/` (`02-store.md`), `src/core/hooks/` post-tool path (not yet present) (`09-hooks.md` §4.6 step 5).
+**Constants:** `REPLACE_TRIGGER_BYTES = 4096` B; `REPLACE_RETURN_BYTES = 96` B (was 1024, then 512);
+`REPLACE_CHUNK_BYTES = 48` B (was 256); `SYNC_INDEX_MAX_BYTES = 65536` B; `MAX_CHUNK_BYTES = 4096` B (search index
+chunks); `INDEX_WRITE_CHUNK = 1048576` B; `SNIPPET_MAX_BYTES = 800` B (under floor(`OUTPUT_CAP` / `SEARCH_PAGE_SIZE`) = 819).
+`OUTPUT_CAP = 16384` B stays the cap for replies and the Read deny threshold.
+
+**Code:** `src/core/hooks/dispatch.ts` (PostToolUse step 5, `lastPrompt`), `src/core/index/chunk.ts`,
+`src/core/index/select.ts` (`selectChunksInMemory`), `src/core/store/fts.ts` (`rankTexts`).
 
 ## 8. WAL mode + busy timeout
 
@@ -183,10 +198,13 @@ The old v1 savings numbers (from the removed `BENCHMARK.md`) are gone: no file i
 
 | Metric | Value | Source, date, agent |
 |---|---|---|
-| Offline replay, corpus byte saving (23175 tool calls, 820 sessions) | 1.1%; -1.5% with the re-run bound | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
+| Final A/B, median session tokens (54 sessions, 3 runs x 6 tasks x 3 arms, 18/18 pass per arm) | off 36,217; v1 42,557; v2 38,252 | `bench/live/results/ab-final.json`, `docs/v2/benchmarks.md`, 2026-10-20, Claude Code 2.1.303, claude-sonnet-5-5 low |
+| Final A/B, saving vs off (median / min / max) | v1 -17.5 / -61.3 / -15.1 %; v2 -5.5 / -5.7 / +30.4 % | same |
+| Final A/B, v2 vs v1 (median / min / max) | +10.2 / +10.0 / +56.9 % | same |
+| Final A/B, median tool_result bytes | off 46.5; v1 46.5; v2 31 | same |
+| Saving loop score | M1 94.12, M2 88.9, guards pass | `bench/saving-score-last.json`, 2026-10-20 |
+| Offline replay, corpus byte saving (23175 tool calls, 820 sessions; old policy with hints) | 1.1%; -1.5% with the re-run bound | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
 | Offline replay, Read byte saving (28 denies of large unranged reads) | 21.2%; 10.4% with the re-run bound | same |
-| Offline replay, Bash byte saving | -2.9%; -4.3% with the re-run bound | same |
-| Live A/B, session input saving per task (median, min, max) | -6.7%, -6.9%, +29.7% | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code 2.1.303, claude-sonnet-5-5 low |
 | Live routing, run 4, under / over (new rule, `ROUTE_BYTES` 2048) | under 0/20 all models; over 0, 0, 1 of 20 | `docs/v2/prompt/results.md`, 2026-10-19, Claude Code 2.1.303 |
 
 Hook latency against the GS6 budgets is in `docs/performance.md`.
