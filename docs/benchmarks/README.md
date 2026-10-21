@@ -113,3 +113,26 @@ Result (re-scored with a case-insensitive answer key, commit 6abd2114): correct 
 - v2 does not cut session tokens on large tasks in this run (+19.6 % vs off). multi-1 and big-json used extra turns for `ctx_*` calls. Not tuned yet.
 - Costs are list-price estimates from the CLI, not a bill.
 - Raw per-session rows stay private; only aggregates are published.
+
+## Final A/B 3 (after the replace and threshold work)
+
+Date 2026-10-21. Agent 2.1.303 (Claude Code), model claude-sonnet-5-5, effort low, keyless `claude -p`, `--max-budget-usd 0.25`. Arms: off, v1 (branch main, 1.0.169, local plugin dir), v2 (build of v2-design). 3 runs per task and arm, all sessions in parallel. Total cost $2.9539 (limit 6). Data: `bench/live/results/ab-final3.json`.
+
+SMALL = log-1 json-1 tests-1 file-1 git-1 (45 sessions). LARGE = multi-1 json-1 big-tests big-json (36 sessions; multi-1 plus the `bench/live/score-tasks.mjs` tasks). Saving = median over tasks of 1 - arm tokens / reference tokens. Negative = the arm used more tokens.
+
+| Group | Arm | Median session tokens | Saving vs off | v2 vs v1 | Median tool_result bytes | Success | Cost |
+|---|---|---|---|---|---|---|---|
+| SMALL | off | 36183 | - | - | 31 | 15/15 | $0.313 |
+| SMALL | v1 | 42496 | -17.4% | - | 31 | 15/15 | $0.554 |
+| SMALL | v2 | 38203 | -5.6% | +10.2% | 8 | 15/15 | $0.346 |
+| LARGE | off | 56624 | - | - | 4608 | 12/12 | $0.612 |
+| LARGE | v1 | 65613 | -16.3% | - | 4717.5 | 12/12 | $0.783 |
+| LARGE | v2 | 57947.5 | +3.8% | +17.6% | 564.5 | 12/12 | $0.345 |
+
+Commands:
+```
+node bench/live/ab-quick.mjs --v1 <v1 dir> --runs 3 --tasks log-1,json-1,tests-1,file-1,git-1 --out ab-final3-small
+node bench/live/ab-quick.mjs --v1 <v1 dir> --runs 3 --tasks multi-1,json-1,big-tests,big-json --out ab-final3-large
+```
+
+Reading: all 81 sessions pass in every arm. On LARGE, v2 shows the model 564.5 median bytes against 4,608 (off) and 4,717.5 (v1), and costs the least. v2 tokens are 3.8 % below off and 17.6 % below v1 (median over tasks). On SMALL, v2 uses 5.6 % more tokens than off (plugin overhead) and 10.2 % fewer than v1. json-1 is the weak task: v2 tokens stay above off (58,197 / 58,110 vs 55,036 / 55,113) because the model makes a check call. Raw rows stay private.
