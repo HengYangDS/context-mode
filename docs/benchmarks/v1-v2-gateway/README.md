@@ -22,7 +22,7 @@ Everyday agent steps: search the code, ask the repo history, make an edit.
 |---|---:|---:|---:|---:|---|---|---|
 | Code search (grep over 150 files) | $0.093 | $0.099 | $0.077 | $0.093 → $0.066 | v1: cost 7% more, likely 7% less to 22% more, **same**<br>v2: **17% lower**, likely 6 to 28%, **less**<br>Gateway: **29% lower**, likely 23 to 34%, **less** | v1 4 of 8<br>v2 7 of 8<br>Gateway 16 of 16 | [JSON](ab.json) · [runs](runs/grep.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
 | One-line edit | $0.057 | $0.095 | $0.068 | $0.075 → $0.054 | v1: cost **66% more**, likely 31 to 100% more, **more**<br>v2: cost 19% more, likely 14% less to 52% more, **same**<br>Gateway: **28% lower**, likely 14 to 42%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 11 of 12 | [JSON](ab.json) · [runs](runs/edit.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
-| Repo history question (git log, 320 commits) | $0.052 | $0.087 | $0.062 | $0.071 → $0.053 | v1: cost **66% more**, likely 30 to 102% more, **more**<br>v2: cost 19% more, likely 13% less to 52% more, **same**<br>Gateway: **25% lower**, likely 17 to 34%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/git.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
+| Repo history question (git log, 320 commits) | $0.052 | $0.087 | $0.062 | $0.071 → $0.053 | v1: cost **66% more**, likely 30 to 102% more, **more**<br>v2: cost 19% more, likely 13% less to 52% more, **same**<br>Gateway: **25% lower**, likely 16 to 34%, **less** | v1 0 of 8<br>v2 2 of 8<br>Gateway 15 of 16 | [JSON](ab.json) · [runs](runs/git.jsonl) · [gateway JSON](published/v3-opus55-short.json) |
 
 ### Large Tool-Output Handling
 
