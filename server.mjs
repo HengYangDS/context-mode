@@ -28304,7 +28304,7 @@ var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "e8537fdfc28f57f141a67f77d3878b61658110ea" : void 0;
+var BUNDLE_SHA = true ? "bcda65610549145347604af51b645f0bfbb46e9f" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -41683,9 +41683,10 @@ function outputOf(resp) {
   if (typeof resp === "string") return resp;
   if (typeof resp === "object" && resp !== null) {
     const r = resp;
-    if (typeof r.stdout === "string") {
+    if (typeof r.stdout === "string" || typeof r.stderr === "string") {
+      const out = typeof r.stdout === "string" ? r.stdout : "";
       const err = typeof r.stderr === "string" ? r.stderr : "";
-      return err === "" ? r.stdout : r.stdout === "" ? err : r.stdout + "\n" + err;
+      return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
   return JSON.stringify(resp);
@@ -41736,8 +41737,35 @@ function encodeClaudeShape(ev, d, hasReplace) {
       return hasReplace && ev.event === "PostToolUse" ? out({ updatedToolOutput: replaceShape(ev, d.output) }) : { stdout: "", exitCode: 0 };
   }
 }
+var REQUIRED_FIELDS = {
+  PreToolUse: ["tool_name"],
+  PostToolUse: ["tool_name", "tool_response"]
+};
+function fnv1a(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+function requireFields(raw) {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return;
+  const p = raw;
+  if (p.hook_event_name === void 0) throw new Error("claude-code: missing required field hook_event_name");
+  for (const f of REQUIRED_FIELDS[p.hook_event_name] ?? []) {
+    if (p[f] === void 0) throw new Error("claude-code: missing required field " + f);
+  }
+}
 function decode3(raw) {
-  return decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  requireFields(raw);
+  const ev = decodeClaudeShape(raw, "claude-code", TOOL_NAME_PREFIX, CLAUDE_SOURCES);
+  if (ev.cwd === "") ev.cwd = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  if (ev.event === "PostToolUse" && ev.tool !== void 0 && ev.tool.callId === void 0) {
+    const cmd = typeof ev.tool.input.command === "string" ? ev.tool.input.command : JSON.stringify(ev.tool.input);
+    ev.tool.callId = "h" + fnv1a(ev.tool.name + "\0" + cmd + "\0" + String(ev.turn ?? 0));
+  }
+  return ev;
 }
 function encode3(ev, d, _extra) {
   return encodeClaudeShape(ev, d, true);
