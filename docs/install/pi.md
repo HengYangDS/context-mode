@@ -2,6 +2,8 @@
 
 Pi installs context-mode as a package straight from the release branch. Pi does not need `~/.context-mode-app`.
 
+Not proven yet: that Pi loads the context-mode extension after the install. The release branch has no `package.json` with a `pi` key, so Pi may install the package and still load nothing. `pi list` shows only that the package is there.
+
 ## Install
 
 ```sh
@@ -17,7 +19,7 @@ The same commands work in PowerShell (not run on Windows yet).
 pi list
 ```
 
-`git:github.com/mksglu/context-mode@release` must be listed. Then run `/ctx-doctor` in Pi.
+`git:github.com/mksglu/context-mode@release` must be listed. Then start Pi and run `/ctx-doctor`. If Pi does not know `/ctx-doctor`, the extension did not load: [report it](#report-a-problem).
 
 ## Update
 

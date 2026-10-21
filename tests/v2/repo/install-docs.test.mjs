@@ -16,6 +16,20 @@ test("install-docs: a bad sample fails on every rule", () => {
   assert.ok(!out.includes("a.md:8"), "text outside a fence is not checked");
 });
 
+test("install-docs: more user paths and placeholders fail", () => {
+  const bad = ["```sh", "ls /home/you/.context-mode-app", '"Users\\\\you\\\\x"', "node <...>/server.mjs", "npx context-mode", "```"].join("\n");
+  const out = checkLines("c.md", bad).join("\n");
+  for (const s of ["c.md:2 user path", "c.md:3 user path", "c.md:4 placeholder", "c.md:5 npx context-mode"]) assert.ok(out.includes(s), s);
+});
+
+test("install-docs: config blocks need an agent variable, not $HOME or ~", () => {
+  const cfg = ["```json", '{"command":["node","~/.context-mode-app/server.mjs"]}', '{"args":["$HOME/.context-mode-app/server.mjs"]}',
+    '{"command":["node","{env:HOME}/.context-mode-app/server.mjs"]}', '{"args":["${extensionPath}${/}.context-mode-app"]}', "```"].join("\n");
+  const out = checkLines("d.md", cfg);
+  assert.equal(out.length, 2, out.join("\n"));
+  assert.ok(out[0].startsWith("d.md:2 ") && out[1].startsWith("d.md:3 "));
+});
+
 test("install-docs: allowed path forms pass", () => {
   const ok = ["```sh", "git clone x ~/.context-mode-app", 'node "$HOME/.context-mode-app/server.mjs"', 'git -C "$env:USERPROFILE\\.context-mode-app" pull',
     '"{env:HOME}/.context-mode-app/server.mjs"', 'a=p.join(h,".context-mode-app")', "```"].join("\n");

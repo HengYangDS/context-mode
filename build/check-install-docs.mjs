@@ -4,6 +4,8 @@
 // `npx context-mode` (v2 has no npm; ADR-0011/0013), or a path to .context-mode-app that does not start with
 // $HOME, ~, %USERPROFILE%, $env:USERPROFILE or an agent variable ({env:HOME}, ${extensionPath}, ${CLAUDE_PLUGIN_ROOT}).
 // A quoted bare ".context-mode-app" segment is allowed: the node one-liners join it to os.homedir().
+// In a config fence (json, jsonc, toml, yaml) no shell runs, so $HOME, ~ and %USERPROFILE% do not expand there:
+// only an agent variable ({env:HOME}, ${extensionPath}, ${CLAUDE_PLUGIN_ROOT}) passes.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -17,13 +19,20 @@ const OK_BEFORE = [
   /(\$HOME|\$\{HOME\}|~|%USERPROFILE%|\$env:USERPROFILE|\{env:HOME\}|\{env:USERPROFILE\}|\$\{extensionPath\}|\$\{CLAUDE_PLUGIN_ROOT\})(\\|\/|\$\{\/\})$/,
   /["'`]$/, // quoted bare segment: p.join(os.homedir(), ".context-mode-app")
 ];
+const AGENT_VAR_BEFORE = /(\{env:HOME\}|\{env:USERPROFILE\}|\$\{extensionPath\}|\$\{CLAUDE_PLUGIN_ROOT\})(\\|\/|\$\{\/\})$/;
+const CONFIG_LANG = /^(json|jsonc|json5|toml|ya?ml)$/i;
 
 export function checkLines(name, text) {
   const bad = [];
   let fence = null;
+  let config = false;
   text.split("\n").forEach((line, i) => {
-    const m = /^\s*(`{3,})/.exec(line);
-    if (m) { fence = fence === null ? m[1] : (line.trim().startsWith(fence) ? null : fence); return; }
+    const m = /^\s*(`{3,})\s*([\w+-]*)/.exec(line);
+    if (m) {
+      if (fence === null) { fence = m[1]; config = CONFIG_LANG.test(m[2]); }
+      else if (line.trim().startsWith(fence)) { fence = null; config = false; }
+      return;
+    }
     if (fence === null) return;
     const at = `${name}:${i + 1}`;
     if (/<[A-Za-z.][^<>\n]*>/.test(line) || /\.\.\.>/.test(line)) bad.push(`${at} placeholder: ${line.trim()}`);
@@ -32,6 +41,10 @@ export function checkLines(name, text) {
     for (const a of line.matchAll(APP)) {
       const before = line.slice(0, a.index);
       const quotedBare = OK_BEFORE[1].test(before) && /^\.context-mode-app["'`]/.test(line.slice(a.index));
+      if (config) {
+        if (!AGENT_VAR_BEFORE.test(before)) bad.push(`${at} .context-mode-app path in a config block needs an agent variable ({env:HOME}, \${extensionPath}): ${line.trim()}`);
+        continue;
+      }
       if (!OK_BEFORE[0].test(before) && !quotedBare) bad.push(`${at} .context-mode-app path without $HOME/~/%USERPROFILE%/agent variable: ${line.trim()}`);
     }
   });

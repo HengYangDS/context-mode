@@ -24,15 +24,25 @@ git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git 
 gemini mcp add -s user context-mode node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent gemini
 ```
 
-Gemini turns off all MCP servers in a folder you have not trusted. Trust the folder when Gemini asks.
+Gemini turns off all MCP servers in a folder you have not trusted. Start `gemini` once in your project folder and choose to trust it.
 
 ## Verify
 
+`gemini mcp list` does not ask about trust, so in an untrusted folder it shows `Disabled`. This command checks the server without that step:
+
+macOS / Linux:
+
 ```sh
-gemini mcp list
+GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list
 ```
 
-`context-mode` must show as Connected. Then run `/ctx-doctor` in Gemini CLI.
+Windows (PowerShell), not run on Windows yet:
+
+```powershell
+$env:GEMINI_CLI_TRUST_WORKSPACE="true"; gemini mcp list; Remove-Item Env:GEMINI_CLI_TRUST_WORKSPACE
+```
+
+`context-mode` must show as Connected. Then start `gemini` in a trusted folder and run `/ctx-doctor`.
 
 ## Update
 
@@ -100,10 +110,12 @@ Tested on macOS with a temporary HOME, against the release branch, commit 043853
 | Command | Gemini CLI version | Date | Result |
 |---|---|---|---|
 | `gemini mcp add -s user context-mode node "$HOME/.context-mode-app/server.mjs" --agent gemini` | 0.65.0 | 2026-10-21 | Pass: settings.json has the real path |
-| `gemini mcp list` | 0.65.0 | 2026-10-21 | Pass: Connected |
+| `gemini mcp list` (untrusted folder) | 0.65.0 | 2026-10-21 | Disabled: Gemini turns off servers in untrusted folders |
+| `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` | 0.65.0 | 2026-10-21 | Pass: Connected |
+| `gemini mcp remove -s user context-mode` | 0.65.0 | 2026-10-21 | Pass: entry removed |
 | `gemini extensions install https://github.com/mksglu/context-mode --ref release` | 0.65.0 | 2026-10-21 | Fail: installs, but server Disconnected and no hooks |
 
-Not run: hooks (this method has none). A live Gemini session (needs a login). `gemini mcp remove` and Windows commands.
+Not run: hooks (this method has none). A live Gemini session and its trust prompt (needs a login). Windows commands.
 
 ## Sources
 
