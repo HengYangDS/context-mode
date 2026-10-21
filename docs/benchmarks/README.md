@@ -71,6 +71,8 @@ Reproduce: `node bench/saving-score.mjs`. Cost: not recorded.
 
 Re-measure on `980272a5`, 2026-10-21, 3 runs: M1 94.21 in all; M2 89.32, 85.83, 87.23 (median 87.23). Target 90: M1 met, M2 not met. `guardsOk` was false in all 3 runs because the gate layer `check-removed` failed.
 
+Re-measure on `c3275a1e` (v2-design), 2026-10-21, 3 runs, lock OK (score files match `bench/saving-score.lock`), `guardsOk` true in all 3: M1 94.26 in all; M2 87.53, 88.02, 88.25 (median 88.02); smallTok 38157.5, 38201.5, 38187.5. Per task (run 1 / 2 / 3): json-1 83.94 / 82.84 / 76.15; multi-1 91.12 / 91.77 / 92.03; big-tests 99.23 in all; big-json 77.93 / 84.27 / 84.48. Target 90: M1 met, M2 not met (88.02). Earlier levers on the same score: `text` M2 85.25 (3 runs, 78.28 to 86), `trigger` M2 85.96; neither merged.
+
 ## 4. Offline replay, before and after
 
 Date 2026-10-20 (aggregate date), Node v26.8.1. Real Claude Code transcripts: 821 sessions, 23,203 paired tool calls. A byte count, not a model run. Source: [data/offline-replay.json](data/offline-replay.json). Reproduce: `node bench/replay.mjs`.
@@ -104,6 +106,8 @@ The recall figure is a smoke gate on 6 synthetic queries. It is not an estimate 
 Date 2026-10-21. 10 sessions per arm, arms a to e, 50 sessions, cost 4.5222 USD. Source: [data/t-cmp.json](data/t-cmp.json). Reproduce: `node e2e/live/compact/run.mjs --runs 10 --model claude-sonnet-5-5 --effort low`.
 
 Result (re-scored with a case-insensitive answer key, commit 6abd2114): correct 10/10 in every arm. The first scoring was case-sensitive and gave 7/10; the 15 misses were one fixture (session-03) and were a scoring error. The model made 0 `ctx_resume` or `ctx_search` calls from the pointer, so the call-rate gate (0 < 0.70) still fails for arm a and the gate is open. The model answered right without the pointer on this fixture set, so this run cannot show that the pointer helps.
+
+Update 2026-10-21 (`c3275a1e`): compaction push recall is merged (state block with decisions, turn-boundary recall). Live T-CMP: sonnet-5-5 10/10 correct, opus-5-5 4/5 (miss: session-02; n is 5). The call-rate gate is retired per `docs/v2/review/DECISIONS-r11.md` section C, so the 0 < 0.70 call-rate result above is no longer a gate.
 
 ## Honest caveats
 

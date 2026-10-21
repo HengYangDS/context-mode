@@ -11,9 +11,9 @@ Date 2026-10-21. Branch `v2-design`, tip `70ee5e84`. Sources: `docs/v2/benchmark
 | CI on v2-design | Green. ci.yml run 39610078713 on `70ee5e84`, 6m36s. ubuntu, macos, windows, each on Node 24.15.0 and Node 26: all success |
 | Gate `node scripts/gate.mjs --all` | Green. Fresh clone, 3 runs, all exit 0, no FAIL lines. v2-unit pass 1240, fail 0, skip 2 (GP3 copilot-cli, one win32-only case). ci-checks pass |
 | `node build/check-removed.mjs` | Exit 0 on a clean checkout |
-| Saving M2 (target 90) | Best 86.84 (median of 3). Below target |
+| Saving M2 (target 90) | Median 88.02 on `c3275a1e` (3 runs, guardsOk true). Below target |
 | Compaction correct | 10/10 in every arm after re-score (was 7/10) |
-| Compaction call rate | Fails: 0/10 (limit 0.70) |
+| Compaction call rate | Gate retired (DECISIONS-r11 C). Live T-CMP: sonnet 10/10, opus 4/5 |
 | Session tokens vs off | v2 uses fewer tokens than off in the last A/B (section 3) |
 
 ## 2. Compaction (T-CMP)
@@ -62,6 +62,20 @@ Trigger lever (branch `impl/m2-trigger`, `12802b6b`, not merged): `REPLACE_TRIGG
 - Offline: M1 stays 94.25 and the <=1K bucket stays -0.32 at every trigger value. At 1024 the 1-4K bucket goes from -0.04 to 79.37. Corpus total with re-run bound goes from 44.30 to 70.70. 1024 is the lowest value that keeps small1k, M1, success and tokens.
 - The `guardsOk` false in that run came from `check-removed` on files in `docs/benchmarks/*`. That check now passes on the v2-design tip (gate green).
 - Second lever, a new replace text so the model needs no check call: **not done**.
+
+### Update 2026-10-21 (v2-design `c3275a1e`)
+
+Compaction push recall is merged (impl/compact-push, DECISIONS-r11 A and B). Live T-CMP, keyless `claude -p`, effort low: sonnet-5-5 10/10 correct, opus-5-5 4/5 (miss: session-02). The call-rate gate is retired per `docs/v2/review/DECISIONS-r11.md` section C: GS11 = correctness (>= 0.80 in the shipped-policy arm) plus the injected-bytes median, reported. Source: `docs/benchmarks/data/t-cmp.json`.
+
+M2 re-score on `c3275a1e` (3 runs, lock OK: sha256 of both score files match `bench/saving-score.lock`, no file changed, `guardsOk` true in all 3 runs). Best result M1 94.26, M2 88.02, smallTok 38187.5.
+
+| Run | M1 | M2 | json-1 | multi-1 | big-tests | big-json | smallTok |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 94.26 | 87.53 | 83.94 | 91.12 | 99.23 | 77.93 | 38157.5 |
+| 2 | 94.26 | 88.02 | 82.84 | 91.77 | 99.23 | 84.27 | 38201.5 |
+| 3 | 94.26 | 88.25 | 76.15 | 92.03 | 99.23 | 84.48 | 38187.5 |
+
+Median M2 88.02 (target 90, not met; closer than the earlier 86.84). Earlier lever runs: lever `text` M2 85.25 (median of 3, range 78.28 to 86), lever `trigger` M2 85.96 (smallTok 38179). Neither is merged.
 
 ## 4. Final A/B: v2 vs v1 vs off
 
