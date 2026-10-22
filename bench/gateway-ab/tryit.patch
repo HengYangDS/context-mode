@@ -1,17 +1,158 @@
+diff --git a/scripts/e2e/oss-arms-lib.mjs b/scripts/e2e/oss-arms-lib.mjs
+index ecbd3532..1c2deaa2 100644
+--- a/scripts/e2e/oss-arms-lib.mjs
++++ b/scripts/e2e/oss-arms-lib.mjs
+@@ -290,3 +290,85 @@ export function buildEvidence({ runs, workloads, arms, labels, meta }) {
+     workloads: out,
+   };
+ }
++
++// ── prereg amendment 1 (docs/benchmarks/try-it/prereg-amendment-1.md on OSS v2-design) ──────────────────────────
++/** One NEW disposable tenant per gateway SESSION (not per prompt): the cycle's role, number and attempt are in the id,
++ *  so no session can read memory, skills or archive written by an earlier session. Owner tenants throw. */
++export function sessionTenant({ stamp, w, role, cycle, attempt }, isOwner = () => false) {
++  if (!stamp || !w || !role || !(cycle >= 0) || !(attempt >= 1)) throw new FailClosed("session-tenant", "stamp, w, role, cycle, attempt are required");
++  const t = "t_ossab_" + stamp + "_" + w + "_" + role.charAt(0) + cycle + "a" + attempt;
++  if (isOwner(t)) throw new FailClosed("owner-tenant", "refused");
++  return t;
++}
++
++/** The text of every tool_result block the client saw, in transcript order (string content or its text blocks). */
++export function toolResultTexts(events) {
++  const out = [];
++  for (const e of events || []) {
++    if (!e || e.type !== "user" || !e.message || !Array.isArray(e.message.content)) continue;
++    for (const b of e.message.content) {
++      if (!b || b.type !== "tool_result") continue;
++      if (typeof b.content === "string") out.push(b.content);
++      else if (Array.isArray(b.content)) out.push(b.content.filter((c) => c && c.type === "text").map((c) => String(c.text || "")).join("\n"));
++    }
++  }
++  return out;
++}
++
++/** Every top-level JSON object embedded in a text, found by brace matching (JSON string state aware) and JSON.parse.
++ *  No regex. Text that does not parse is skipped. */
++export function jsonObjectsIn(text) {
++  const s = String(text || ""), out = [];
++  let i = 0;
++  while (i < s.length) {
++    if (s.charAt(i) !== "{") { i++; continue; }
++    let depth = 0, inStr = false, esc = false, end = -1;
++    for (let k = i; k < s.length; k++) {
++      const ch = s.charAt(k);
++      if (inStr) { if (esc) esc = false; else if (ch === "\\") esc = true; else if (ch === "\"") inStr = false; continue; }
++      if (ch === "\"") inStr = true;
++      else if (ch === "{") depth++;
++      else if (ch === "}") { depth--; if (depth === 0) { end = k; break; } }
++    }
++    if (end < 0) { i++; continue; }
++    let j = null; try { j = JSON.parse(s.slice(i, end + 1)); } catch { j = null; }
++    if (j && typeof j === "object") { out.push(j); i = end + 1; } else i++;
++  }
++  return out;
++}
++
++/** The record a tool_result served or generated at `index`: an object (at any depth of a JSON object parsed from a
++ *  tool_result) whose own `id` or `index` key equals the index (number, or the same digits as a string). The LAST such
++ *  object in transcript order wins (the final fetch). null when no tool_result holds one (fail closed). */
++export function recordFromToolResults(texts, index) {
++  let found = null;
++  const want = String(index);
++  const hit = (o) => ["id", "index"].some((k) => Object.prototype.hasOwnProperty.call(o, k) && (o[k] === index || o[k] === want));
++  const walk = (v) => {
++    if (!v || typeof v !== "object") return;
++    if (!Array.isArray(v) && hit(v)) found = v;
++    for (const x of Object.values(v)) walk(x);
++  };
++  for (const t of texts || []) for (const o of jsonObjectsIn(t)) walk(o);
++  return found;
++}
++
++/** Scalar leaves of a record, as the strings that must appear whole in the answer. */
++export function recordLeaves(v, out = []) {
++  if (v === null || v === undefined) return out;
++  if (typeof v === "object") { for (const x of Object.values(v)) recordLeaves(x, out); return out; }
++  out.push(String(v));
++  return out;
++}
++
++/** large-json oracle (amendment 1): the reference is the record the session's own tool_result showed at index 13000;
++ *  pass when every leaf value appears whole in the final answer. No such tool_result: "no-record-in-tool-result". */
++export function largeJsonTranscriptWhy(events, answer, index = 13000) {
++  const rec = recordFromToolResults(toolResultTexts(events), index);
++  if (rec === null) return "no-record-in-tool-result";
++  const need = recordLeaves(rec);
++  if (need.length === 0) return "empty-reference-record";
++  const s = String(answer || "");
++  const miss = need.filter((x) => s.indexOf(x) < 0);
++  return miss.length === 0 ? "ok" : "answer-missing-" + miss.length + "-of-" + need.length + "-values";
++}
+diff --git a/scripts/e2e/oss-arms-lib.test.mjs b/scripts/e2e/oss-arms-lib.test.mjs
+index f88eccff..b25b8793 100644
+--- a/scripts/e2e/oss-arms-lib.test.mjs
++++ b/scripts/e2e/oss-arms-lib.test.mjs
+@@ -99,3 +99,44 @@ test("evidence: arms against plain per cycle, voids counted not paired", () => {
+   assert.equal(w.analysis.v1.verdict, "more");
+   assert.equal(w.analysis.success_v1, "3/3");
+ });
++
++import { sessionTenant, toolResultTexts, jsonObjectsIn, recordFromToolResults, largeJsonTranscriptWhy } from "./oss-arms-lib.mjs";
++import { completionWhy } from "./tryit-workloads.mjs";
++
++test("amendment 1: one new tenant per gateway session; owner tenants and missing parts throw", () => {
++  const a = sessionTenant({ stamp: "S", w: "web-scrape", role: "measured", cycle: 1, attempt: 1 });
++  const b = sessionTenant({ stamp: "S", w: "web-scrape", role: "measured", cycle: 2, attempt: 1 });
++  const c = sessionTenant({ stamp: "S", w: "web-scrape", role: "measured", cycle: 1, attempt: 2 });
++  const d = sessionTenant({ stamp: "S", w: "web-scrape", role: "warmup", cycle: 1, attempt: 1 });
++  assert.equal(new Set([a, b, c, d]).size, 4);
++  assert.equal(a.indexOf("t_ossab_S_web-scrape_"), 0);
++  assert.throws(() => sessionTenant({ stamp: "S", w: "x", role: "measured", cycle: 1, attempt: 1 }, () => true), FailClosed);
++  assert.throws(() => sessionTenant({ stamp: "", w: "x", role: "measured", cycle: 1, attempt: 1 }), FailClosed);
++});
++
++const tr = (content) => ({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: "u", content }] } });
++const said = (text) => ({ type: "assistant", message: { content: [{ type: "text", text }] } });
++
++test("amendment 1: JSON objects in tool_result text are found by brace matching, strings with braces included", () => {
++  assert.deepEqual(jsonObjectsIn('count: 2\n{"id": 1, "s": "a } b"} tail {bad} {"x": {"y": 2}}'), [{ id: 1, s: "a } b" }, { x: { y: 2 } }]);
++  assert.deepEqual(toolResultTexts([tr("plain"), tr([{ type: "text", text: "t1" }, { type: "image" }]), said("no")]), ["plain", "t1"]);
++});
++
++test("amendment 1: large-json reference is the index-13000 record from the tool_result; pass needs every leaf", () => {
++  const rec = { id: 13000, name: "user_13000", secret: true, message: "The eagle lands at midnight", tags: ["a", "b"] };
++  const ev = [tr("payload: 7.5 MB\n" + JSON.stringify({ status: 200, record: rec }, null, 2))];
++  assert.equal(largeJsonTranscriptWhy(ev, "id 13000 user_13000 secret true: The eagle lands at midnight, tags a b"), "ok");
++  assert.equal(largeJsonTranscriptWhy(ev, "id 13000 user_13000 true The eagle lands"), "answer-missing-2-of-6-values");
++  // string index, nested array, last tool_result wins
++  const ev2 = [tr(JSON.stringify([{ index: "13000", v: "old" }])), tr(JSON.stringify({ records: [{ index: 13000, v: "new" }] }))];
++  assert.deepEqual(recordFromToolResults(toolResultTexts(ev2), 13000), { index: 13000, v: "new" });
++  // record only in model prose or nowhere: fail closed
++  assert.equal(largeJsonTranscriptWhy([said(JSON.stringify(rec))], JSON.stringify(rec)), "no-record-in-tool-result");
++  assert.equal(largeJsonTranscriptWhy([tr("index 13000 looked fine")], "x"), "no-record-in-tool-result");
++});
++
++test("amendment 1: the gateway's edge calls count for the completion check; none still fails", () => {
++  const p = { result: { subtype: "success", stop_reason: "end_turn" }, tools: {} };
++  assert.equal(completionWhy("", {}, "answer", p), "no-tool-call");
++  assert.equal(completionWhy("", {}, "answer", { ...p, edge_calls: 1 }), "ok");
++});
 diff --git a/scripts/e2e/start-cost-ab-arms.mjs b/scripts/e2e/start-cost-ab-arms.mjs
-index f2488020..7d747c92 100644
+index f2488020..dda18dac 100644
 --- a/scripts/e2e/start-cost-ab-arms.mjs
 +++ b/scripts/e2e/start-cost-ab-arms.mjs
-@@ -22,7 +22,8 @@ import { fileURLToPath } from "node:url";
+@@ -22,8 +22,9 @@ import { fileURLToPath } from "node:url";
  import { tenantPreflight, disposableHeaders, headerLines, adminKeyFromEnv, isOwnerTenant, claudeLoginCredential } from "./tenant-preflight.mjs";
  import { seedCredentials } from "../../tests/fourarm/runner.mjs";
  import { readOpsSession, gatewayBilled } from "./billed-basis.mjs";
 -import { WORK } from "./short-workloads.mjs";
+-import { FailClosed, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, rateLimited, publicRecord, buildEvidence, PLUGIN_ARMS } from "./oss-arms-lib.mjs";
 +import { WORK as SHORT_WORK } from "./short-workloads.mjs";
 +import { TRYIT_WORK, TRYIT_LABELS } from "./tryit-workloads.mjs";
- import { FailClosed, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, rateLimited, publicRecord, buildEvidence, PLUGIN_ARMS } from "./oss-arms-lib.mjs";
++import { FailClosed, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, rateLimited, publicRecord, buildEvidence, PLUGIN_ARMS, sessionTenant } from "./oss-arms-lib.mjs";
  
  const HERE = dirname(fileURLToPath(import.meta.url));
+ const REPO = dirname(dirname(HERE));
 @@ -31,6 +32,10 @@ const argv = process.argv;
  const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 && i + 1 < argv.length ? argv[i + 1] : d; };
  const flag = (n) => argv.indexOf(n) >= 0;
@@ -32,17 +173,82 @@ index f2488020..7d747c92 100644
  const NEEDS_GW = ARMS.indexOf("gateway") >= 0 || BRIDGE > 0;
  
  // ── freeze checks ───────────────────────────────────────────────────────────────────────────────────────────
-@@ -168,7 +173,8 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+@@ -88,17 +93,11 @@ if (HARNESS_DIRTY) throw new FailClosed("harness-dirty", "commit scripts/e2e bef
+ 
+ // ── gateway (only when an arm needs it) ─────────────────────────────────────────────────────────────────────
+ let GW = null, ADMIN = null;
+-const TENANTS = {};
+ if (NEEDS_GW) {
+   const { CONFIG } = await import("../../tests/scenarios.mjs");
+   GW = arg("--gw", process.env.CM_GW_URL || CONFIG.GW);
+   ADMIN = await adminKeyFromEnv();
+   if (!ADMIN) throw new FailClosed("no-admin-key", "without the admin key x-cm-tenant is ignored and traffic lands on the owner tenant");
+-  for (const w of WLS) {
+-    const t = "t_ossab_" + STAMP + "_" + w;
+-    if (isOwnerTenant(t)) throw new FailClosed("owner-tenant", "refused");
+-    TENANTS[w] = t;
+-  }
+ }
+ async function getJson(path, withKey) {
+   const r = await fetch(GW + path, { headers: withKey ? { "x-context-mode-key": ADMIN } : {} });
+@@ -143,13 +142,19 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+   for (const k of Object.keys(env)) if (k.indexOf("CLAUDE_CODE_") === 0 || k === "CLAUDECODE" || k === "CLAUDE_PID" || k === "AI_AGENT" || k === "CLAUDE_EFFORT") delete env[k];
+   delete env.ANTHROPIC_BASE_URL; delete env.ANTHROPIC_CUSTOM_HEADERS;
+   env.ENABLE_CLAUDEAI_MCP_SERVERS = "false"; env.CLAUDE_CODE_DISABLE_AUTO_MEMORY = "1"; env.CLAUDE_CODE_DISABLE_CLAUDE_MDS = "1";
+-  if (arm === "gateway") { env.ANTHROPIC_BASE_URL = GW; env.ANTHROPIC_CUSTOM_HEADERS = headerLines(disposableHeaders({ adminKey: ADMIN, tenant: TENANTS[w] })); }
++  // Amendment 1: a NEW disposable tenant per gateway SESSION, proved by a dry-run preflight before the session.
++  const tenant = arm === "gateway" ? sessionTenant({ stamp: STAMP, w, role, cycle, attempt }, isOwnerTenant) : null;
++  if (arm === "gateway") {
++    const pre = await tenantPreflight({ gw: GW, headers: disposableHeaders({ adminKey: ADMIN, tenant }), dialect: "anthropic", expect: tenant, credential: claudeLoginCredential() });
++    if (!pre || pre.tenant !== tenant) throw new FailClosed("preflight", w + " " + role + " " + cycle);
++    env.ANTHROPIC_BASE_URL = GW; env.ANTHROPIC_CUSTOM_HEADERS = headerLines(disposableHeaders({ adminKey: ADMIN, tenant }));
++  }
+   const spec = SPECS[arm] || null;
+   const args = ["-p", WORK[w].prompt, "--model", MODEL, "--output-format", "stream-json", "--verbose", "--max-turns", MAX_TURNS,
+     "--permission-mode", "bypassPermissions", "--max-budget-usd", BUDGET, "--strict-mcp-config"];
+   if (spec) args.push("--plugin-dir", spec.dir, "--mcp-config", JSON.stringify(spec.map));
+   else args.push("--mcp-config", JSON.stringify({ mcpServers: {} }));
+-  const flagsBefore = arm === "gateway" ? await readFlags(TENANTS[w]) : undefined;
++  const flagsBefore = arm === "gateway" ? await readFlags(tenant) : undefined;
+   const t0 = Date.now();
+   const out = await new Promise((res) => {
+     const c = spawn(CLAUDE, args, { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"] });
+@@ -168,7 +173,6 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
      harness_commit: HARNESS_COMMIT, credential: cred.credentialMode, session: p.init ? p.init.session_id : null, tools: p.tools,
      rate_limited: rateLimited(p.events), turns: p.result ? p.result.num_turns : null, result_subtype: p.result ? p.result.subtype : null };
    rec.budget_hit = !!(rec.result_subtype && String(rec.result_subtype).indexOf("budget") >= 0);
 -  rec.success = p.result ? WORK[w].ok(dir, META[w], answer) === true : false;
-+  rec.success = p.result ? WORK[w].ok(dir, META[w], answer, p) === true : false;
-+  if (WORK[w].why) rec.oracle = WORK[w].why(dir, META[w], answer, p);
    if (spec) {
      rec.plugin = { arm, ...spec.revision };
      rec.plugin_tool_calls = Object.keys(p.tools).filter((t) => t.indexOf(spec.prefix) === 0).reduce((s, t) => s + p.tools[t], 0);
-@@ -204,7 +210,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
+@@ -181,17 +185,23 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+   else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
+   if (arm === "gateway") {
+     rec.flags_before = flagsBefore;
+-    rec.tenant = TENANTS[w];
++    rec.tenant = tenant;
++    rec.tenant_scope = "session";
+     if (rec.session) {
+-      const o = await readOpsSession({ gw: GW, adminKey: ADMIN, tenant: TENANTS[w], session: rec.session, hours: 6 });
++      const o = await readOpsSession({ gw: GW, adminKey: ADMIN, tenant, session: rec.session, hours: 6 });
+       const billed = gatewayBilled([o], p.results);
+       rec.gateway_record = o && o.found ? { found: true, complete: !!o.complete, requests: o.requests, edge_calls: o.edge_calls, tokens: o.tokens, anthropic_usd: o.anthropic_usd, coverage: billed.coverage } : { found: false };
+       if (billed.usd === null) { rec.resolution.ok = false; rec.resolution.why.push("gateway-record " + billed.why); }
+       else { rec.usd = billed.usd; rec.usd_low = billed.usd; rec.calls_from = "gateway_record_session"; }
+     } else { rec.resolution.ok = false; rec.resolution.why.push("gateway-no-session"); }
+     rec.resolution.gateway_record_found = !!(rec.gateway_record && rec.gateway_record.found);
+-    rec.flags_after = await readFlags(TENANTS[w]);
++    rec.flags_after = await readFlags(tenant);
+   }
++  // Amendment 1: the gateway arm's tool calls that ran at the edge (gateway per-call record, edge_calls) count as tool
++  // calls for the completion check; the client transcript never shows them.
++  if (arm === "gateway") p.edge_calls = rec.gateway_record && rec.gateway_record.found ? Number(rec.gateway_record.edge_calls) || 0 : 0;
++  rec.success = p.result ? WORK[w].ok(dir, META[w], answer, p) === true : false;
++  if (WORK[w].why) rec.oracle = WORK[w].why(dir, META[w], answer, p);
+   if (rec.usd !== null && rec.usd_client > 0) {
+     rec.client_gap_pct = 100 * (rec.usd - rec.usd_client) / rec.usd_client;
+     rec.client_gap_flag = Math.abs(rec.client_gap_pct) > 1;
+@@ -204,7 +214,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
  function writeEvidence() {
    const doc = buildEvidence({ runs, workloads: WLS, arms: ARMS, labels: LABELS, meta: {
      pairs_planned: N, warmup: WARMUP, model: MODEL, client_version: CLIENT_VERSION, date: new Date().toISOString().split("T")[0], harness_commit: HARNESS_COMMIT,
@@ -52,26 +258,44 @@ index f2488020..7d747c92 100644
      plugins: Object.fromEntries(Object.values(SPECS).map((s) => [s.arm, { server: s.server, tool_prefix: s.prefix, ...s.revision }])),
      arm_text: { plain: "Claude Code talks to Anthropic direct, no plugin.", v1: "Claude Code with the OSS context-mode plugin v1.", v2: "Claude Code with the OSS context-mode plugin v2.", gateway: "Claude Code talks to Anthropic through Context Mode." } } });
    doc.public_runs = runs.map(publicRecord);
+@@ -242,15 +253,6 @@ async function runCycle(w, role, cycle, order) {
+ }
+ 
+ // ── the grid ────────────────────────────────────────────────────────────────────────────────────────────────
+-const preflights = {};
+-if (NEEDS_GW) {
+-  const cred = claudeLoginCredential();
+-  for (const w of WLS) {
+-    const pre = await tenantPreflight({ gw: GW, headers: disposableHeaders({ adminKey: ADMIN, tenant: TENANTS[w] }), dialect: "anthropic", expect: TENANTS[w], credential: cred });
+-    if (!pre || pre.tenant !== TENANTS[w]) throw new FailClosed("preflight", w);
+-    preflights[w] = true;
+-  }
+-}
+ const lanes = WLS.slice();
+ await Promise.all(Array.from({ length: Math.max(1, Math.min(CONC, WLS.length)) }, async () => {
+   while (lanes.length && !stopped) {
 diff --git a/scripts/e2e/tryit-workloads.mjs b/scripts/e2e/tryit-workloads.mjs
 new file mode 100644
-index 00000000..d8007eaa
+index 00000000..bd9fffca
 --- /dev/null
 +++ b/scripts/e2e/tryit-workloads.mjs
-@@ -0,0 +1,98 @@
+@@ -0,0 +1,67 @@
 +// scripts/e2e/tryit-workloads.mjs — THE SIX README "TRY IT" PROMPTS (docs/benchmarks/try-it/prereg.md on the OSS repo,
 +// branch v2-design, commit f924eda2). Same shape as short-workloads.mjs: a fixture builder, the verbatim prompt, and a
 +// task oracle `ok(dir, meta, answer, parsed)`. Every fixture is an EMPTY cwd: the prompts fetch, clone or build what
 +// they need. `why(...)` returns the oracle's reason, so a fail is explained in the private record.
 +// NO REGEX. NO TRUNCATION. Fail closed: an oracle that cannot find its reference answers false.
 +import { spawnSync } from "node:child_process";
-+import { mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
++import { mkdirSync } from "node:fs";
 +import { join } from "node:path";
++import { largeJsonTranscriptWhy } from "./oss-arms-lib.mjs";
 +
 +const empty = (dir) => { mkdirSync(dir, { recursive: true }); return {}; };
-+const toolCalls = (p) => Object.values((p && p.tools) || {}).reduce((s, n) => s + n, 0);
++// Client-visible tool_use blocks plus (gateway arm, amendment 1) the edge calls in the gateway per-call record.
++export const toolCalls = (p) => Object.values((p && p.tools) || {}).reduce((s, n) => s + n, 0) + (Number(p && p.edge_calls) || 0);
 +
 +/** Completion check (prereg): end_turn, at least one tool call, a non-empty final answer. Not a quality check. */
-+function completionWhy(dir, m, answer, p) {
++export function completionWhy(dir, m, answer, p) {
 +  if (!p || !p.result) return "no-result-event";
 +  if (p.result.is_error === true || p.result.subtype !== "success") return "result-" + p.result.subtype;
 +  if (p.result.stop_reason !== undefined && p.result.stop_reason !== null && p.result.stop_reason !== "end_turn") return "stop-" + p.result.stop_reason;
@@ -80,48 +304,15 @@ index 00000000..d8007eaa
 +  return "ok";
 +}
 +
-+// ── large-json: the hidden record the session's own served data holds at index 13000 ─────────────────────────
-+// The prompt has the model build the data, so the harness reads it back from disk after the session: every *.json
-+// file of 1 MB or more under the cwd (node_modules skipped) is parsed; the first array of exactly 20,000 items (top
-+// level, or one level down) gives the reference record arr[13000]. Success = every scalar leaf of that record appears
-+// whole in the final answer. Data built only in memory leaves nothing to read: the oracle answers false
-+// ("no-served-data-on-disk"), never a guess.
-+function jsonFiles(dir, out = []) {
-+  let names = []; try { names = readdirSync(dir); } catch { return out; }
-+  for (const n of names) {
-+    if (n === "node_modules" || n === ".git") continue;
-+    const p = join(dir, n); let st; try { st = statSync(p); } catch { continue; }
-+    if (st.isDirectory()) jsonFiles(p, out);
-+    else if (n.endsWith(".json") && st.size >= 1000000) out.push(p);
-+  }
-+  return out;
-+}
-+function arrayOf20k(j) {
-+  if (Array.isArray(j) && j.length === 20000) return j;
-+  if (j && typeof j === "object" && !Array.isArray(j)) for (const v of Object.values(j)) if (Array.isArray(v) && v.length === 20000) return v;
-+  return null;
-+}
-+function leaves(v, out = []) {
-+  if (v === null || v === undefined) return out;
-+  if (typeof v === "object") { for (const x of Object.values(v)) leaves(x, out); return out; }
-+  out.push(String(v));
-+  return out;
-+}
++// ── large-json (prereg amendment 1): the hidden record as the session's OWN tool_result showed it ─────────────
++// The first run read the record back from disk and failed every arm that built the data in memory
++// ("no-served-data-on-disk"). The reference is now the record object JSON-parsed from the tool_result that served or
++// generated index 13000 (oss-arms-lib.mjs largeJsonTranscriptWhy). Success = every scalar leaf of that record appears
++// whole in the final answer. No such tool_result: "no-record-in-tool-result" (fail closed), never a guess.
 +function largeJsonWhy(dir, m, answer, p) {
 +  const c = completionWhy(dir, m, answer, p);
 +  if (c !== "ok" && c !== "no-tool-call") return c;
-+  let rec = null;
-+  for (const f of jsonFiles(dir)) {
-+    let j; try { j = JSON.parse(readFileSync(f, "utf8")); } catch { continue; }
-+    const a = arrayOf20k(j);
-+    if (a) { rec = a[13000]; break; }
-+  }
-+  if (rec === null || rec === undefined) return "no-served-data-on-disk";
-+  const need = leaves(rec);
-+  if (need.length === 0) return "empty-reference-record";
-+  const s = String(answer || "");
-+  const miss = need.filter((x) => s.indexOf(x) < 0);
-+  return miss.length === 0 ? "ok" : "answer-missing-" + miss.length + "-of-" + need.length + "-values";
++  return largeJsonTranscriptWhy(p && p.events, answer, 13000);
 +}
 +
 +// ── git-history: the top author of the last 500 commits, from a reference clone pinned at harness start ──────
