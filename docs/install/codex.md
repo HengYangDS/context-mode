@@ -103,7 +103,7 @@ Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/c
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+Tested on macOS with a temporary HOME, against the release branch, commit 05e97724 (rows dated 2026-10-21 ran on 0438537; the 2026-10-22 re-run on 05e97724 passed the same install, `codex mcp list` and hook checks).
 
 | Command | Codex version | Date | Result |
 |---|---|---|---|

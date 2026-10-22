@@ -71,7 +71,7 @@ Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/c
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 87a17f8.
+Tested on macOS with a temporary HOME, against the release branch, commit 05e97724.
 
 | Command | Qwen Code version | Date | Result |
 |---|---|---|---|

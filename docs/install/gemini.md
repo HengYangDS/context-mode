@@ -1,27 +1,21 @@
 # Install context-mode v2 on Gemini CLI
 
-This guide adds the MCP server with `gemini mcp add`. This gives the context-mode tools, but no hooks.
-
-The extension install (`gemini extensions install https://github.com/mksglu/context-mode --ref release`) is the better method, because it also adds the hooks and updates by itself. It does not work yet: the release build has a relative server path in `gemini-extension.json` and no `hooks/hooks.json`, so the server shows as Disconnected. This guide will move to it when the build is fixed.
+This guide installs the extension. It adds the MCP server and the hooks, and it updates by itself.
 
 ## Install
-
-Get the files first. See [Get the files](./README.md#get-the-files).
 
 macOS / Linux:
 
 ```sh
 npm install -g @google/gemini-cli
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
-gemini mcp add -s user context-mode node "$HOME/.context-mode-app/server.mjs" --agent gemini
+gemini extensions install https://github.com/mksglu/context-mode --ref release --consent
 ```
 
 Windows (PowerShell), not run on Windows yet:
 
 ```powershell
 npm install -g @google/gemini-cli
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
-gemini mcp add -s user context-mode node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent gemini
+gemini extensions install https://github.com/mksglu/context-mode --ref release --consent
 ```
 
 Gemini turns off all MCP servers in a folder you have not trusted. Start `gemini` once in your project folder and choose to trust it.
@@ -42,20 +36,12 @@ Windows (PowerShell), not run on Windows yet:
 $env:GEMINI_CLI_TRUST_WORKSPACE="true"; gemini mcp list; Remove-Item Env:GEMINI_CLI_TRUST_WORKSPACE
 ```
 
-`context-mode` must show as Connected. Then start `gemini` in a trusted folder and run `/ctx-doctor`.
+`context-mode` must show as Connected, from the extension `context-mode`. Then start `gemini` in a trusted folder and run `/ctx-doctor`.
 
 ## Update
 
-macOS / Linux:
-
 ```sh
-git -C ~/.context-mode-app pull
-```
-
-Windows (PowerShell):
-
-```powershell
-git -C "$env:USERPROFILE\.context-mode-app" pull
+gemini extensions update context-mode
 ```
 
 Restart Gemini CLI.
@@ -84,6 +70,12 @@ Then add the v1 entry for Gemini CLI as the [Rollback table](../../README.md#upg
 
 ## Uninstall
 
+```sh
+gemini extensions uninstall context-mode
+```
+
+If you used the older `gemini mcp add` method, also run:
+
 macOS / Linux:
 
 ```sh
@@ -98,24 +90,23 @@ gemini mcp remove -s user context-mode
 Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
 ```
 
-
 ## Report a problem
 
 Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+Tested on macOS with a temporary HOME, against the release branch, commit 05e97724.
 
 | Command | Gemini CLI version | Date | Result |
 |---|---|---|---|
-| `gemini mcp add -s user context-mode node "$HOME/.context-mode-app/server.mjs" --agent gemini` | 0.65.0 | 2026-10-21 | Pass: settings.json has the real path |
-| `gemini mcp list` (untrusted folder) | 0.65.0 | 2026-10-21 | Disabled: Gemini turns off servers in untrusted folders |
-| `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` | 0.65.0 | 2026-10-21 | Pass: Connected |
-| `gemini mcp remove -s user context-mode` | 0.65.0 | 2026-10-21 | Pass: entry removed |
-| `gemini extensions install https://github.com/mksglu/context-mode --ref release` | 0.65.0 | 2026-10-21 | Fail: installs, but server Disconnected and no hooks |
+| `gemini extensions install https://github.com/mksglu/context-mode --ref release --consent` | 0.65.0 | 2026-10-22 | Pass: installed; `hooks/hooks.json` registers BeforeTool, AfterTool, BeforeAgent |
+| `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` | 0.65.0 | 2026-10-22 | Pass: Connected, `${extensionPath}` resolved to the extension folder |
+| `tools/list` over stdio to `server.mjs --agent gemini` | 0.65.0 | 2026-10-22 | Pass: 9 tools |
+| `gemini mcp add -s user ...` (older method), `mcp list`, `mcp remove` | 0.65.0 | 2026-10-22 | Pass: real path in settings.json, Connected, removed |
+| `gemini extensions update` / `uninstall` | 0.65.0 | not run | Not run |
 
-Not run: hooks (this method has none). A live Gemini session and its trust prompt (needs a login). Windows commands.
+Not run: whether a live Gemini session loads the hooks, `/ctx-doctor` and the trust prompt (needs a login). `gemini extensions update` and `uninstall`. Windows commands.
 
 ## Sources
 
