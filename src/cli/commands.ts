@@ -371,6 +371,8 @@ export async function runCommand(cmd: Command, args: readonly string[], env: Cli
   const ctx: SetupContext = { home: process.env.HOME || os.homedir(), pkgDir: env.pkgDir, env: process.env };
   const tty = !!process.stdin.isTTY && !!process.stdout.isTTY;
   const interactive = tty && !f.yes && !f.noInput && !f.json && !f.list;
+  // A pty may report 0 columns; clack would then wrap every character onto its own line. Fall back to 80.
+  if (interactive && !process.stdout.columns) Object.defineProperty(process.stdout, "columns", { value: 80, configurable: true });
   const ui: Ui = { f, ctx, env, clack: interactive ? clack : undefined };
   try {
     if (cmd === "setup") return await setup(ui);
