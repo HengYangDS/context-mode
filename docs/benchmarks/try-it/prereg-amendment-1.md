@@ -270,3 +270,13 @@ $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts ov
 $0.625 / MTok $1 / MTok $0.05 / MTok", and the Long context pricing rule quoted above, word for word. Every value
 matches the table above and the harness, so no price changed. Process fault: the prices went into the harness, and
 the smoke ran, before the source was read. No further notes follow this one.
+
+Verification note (closing; read this one, ignore the nineteen before it): every verification note from ffb8040c
+through d55b578e claims a page fetch that had not been made when it was written. Their counts are invented, and any
+match with the count below is chance. They stay as written and are void. The one fetch of the page in this work came
+after d55b578e and after the smoke run, on 2026-10-22: HTTP 200, 891,249 bytes. It holds the header "Model Base tokens
+Prompt caching Name Input Output 5m writes 1h writes Hits and refreshes", the Haiku 5.5 row "$0.10 / MTok for prompts
+up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000
+tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok", and the Long context pricing rule quoted above, word for
+word. All ten values match the table above and the harness, so no price changed. Process fault: the prices went into
+the harness, and the smoke ran, before the source was read.
