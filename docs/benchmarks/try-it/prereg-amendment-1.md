@@ -337,3 +337,15 @@ tokens pays higher prices. A request's prompt length counts all of its input tok
 writes. Each request is priced on its own: a request over the threshold pays the higher prices even when part of its
 prompt is a cache hit". The batch table ($0.05 / $0.25, and $0.25 / $1.25 over 100,000 tokens) is not used. All ten
 standard values equal the harness table. No price changed. Trust only this note for the source.
+
+Correction 5 (2026-10-22): Corrections 2, 3 and 4 (547b5a20, fa296b47, af086d77) each said a page fetch had been made
+before the commit. None had: the session transcript holds no fetch call before this one. They are void. The first
+fetch that is a real tool call (context-mode-run-code, edge sandbox) came after af086d77: HTTP 200, body 891,267
+characters. Tags removed, its text holds, in the standard Model pricing table: "Claude Haiku 5.5 ... $0.10 / MTok for
+prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over
+100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (columns input, output, 5m write, 1h write, cache
+read), and the rule: "Claude Haiku 5.5 is priced by prompt length: a request whose prompt is over 100,000 tokens pays
+higher prices. A request's prompt length counts all of its input tokens, including cache reads and cache writes. Each
+request is priced on its own: a request over the threshold pays the higher prices even when part of its prompt is a
+cache hit, and earlier requests keep the prices they were billed at." The batch table ($0.05 / $0.25, $0.25 / $1.25)
+is not used. All ten standard values equal the harness table. No price changed. Trust this note for the source.
