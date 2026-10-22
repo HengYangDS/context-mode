@@ -40,7 +40,19 @@ const diag = await agent(`${RULES}\n\nRole: diagnostician. In the first try-it r
 Smoke: large-json and web-scrape, gateway + v2 arms, 1 cycle, claude-haiku-4-5-20251001; pass only if the gateway session uses a fresh tenant and the new oracle gives a real verdict.
 Return done (true only if amendment pushed and smoke passed), commits, numbers (diagnosis in one line, smoke), summary.`,
   { label: 'fix-diagnose', phase: 'Diagnose', schema: RESULT, ...OPH })
-if (!diag || !diag.done) return { stopped: 'diagnose/fix not done', diag }
+let ready = diag && diag.done
+if (diag && !diag.done) {
+  // First diagnose run stopped fail-closed: WebFetch uses claude-haiku-5-5, missing from the price table.
+  const pf = await agent(`${RULES}\n\nPrevious step: ${JSON.stringify(diag).slice(0, 3000)}\n\nRole: price fix + smoke. Official list price of claude-haiku-5-5, read 2026-10-22 from https://platform.claude.com/docs/en/about-claude/pricing (USD per MTok): prompts up to 100,000 tokens: input 0.10, 5m cache write 0.125, 1h cache write 0.20, cache read 0.01, output 0.50; prompts over 100,000 tokens (input + cache read + cache write of that request): input 0.50, 5m cache write 0.625, 1h cache write 1.00, cache read 0.05, output 2.50. Do not change any other price.
+1. In ${WT} add claude-haiku-5-5 to PRICES with both tiers; price each request by its own prompt length when per-request usage is available (gateway record, per-model usage in the result event); if only a per-model total is available, use the lower tier and flag the run (price_tier_assumed). Unit test both tiers. Local commit.
+2. Append a section "Addendum: helper model price" to ${OUT}/prereg-amendment-1.md with the prices, the source URL and date, and the tier rule; update bench/gateway-ab/tryit.patch. Commit + push BEFORE any measured run.
+3. Re-run the smoke: web-scrape, arms plain, v2, gateway, 1 cycle, claude-haiku-4-5-20251001. Pass only if every arm resolves, the gateway session has a fresh tenant, and the WebFetch helper call is priced.
+Return done (true only if addendum pushed and smoke passed), commits, numbers, summary.`,
+    { label: 'fix-price', phase: 'Diagnose', schema: RESULT, ...OPH })
+  ready = pf && pf.done
+  diag.priceFix = pf
+}
+if (!ready) return { stopped: 'diagnose/price fix not done', diag }
 
 phase('Run')
 const runs = await parallel(RERUN.map((p) => () => agent(`${RULES}\n\nAmendment: ${JSON.stringify(diag).slice(0, 2500)} (${OUT}/prereg-amendment-1.md on v2-design).
