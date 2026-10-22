@@ -101,6 +101,7 @@ Tested on macOS with a temporary HOME, against the release branch, commit 05e977
 | Command | Gemini CLI version | Date | Result |
 |---|---|---|---|
 | `gemini extensions install https://github.com/mksglu/context-mode --ref release --consent` | 0.65.0 | 2026-10-22 | Pass: installed; `hooks/hooks.json` registers BeforeTool, AfterTool, BeforeAgent |
+| `gemini extensions link <local copy of release-out> --consent`, `extensions list`; BeforeTool and BeforeAgent hook command run by hand | 0.65.0 | 2026-10-22 | Pass: linked and enabled; hooks exit 0. `hooks/hooks.json` has no SessionStart (D-FU-GCH-1), so no resume hint at session start |
 | `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` | 0.65.0 | 2026-10-22 | Pass: Connected, `${extensionPath}` resolved to the extension folder |
 | `tools/list` over stdio to `server.mjs --agent gemini` | 0.65.0 | 2026-10-22 | Pass: 9 tools |
 | `gemini mcp add -s user ...` (older method), `mcp list`, `mcp remove` | 0.65.0 | 2026-10-22 | Pass: real path in settings.json, Connected, removed |
