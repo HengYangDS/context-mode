@@ -26,7 +26,10 @@ const HOOKS_DIR = "hooks";
 const PLUGIN_ROOT_VAR: Readonly<Partial<Record<AgentId, string>>> = { "claude-code": "${CLAUDE_PLUGIN_ROOT}", qwen: "${CLAUDE_PLUGIN_ROOT}" };
 // D-FU-RM-QWEN-1: Qwen expands ${extensionPath} and ${/} in qwen-extension.json (server path), but in hook commands
 // it replaces only ${CLAUDE_PLUGIN_ROOT}. So the server path and the hook command use different variables.
-const SERVER_PATH_PREFIX: Readonly<Partial<Record<AgentId, string>>> = { qwen: "${extensionPath}${/}" };
+const SERVER_PATH_PREFIX: Readonly<Partial<Record<AgentId, string>>> = { qwen: "${extensionPath}${/}", gemini: "${extensionPath}${/}" };
+// D-FU-RM-GEMINI-1: Gemini expands ${extensionPath} and ${/} in the manifest and in hook commands, and reads hooks only
+// from <ext>/hooks/hooks.json. So its hook command names the extension path directly.
+const HOOK_PATH_PREFIX: Readonly<Partial<Record<AgentId, string>>> = { gemini: "${extensionPath}${/}" };
 const bundleArg = (row: AdapterRow, file: string): string => {
   const root = PLUGIN_ROOT_VAR[row.id];
   return root === undefined ? file : root + "/" + file;
@@ -35,8 +38,11 @@ const serverArg = (row: AdapterRow): string => {
   const prefix = SERVER_PATH_PREFIX[row.id];
   return prefix === undefined ? bundleArg(row, SERVER_BUNDLE) : prefix + SERVER_BUNDLE;
 };
-const bundleCmd = (row: AdapterRow, file: string): string =>
-  PLUGIN_ROOT_VAR[row.id] === undefined ? file : '"' + bundleArg(row, file) + '"';
+const bundleCmd = (row: AdapterRow, file: string): string => {
+  const prefix = HOOK_PATH_PREFIX[row.id];
+  if (prefix !== undefined) return '"' + prefix + file + '"';
+  return PLUGIN_ROOT_VAR[row.id] === undefined ? file : '"' + bundleArg(row, file) + '"';
+};
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json };
 type JsonObject = { [key: string]: Json };
@@ -108,7 +114,9 @@ const HOOK_SHAPES: Readonly<Record<AgentId, ((row: AdapterRow) => JsonObject) | 
   opencode: null,
 };
 
-const hookFile = (row: AdapterRow): string => HOOKS_DIR + "/" + row.id + ".json";
+// D-FU-RM-GEMINI-1: Gemini reads only hooks/hooks.json; every other host reads hooks/<id>.json.
+const GEMINI_HOOK_FILE = "hooks.json";
+const hookFile = (row: AdapterRow): string => HOOKS_DIR + "/" + (row.id === "gemini" ? GEMINI_HOOK_FILE : row.id + ".json");
 
 function mcpManifest(row: AdapterRow, version: string): JsonObject {
   return {
