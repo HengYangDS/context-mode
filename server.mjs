@@ -28067,7 +28067,7 @@ var SEARCH_PAGE_SIZE = 20;
 var SNIPPET_MAX_BYTES = 800;
 var MAX_CANDIDATES = 85;
 var MAX_CANDIDATES_TOTAL = 340;
-var WEIGHT = Object.freeze({ toolerr: 900, prompt: 500, edit: 400, index: 200 });
+var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var RATIO_SECTION_DECAY = 0.7;
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -28304,7 +28304,7 @@ var DECISION_SOURCE = "decision";
 var DECISION_USER_LABEL = "decision (user)";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "bcda65610549145347604af51b645f0bfbb46e9f" : void 0;
+var BUNDLE_SHA = true ? "bcf7e4062145813f0277008bbe823942e66ca232" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -29177,7 +29177,7 @@ function present(v) {
 function dirOf(kind, src) {
   switch (kind) {
     case "env:CLAUDE_PROJECT_DIR":
-      return present(src.env.CLAUDE_PROJECT_DIR);
+      return present(src.env.CLAUDE_PROJECT_DIR) ?? present(src.cwd) ?? process.cwd();
     case "arg:--agent+cwd":
     case "spawn-cwd":
       return present(src.cwd);
@@ -42302,7 +42302,7 @@ var ADAPTERS = Object.freeze([
     toolNamePrefix: TOOL_NAME_PREFIX7,
     nativeTools: { shell: [] },
     execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
+    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
@@ -44502,7 +44502,7 @@ function capSection(list2) {
   return list2.length > MAX_CANDIDATES ? list2.slice(list2.length - MAX_CANDIDATES) : list2;
 }
 function emptySet() {
-  return { lastRequest: null, openErrors: [], changedFiles: [], earlierRequests: [], indexedSources: [] };
+  return { lastRequest: null, openErrors: [], changedFiles: [], decisions: [], earlierRequests: [], indexedSources: [] };
 }
 function buildCandidates(rows, sessionId) {
   if (!sessionId) return emptySet();
@@ -44538,15 +44538,25 @@ function buildCandidates(rows, sessionId) {
     changedFiles.push({ ...c, editCount: e.count });
   }
   changedFiles.sort((a, b) => a.seq - b.seq);
+  const decided = /* @__PURE__ */ new Map();
+  for (const r of own4) {
+    if (r.kind !== "decision" || r.body === "") continue;
+    const key = r.key ?? r.body;
+    decided.set(key, { row: r, count: (decided.get(key)?.count ?? 0) + 1 });
+  }
+  const decisions = [];
+  for (const [key, d] of decided) decisions.push(make("decisions", d.row, "decided #" + d.row.seq + ": " + firstLine2(d.row.body), d.count, key));
+  decisions.sort((a, b) => a.seq - b.seq);
   const indexedSources = own4.filter((r) => r.kind === "index").map((r) => make("indexed_sources", r, "indexed " + (r.key ?? ""), 1, r.key));
   const set2 = {
     lastRequest,
     openErrors: capSection(openErrors),
     changedFiles: capSection(changedFiles),
+    decisions: capSection(decisions),
     earlierRequests: capSection(earlierRequests),
     indexedSources: capSection(indexedSources)
   };
-  const rest = [...set2.openErrors, ...set2.changedFiles, ...set2.earlierRequests, ...set2.indexedSources];
+  const rest = [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources];
   const total = rest.length + (lastRequest === null ? 0 : 1);
   if (total <= MAX_CANDIDATES_TOTAL) return set2;
   const drop = new Set(rest.map((c) => c.seq).sort((a, b) => a - b).slice(0, total - MAX_CANDIDATES_TOTAL));
@@ -44554,6 +44564,7 @@ function buildCandidates(rows, sessionId) {
     lastRequest,
     openErrors: set2.openErrors.filter((c) => !drop.has(c.seq)),
     changedFiles: set2.changedFiles.filter((c) => !drop.has(c.seq)),
+    decisions: set2.decisions.filter((c) => !drop.has(c.seq)),
     earlierRequests: set2.earlierRequests.filter((c) => !drop.has(c.seq)),
     indexedSources: set2.indexedSources.filter((c) => !drop.has(c.seq))
   };
@@ -44562,7 +44573,7 @@ function buildCandidates(rows, sessionId) {
 // src/core/compaction/score.ts
 function scoreCandidate(input) {
   if (!Object.hasOwn(WEIGHT, input.section)) {
-    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, prompt, edit and index rows are scored (ADR-0009 \xA73).`);
+    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, decision, prompt, edit and index rows are scored (ADR-0009 \xA73, DECISIONS-r11).`);
   }
   const age = Math.max(0, input.currentTurn - input.itemTurn);
   const decay = DECAY_X1000[Math.min(age, DECAY_X1000.length - 1)];
@@ -44579,6 +44590,8 @@ function weightKey(section) {
       return "toolerr";
     case "changed_files":
       return "edit";
+    case "decisions":
+      return "decision";
     case "indexed_sources":
       return "index";
   }
@@ -44613,7 +44626,7 @@ function renderState(rows, turn) {
   const pinnedLine = set2.lastRequest === null ? null : lineOf2(set2.lastRequest);
   if (pinnedLine !== null) used += bytesOf(pinnedLine) + 1;
   const remaining = scoreCandidates(
-    [...set2.openErrors, ...set2.changedFiles, ...set2.earlierRequests, ...set2.indexedSources],
+    [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources],
     turn
   );
   const k = /* @__PURE__ */ new Map();
@@ -44642,7 +44655,7 @@ function renderState(rows, turn) {
   }
   const lines = [openTag];
   if (pinnedLine !== null) lines.push(pinnedLine);
-  for (const section of ["open_errors", "changed_files", "earlier_requests", "indexed_sources"]) {
+  for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"]) {
     for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf2(c));
   }
   const queries = [];

@@ -9,7 +9,7 @@ var REPORT_CAP = 4096;
 var INDEX_WRITE_CHUNK = 1048576;
 var MAX_CHUNK_BYTES = 4096;
 var READ_MAX_LINES = 200;
-var WEIGHT = Object.freeze({ toolerr: 900, prompt: 500, edit: 400, index: 200 });
+var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
   1e3,
   881,
@@ -1001,7 +1001,7 @@ var ADAPTERS = Object.freeze([
     toolNamePrefix: TOOL_NAME_PREFIX7,
     nativeTools: { shell: [] },
     execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
+    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
@@ -3121,7 +3121,7 @@ function present2(v) {
 function dirOf(kind, src) {
   switch (kind) {
     case "env:CLAUDE_PROJECT_DIR":
-      return present2(src.env.CLAUDE_PROJECT_DIR);
+      return present2(src.env.CLAUDE_PROJECT_DIR) ?? present2(src.cwd) ?? process.cwd();
     case "arg:--agent+cwd":
     case "spawn-cwd":
       return present2(src.cwd);

@@ -1,8 +1,9 @@
 {
+  "hooks": "hooks/qwen.json",
   "mcpServers": {
     "context-mode": {
       "args": [
-        "server.mjs",
+        "${extensionPath}${/}server.mjs",
         "--agent",
         "qwen"
       ],

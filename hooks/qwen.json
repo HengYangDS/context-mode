@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "node hook.mjs --agent qwen",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hook.mjs\" --agent qwen",
             "timeout": 5,
             "type": "command"
           }
@@ -16,7 +16,7 @@
       {
         "hooks": [
           {
-            "command": "node hook.mjs --agent qwen",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hook.mjs\" --agent qwen",
             "timeout": 5,
             "type": "command"
           }
@@ -28,7 +28,7 @@
       {
         "hooks": [
           {
-            "command": "node hook.mjs --agent qwen",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hook.mjs\" --agent qwen",
             "timeout": 5,
             "type": "command"
           }
@@ -39,7 +39,7 @@
       {
         "hooks": [
           {
-            "command": "node hook.mjs --agent qwen",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hook.mjs\" --agent qwen",
             "timeout": 5,
             "type": "command"
           }

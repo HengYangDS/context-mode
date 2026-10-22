@@ -11163,7 +11163,7 @@ var SNIPPET_MAX_BYTES = 800;
 var READ_MAX_LINES = 200;
 var MAX_CANDIDATES = 85;
 var MAX_CANDIDATES_TOTAL = 340;
-var WEIGHT = Object.freeze({ toolerr: 900, prompt: 500, edit: 400, index: 200 });
+var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var RATIO_SECTION_DECAY = 0.7;
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -11416,6 +11416,14 @@ var COMPACT_STATE_KEY = "compact-state";
 var PENDING_COMPACT_KEY = "pending-compact";
 var PENDING_COMPACT_META_PREFIX = "pending_compact:";
 var PENDING_COMPACT_FLAG = "1";
+var RECALL_BUDGET_BYTES = 2048;
+var RECALL_MIN_SCORE = 5;
+var RECALL_MAX_ROWS = 340;
+var COMPACTED_META_PREFIX = "compacted:";
+var RECALL_SEEN_META_PREFIX = "recall_seen:";
+var RECALL_OPEN_TAG = "<context_mode_recall>";
+var RECALL_CLOSE_TAG = "</context_mode_recall>";
+var RECALL_KEY = "recall";
 var RESUME_HINT = "This session may have run before. Call {prefix}ctx_resume for a summary of what happened.";
 var SUBAGENT_SOURCE_PREFIX = "subagent:";
 var RUN_WRAPPER_FILE = "run.mjs";
@@ -11452,7 +11460,7 @@ var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "bcda65610549145347604af51b645f0bfbb46e9f" : void 0;
+var BUNDLE_SHA = true ? "bcf7e4062145813f0277008bbe823942e66ca232" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -12475,7 +12483,7 @@ var ADAPTERS = Object.freeze([
     toolNamePrefix: TOOL_NAME_PREFIX8,
     nativeTools: { shell: [] },
     execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
+    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
@@ -12537,6 +12545,10 @@ var BY_ID = new Map(ADAPTERS.map((r) => [r.id, r]));
 var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "pi"]);
 function hasReplace(row5) {
   return REPLACE_ROWS.has(row5.id);
+}
+var RECALL_ROWS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "zcode"]);
+function hasRecall(row5) {
+  return RECALL_ROWS.has(row5.id);
 }
 function getAdapter(id) {
   return BY_ID.get(id);
@@ -14383,7 +14395,7 @@ function present2(v) {
 function dirOf(kind, src) {
   switch (kind) {
     case "env:CLAUDE_PROJECT_DIR":
-      return present2(src.env.CLAUDE_PROJECT_DIR);
+      return present2(src.env.CLAUDE_PROJECT_DIR) ?? present2(src.cwd) ?? process.cwd();
     case "arg:--agent+cwd":
     case "spawn-cwd":
       return present2(src.cwd);
@@ -14778,6 +14790,10 @@ function readLastPrompt(db, sessionId) {
   const row5 = db.raw.prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq DESC LIMIT 1").get(sessionId);
   return row5 === void 0 ? "" : row5.body;
 }
+function readRecallRows(db, sessionId, worktree, limit) {
+  if (sessionId === "") return [];
+  return db.raw.prepare("SELECT * FROM events WHERE kind <> 'cost' AND (session_id = ? OR worktree = ?) ORDER BY seq DESC LIMIT ?").all(sessionId, worktree, limit);
+}
 
 // src/core/compaction/candidates.ts
 function firstLine2(body) {
@@ -14793,7 +14809,7 @@ function capSection(list3) {
   return list3.length > MAX_CANDIDATES ? list3.slice(list3.length - MAX_CANDIDATES) : list3;
 }
 function emptySet() {
-  return { lastRequest: null, openErrors: [], changedFiles: [], earlierRequests: [], indexedSources: [] };
+  return { lastRequest: null, openErrors: [], changedFiles: [], decisions: [], earlierRequests: [], indexedSources: [] };
 }
 function buildCandidates(rows, sessionId) {
   if (!sessionId) return emptySet();
@@ -14829,15 +14845,25 @@ function buildCandidates(rows, sessionId) {
     changedFiles.push({ ...c, editCount: e.count });
   }
   changedFiles.sort((a, b) => a.seq - b.seq);
+  const decided = /* @__PURE__ */ new Map();
+  for (const r of own4) {
+    if (r.kind !== "decision" || r.body === "") continue;
+    const key = r.key ?? r.body;
+    decided.set(key, { row: r, count: (decided.get(key)?.count ?? 0) + 1 });
+  }
+  const decisions = [];
+  for (const [key, d] of decided) decisions.push(make("decisions", d.row, "decided #" + d.row.seq + ": " + firstLine2(d.row.body), d.count, key));
+  decisions.sort((a, b) => a.seq - b.seq);
   const indexedSources = own4.filter((r) => r.kind === "index").map((r) => make("indexed_sources", r, "indexed " + (r.key ?? ""), 1, r.key));
   const set2 = {
     lastRequest,
     openErrors: capSection(openErrors),
     changedFiles: capSection(changedFiles),
+    decisions: capSection(decisions),
     earlierRequests: capSection(earlierRequests),
     indexedSources: capSection(indexedSources)
   };
-  const rest = [...set2.openErrors, ...set2.changedFiles, ...set2.earlierRequests, ...set2.indexedSources];
+  const rest = [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources];
   const total = rest.length + (lastRequest === null ? 0 : 1);
   if (total <= MAX_CANDIDATES_TOTAL) return set2;
   const drop = new Set(rest.map((c) => c.seq).sort((a, b) => a - b).slice(0, total - MAX_CANDIDATES_TOTAL));
@@ -14845,6 +14871,7 @@ function buildCandidates(rows, sessionId) {
     lastRequest,
     openErrors: set2.openErrors.filter((c) => !drop.has(c.seq)),
     changedFiles: set2.changedFiles.filter((c) => !drop.has(c.seq)),
+    decisions: set2.decisions.filter((c) => !drop.has(c.seq)),
     earlierRequests: set2.earlierRequests.filter((c) => !drop.has(c.seq)),
     indexedSources: set2.indexedSources.filter((c) => !drop.has(c.seq))
   };
@@ -14853,7 +14880,7 @@ function buildCandidates(rows, sessionId) {
 // src/core/compaction/score.ts
 function scoreCandidate(input) {
   if (!Object.hasOwn(WEIGHT, input.section)) {
-    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, prompt, edit and index rows are scored (ADR-0009 \xA73).`);
+    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, decision, prompt, edit and index rows are scored (ADR-0009 \xA73, DECISIONS-r11).`);
   }
   const age = Math.max(0, input.currentTurn - input.itemTurn);
   const decay = DECAY_X1000[Math.min(age, DECAY_X1000.length - 1)];
@@ -14870,6 +14897,8 @@ function weightKey(section) {
       return "toolerr";
     case "changed_files":
       return "edit";
+    case "decisions":
+      return "decision";
     case "indexed_sources":
       return "index";
   }
@@ -14904,7 +14933,7 @@ function renderState(rows, turn) {
   const pinnedLine = set2.lastRequest === null ? null : lineOf(set2.lastRequest);
   if (pinnedLine !== null) used += bytesOf(pinnedLine) + 1;
   const remaining = scoreCandidates(
-    [...set2.openErrors, ...set2.changedFiles, ...set2.earlierRequests, ...set2.indexedSources],
+    [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources],
     turn
   );
   const k = /* @__PURE__ */ new Map();
@@ -14933,7 +14962,7 @@ function renderState(rows, turn) {
   }
   const lines = [openTag];
   if (pinnedLine !== null) lines.push(pinnedLine);
-  for (const section of ["open_errors", "changed_files", "earlier_requests", "indexed_sources"]) {
+  for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"]) {
     for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c));
   }
   const queries = [];
@@ -14946,239 +14975,6 @@ function renderState(rows, turn) {
   }
   lines.push(moreLine(queries), STATE_CLOSE_TAG);
   return lines.join("\n");
-}
-
-// src/core/index/chunk.ts
-var VOID_TAGS = /* @__PURE__ */ new Set([
-  "area",
-  "base",
-  "br",
-  "col",
-  "embed",
-  "hr",
-  "img",
-  "input",
-  "link",
-  "meta",
-  "param",
-  "source",
-  "track",
-  "wbr"
-]);
-var RAW_TAGS = /* @__PURE__ */ new Set(["script", "style"]);
-var encoder = new TextEncoder();
-function chunkText(text, kind, maxBytes = MAX_CHUNK_BYTES) {
-  const src = normalize(text);
-  if (src.length === 0) return [];
-  const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, kind === "md");
-  const cap = Math.max(4, Math.min(MAX_CHUNK_BYTES, Math.floor(maxBytes)));
-  return merge2(src, blocks, kind !== "text", cap, cap < MAX_CHUNK_BYTES);
-}
-function normalize(text) {
-  const lf = text.split("\r\n").join("\n");
-  return lf.startsWith("\uFEFF") ? lf.slice(1) : lf;
-}
-function lineBlocks(src, md) {
-  const out = [];
-  let start = -1;
-  let end = -1;
-  let inTable = false;
-  let fence = "";
-  const close = () => {
-    if (start >= 0) out.push({ start, end });
-    start = -1;
-  };
-  const add = (from, to, table) => {
-    if (start < 0) start = from;
-    end = to;
-    inTable = table;
-  };
-  let pos = 0;
-  while (pos <= src.length) {
-    const nl = src.indexOf("\n", pos);
-    const eol = nl < 0 ? src.length : nl;
-    const line = src.slice(pos, eol);
-    if (fence !== "") {
-      add(pos, eol, false);
-      if (closesFence(line, fence)) fence = "";
-    } else if (line.length === 0) {
-      close();
-    } else {
-      const opener = md ? fenceOf(line) : "";
-      const table = md && opener === "" && line.includes("|");
-      if (md && start >= 0 && table !== inTable) close();
-      add(pos, eol, table);
-      fence = opener;
-    }
-    pos = eol + 1;
-  }
-  close();
-  return out;
-}
-function fenceOf(line) {
-  const t = line.trimStart();
-  if (!t.startsWith("```") && !t.startsWith("~~~")) return "";
-  let n = 0;
-  while (n < t.length && t[n] === t[0]) n += 1;
-  return t.slice(0, n);
-}
-function closesFence(line, fence) {
-  const t = line.trim();
-  if (t.length < fence.length) return false;
-  for (let i = 0; i < t.length; i += 1) if (t[i] !== fence[0]) return false;
-  return true;
-}
-function htmlBlocks(src) {
-  const out = [];
-  const open3 = /* @__PURE__ */ new Map();
-  let depth = 0;
-  let blockStart = 0;
-  let i = 0;
-  const split = (at2) => {
-    pushTrimmed(out, src, blockStart, at2);
-    blockStart = at2;
-  };
-  while (i < src.length) {
-    if (src[i] !== "<") {
-      i += 1;
-      continue;
-    }
-    if (src.startsWith("<!--", i)) {
-      const e = src.indexOf("-->", i + "<!--".length);
-      i = e < 0 ? src.length : e + "-->".length;
-      continue;
-    }
-    const tag2 = readTag(src, i);
-    if (tag2 === void 0) {
-      i += 1;
-      continue;
-    }
-    i = tag2.end;
-    if (tag2.close) {
-      const n = open3.get(tag2.name) ?? 0;
-      if (n === 0) continue;
-      open3.set(tag2.name, n - 1);
-      depth -= 1;
-      if (depth === 0) split(i);
-      continue;
-    }
-    if (tag2.selfClose || VOID_TAGS.has(tag2.name)) continue;
-    if (RAW_TAGS.has(tag2.name)) {
-      i = rawEnd(src, i, tag2.name);
-      if (depth === 0) split(i);
-      continue;
-    }
-    open3.set(tag2.name, (open3.get(tag2.name) ?? 0) + 1);
-    depth += 1;
-  }
-  pushTrimmed(out, src, blockStart, src.length);
-  return out;
-}
-function isLetter(c) {
-  return c >= "a" && c <= "z" || c >= "A" && c <= "Z";
-}
-function isNameChar(c) {
-  return isLetter(c) || c >= "0" && c <= "9" || c === "-" || c === ":";
-}
-function readTag(src, i) {
-  let j = i + 1;
-  const close = src[j] === "/";
-  if (close) j += 1;
-  if (j >= src.length || !isLetter(src[j])) return void 0;
-  const nameStart = j;
-  while (j < src.length && isNameChar(src[j])) j += 1;
-  const name = src.slice(nameStart, j).toLowerCase();
-  let quote = "";
-  while (j < src.length) {
-    const c = src[j];
-    if (quote !== "") {
-      if (c === quote) quote = "";
-    } else if (c === '"' || c === "'") {
-      quote = c;
-    } else if (c === ">") {
-      break;
-    }
-    j += 1;
-  }
-  if (j >= src.length) return void 0;
-  return { name, close, selfClose: src[j - 1] === "/", end: j + 1 };
-}
-function rawEnd(src, from, name) {
-  let k = src.indexOf("</", from);
-  while (k >= 0) {
-    const after = k + "</".length + name.length;
-    const named = src.slice(k + "</".length, after).toLowerCase() === name;
-    if (named && (after >= src.length || !isNameChar(src[after]))) {
-      const gt = src.indexOf(">", after);
-      return gt < 0 ? src.length : gt + 1;
-    }
-    k = src.indexOf("</", k + "</".length);
-  }
-  return src.length;
-}
-function isSpace(c) {
-  return c === " " || c === "\n" || c === "	" || c === "\f" || c === "\r";
-}
-function pushTrimmed(out, src, start, end) {
-  let s = start;
-  let e = end;
-  while (s < e && isSpace(src[s])) s += 1;
-  while (e > s && isSpace(src[e - 1])) e -= 1;
-  if (s < e) out.push({ start: s, end: e });
-}
-function utf8Bytes(s) {
-  return Buffer.byteLength(s, "utf8");
-}
-function cutPoint(src, start, end, scratch) {
-  let limit = Math.min(end, start + scratch.length);
-  if (limit < end && [...src.slice(limit - 1, limit + 1)].length === 1) limit -= 1;
-  const r = encoder.encodeInto(src.slice(start, limit), scratch);
-  return { end: start + r.read, written: r.written };
-}
-function merge2(src, blocks, join24, cap, lineCut) {
-  const out = [];
-  const scratch = new Uint8Array(cap);
-  let cur;
-  let curBytes = 0;
-  const emit = (start, end, bytes3) => {
-    out.push({ ord: out.length, text: src.slice(start, end), bytes: bytes3 });
-  };
-  for (const b of blocks) {
-    if (cur !== void 0 && !join24) {
-      emit(cur.start, cur.end, curBytes);
-      cur = void 0;
-    }
-    if (cur !== void 0) {
-      const add = utf8Bytes(src.slice(cur.end, b.end));
-      if (curBytes + add <= cap) {
-        cur.end = b.end;
-        curBytes += add;
-        continue;
-      }
-      emit(cur.start, cur.end, curBytes);
-      cur = void 0;
-    }
-    let start = b.start;
-    let bytes3 = utf8Bytes(src.slice(b.start, b.end));
-    while (bytes3 > cap) {
-      const cut = cutPoint(src, start, b.end, scratch);
-      const nl = lineCut ? src.lastIndexOf("\n", cut.end - 1) : -1;
-      if (nl > start) {
-        const w = utf8Bytes(src.slice(start, nl + 1));
-        emit(start, nl + 1, w);
-        start = nl + 1;
-        bytes3 -= w;
-        continue;
-      }
-      emit(start, cut.end, cut.written);
-      start = cut.end;
-      bytes3 -= cut.written;
-    }
-    cur = { start, end: b.end };
-    curBytes = bytes3;
-  }
-  if (cur !== void 0) emit(cur.start, cur.end, curBytes);
-  return out;
 }
 
 // src/core/store/fts.ts
@@ -15451,6 +15247,270 @@ function rankTexts(texts, q, mode = "all") {
   }
 }
 
+// src/core/compaction/recall.ts
+var NONE2 = { text: "", seqs: [] };
+function bytesOf2(s) {
+  return Buffer.byteLength(s, "utf8");
+}
+function textOf(r) {
+  return [r.key ?? "", r.path ?? "", r.body].filter((t) => t !== "").join("\n");
+}
+function recallLine(r) {
+  return "#" + r.seq + " " + r.kind + (r.tool === null ? "" : " " + r.tool) + ": " + textOf(r);
+}
+function pickRecall(rows, prompt, seen) {
+  if (prompt.trim() === "") return NONE2;
+  const pool = rows.filter((r) => !seen.has(r.seq) && r.kind !== "cost" && !(r.kind === "prompt" && r.body === prompt) && textOf(r) !== "");
+  if (pool.length === 0) return NONE2;
+  const scores = rankTexts(pool.map(textOf), prompt, "any");
+  const order = pool.map((r, i) => ({ r, score: scores[i] })).filter((x) => x.score >= RECALL_MIN_SCORE).sort((a, b) => b.score - a.score || b.r.seq - a.r.seq);
+  if (order.length === 0) return NONE2;
+  let used = bytesOf2(RECALL_OPEN_TAG) + 1 + bytesOf2(RECALL_CLOSE_TAG);
+  const taken = [];
+  for (const { r } of order) {
+    const cost = bytesOf2(recallLine(r)) + 1;
+    if (used + cost > RECALL_BUDGET_BYTES) continue;
+    used += cost;
+    taken.push(r);
+  }
+  if (taken.length === 0) return NONE2;
+  taken.sort((a, b) => a.seq - b.seq);
+  return { text: [RECALL_OPEN_TAG, ...taken.map(recallLine), RECALL_CLOSE_TAG].join("\n"), seqs: taken.map((r) => r.seq) };
+}
+
+// src/core/index/chunk.ts
+var VOID_TAGS = /* @__PURE__ */ new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "param",
+  "source",
+  "track",
+  "wbr"
+]);
+var RAW_TAGS = /* @__PURE__ */ new Set(["script", "style"]);
+var encoder = new TextEncoder();
+function chunkText(text, kind, maxBytes = MAX_CHUNK_BYTES) {
+  const src = normalize(text);
+  if (src.length === 0) return [];
+  const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, kind === "md");
+  const cap = Math.max(4, Math.min(MAX_CHUNK_BYTES, Math.floor(maxBytes)));
+  return merge2(src, blocks, kind !== "text", cap, cap < MAX_CHUNK_BYTES);
+}
+function normalize(text) {
+  const lf = text.split("\r\n").join("\n");
+  return lf.startsWith("\uFEFF") ? lf.slice(1) : lf;
+}
+function lineBlocks(src, md) {
+  const out = [];
+  let start = -1;
+  let end = -1;
+  let inTable = false;
+  let fence = "";
+  const close = () => {
+    if (start >= 0) out.push({ start, end });
+    start = -1;
+  };
+  const add = (from, to, table) => {
+    if (start < 0) start = from;
+    end = to;
+    inTable = table;
+  };
+  let pos = 0;
+  while (pos <= src.length) {
+    const nl = src.indexOf("\n", pos);
+    const eol = nl < 0 ? src.length : nl;
+    const line = src.slice(pos, eol);
+    if (fence !== "") {
+      add(pos, eol, false);
+      if (closesFence(line, fence)) fence = "";
+    } else if (line.length === 0) {
+      close();
+    } else {
+      const opener = md ? fenceOf(line) : "";
+      const table = md && opener === "" && line.includes("|");
+      if (md && start >= 0 && table !== inTable) close();
+      add(pos, eol, table);
+      fence = opener;
+    }
+    pos = eol + 1;
+  }
+  close();
+  return out;
+}
+function fenceOf(line) {
+  const t = line.trimStart();
+  if (!t.startsWith("```") && !t.startsWith("~~~")) return "";
+  let n = 0;
+  while (n < t.length && t[n] === t[0]) n += 1;
+  return t.slice(0, n);
+}
+function closesFence(line, fence) {
+  const t = line.trim();
+  if (t.length < fence.length) return false;
+  for (let i = 0; i < t.length; i += 1) if (t[i] !== fence[0]) return false;
+  return true;
+}
+function htmlBlocks(src) {
+  const out = [];
+  const open3 = /* @__PURE__ */ new Map();
+  let depth = 0;
+  let blockStart = 0;
+  let i = 0;
+  const split = (at2) => {
+    pushTrimmed(out, src, blockStart, at2);
+    blockStart = at2;
+  };
+  while (i < src.length) {
+    if (src[i] !== "<") {
+      i += 1;
+      continue;
+    }
+    if (src.startsWith("<!--", i)) {
+      const e = src.indexOf("-->", i + "<!--".length);
+      i = e < 0 ? src.length : e + "-->".length;
+      continue;
+    }
+    const tag2 = readTag(src, i);
+    if (tag2 === void 0) {
+      i += 1;
+      continue;
+    }
+    i = tag2.end;
+    if (tag2.close) {
+      const n = open3.get(tag2.name) ?? 0;
+      if (n === 0) continue;
+      open3.set(tag2.name, n - 1);
+      depth -= 1;
+      if (depth === 0) split(i);
+      continue;
+    }
+    if (tag2.selfClose || VOID_TAGS.has(tag2.name)) continue;
+    if (RAW_TAGS.has(tag2.name)) {
+      i = rawEnd(src, i, tag2.name);
+      if (depth === 0) split(i);
+      continue;
+    }
+    open3.set(tag2.name, (open3.get(tag2.name) ?? 0) + 1);
+    depth += 1;
+  }
+  pushTrimmed(out, src, blockStart, src.length);
+  return out;
+}
+function isLetter(c) {
+  return c >= "a" && c <= "z" || c >= "A" && c <= "Z";
+}
+function isNameChar(c) {
+  return isLetter(c) || c >= "0" && c <= "9" || c === "-" || c === ":";
+}
+function readTag(src, i) {
+  let j = i + 1;
+  const close = src[j] === "/";
+  if (close) j += 1;
+  if (j >= src.length || !isLetter(src[j])) return void 0;
+  const nameStart = j;
+  while (j < src.length && isNameChar(src[j])) j += 1;
+  const name = src.slice(nameStart, j).toLowerCase();
+  let quote = "";
+  while (j < src.length) {
+    const c = src[j];
+    if (quote !== "") {
+      if (c === quote) quote = "";
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === ">") {
+      break;
+    }
+    j += 1;
+  }
+  if (j >= src.length) return void 0;
+  return { name, close, selfClose: src[j - 1] === "/", end: j + 1 };
+}
+function rawEnd(src, from, name) {
+  let k = src.indexOf("</", from);
+  while (k >= 0) {
+    const after = k + "</".length + name.length;
+    const named = src.slice(k + "</".length, after).toLowerCase() === name;
+    if (named && (after >= src.length || !isNameChar(src[after]))) {
+      const gt = src.indexOf(">", after);
+      return gt < 0 ? src.length : gt + 1;
+    }
+    k = src.indexOf("</", k + "</".length);
+  }
+  return src.length;
+}
+function isSpace(c) {
+  return c === " " || c === "\n" || c === "	" || c === "\f" || c === "\r";
+}
+function pushTrimmed(out, src, start, end) {
+  let s = start;
+  let e = end;
+  while (s < e && isSpace(src[s])) s += 1;
+  while (e > s && isSpace(src[e - 1])) e -= 1;
+  if (s < e) out.push({ start: s, end: e });
+}
+function utf8Bytes(s) {
+  return Buffer.byteLength(s, "utf8");
+}
+function cutPoint(src, start, end, scratch) {
+  let limit = Math.min(end, start + scratch.length);
+  if (limit < end && [...src.slice(limit - 1, limit + 1)].length === 1) limit -= 1;
+  const r = encoder.encodeInto(src.slice(start, limit), scratch);
+  return { end: start + r.read, written: r.written };
+}
+function merge2(src, blocks, join24, cap, lineCut) {
+  const out = [];
+  const scratch = new Uint8Array(cap);
+  let cur;
+  let curBytes = 0;
+  const emit = (start, end, bytes3) => {
+    out.push({ ord: out.length, text: src.slice(start, end), bytes: bytes3 });
+  };
+  for (const b of blocks) {
+    if (cur !== void 0 && !join24) {
+      emit(cur.start, cur.end, curBytes);
+      cur = void 0;
+    }
+    if (cur !== void 0) {
+      const add = utf8Bytes(src.slice(cur.end, b.end));
+      if (curBytes + add <= cap) {
+        cur.end = b.end;
+        curBytes += add;
+        continue;
+      }
+      emit(cur.start, cur.end, curBytes);
+      cur = void 0;
+    }
+    let start = b.start;
+    let bytes3 = utf8Bytes(src.slice(b.start, b.end));
+    while (bytes3 > cap) {
+      const cut = cutPoint(src, start, b.end, scratch);
+      const nl = lineCut ? src.lastIndexOf("\n", cut.end - 1) : -1;
+      if (nl > start) {
+        const w = utf8Bytes(src.slice(start, nl + 1));
+        emit(start, nl + 1, w);
+        start = nl + 1;
+        bytes3 -= w;
+        continue;
+      }
+      emit(start, cut.end, cut.written);
+      start = cut.end;
+      bytes3 -= cut.written;
+    }
+    cur = { start, end: b.end };
+    curBytes = bytes3;
+  }
+  if (cur !== void 0) emit(cur.start, cur.end, curBytes);
+  return out;
+}
+
 // src/core/index/select.ts
 var READ_CHUNKS = "SELECT ord, body FROM chunks WHERE source_id = ?";
 var READ_LABEL = "SELECT label FROM sources WHERE id = ?";
@@ -15616,7 +15676,10 @@ function str2(v) {
   return typeof v === "string" ? v : "";
 }
 async function handleHook(agent, raw, env) {
-  if (!isAgentId(agent)) return EMPTY4;
+  if (!isAgentId(agent)) {
+    process.stderr.write("hooks: unknown agent " + JSON.stringify(agent) + "\n");
+    return EMPTY4;
+  }
   const row5 = getAdapter(agent);
   let ev;
   try {
@@ -15628,7 +15691,8 @@ async function handleHook(agent, raw, env) {
   let project;
   try {
     project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd });
-  } catch {
+  } catch (err) {
+    process.stderr.write("hooks: no project: " + String(err.code ?? "ERROR") + " " + message(err) + "\n");
     return row5.encode(ev, ALLOW2);
   }
   let decision;
@@ -15651,7 +15715,7 @@ function dispatch(ev, row5, project, env) {
     case "PostToolUse":
       return postToolUse(ev, row5, project, env);
     case "PreCompact":
-      return preCompact(ev, project);
+      return preCompact(ev, row5, project);
     case "Usage":
       return usage(ev, project);
   }
@@ -15665,6 +15729,7 @@ function compactText(db, ev, row5) {
   return renderState(readSessionEvents(db, ev.sessionId), ev.turn ?? 0);
 }
 async function sessionStart(ev, row5, project) {
+  if (ev.source === "compact" && hasRecall(row5)) markCompacted(await openDb(project), ev.sessionId);
   if (ev.source === "compact" && row5.compactDelivery === "sessionstart") {
     const db2 = await openDb(project);
     if (!shouldHint(db2, ev.sessionId, COMPACT_STATE_KEY)) return ALLOW2;
@@ -15696,10 +15761,36 @@ async function userPromptSubmit(ev, row5, project) {
     returned_bytes: 0
   });
   echoDetached(ev, project, body);
-  if (row5.compactDelivery !== "pending-flag") return ALLOW2;
+  if (row5.compactDelivery === "pending-flag") {
+    const db = await openDb(project);
+    if (metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) !== null) {
+      return { kind: "hint", text: compactText(db, ev, row5), onceKey: PENDING_COMPACT_KEY };
+    }
+  }
+  return recall(ev, row5, project, body);
+}
+function markCompacted(db, sessionId) {
+  if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+}
+function seenSeqs(value) {
+  if (value === null) return [];
+  try {
+    const v = JSON.parse(value);
+    return Array.isArray(v) ? v.filter((n) => typeof n === "number") : [];
+  } catch {
+    return [];
+  }
+}
+async function recall(ev, row5, project, prompt) {
+  if (!hasRecall(row5) || ev.sessionId === "") return ALLOW2;
   const db = await openDb(project);
-  if (metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) === null) return ALLOW2;
-  return { kind: "hint", text: compactText(db, ev, row5), onceKey: PENDING_COMPACT_KEY };
+  if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW2;
+  const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
+  const seen = seenSeqs(metaGet(db, seenKey));
+  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen));
+  if (picked.text === "") return ALLOW2;
+  metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
 }
 function optionsKey(sessionId) {
   return DECISION_SOURCE + ":" + DECISION_OPTION_KEY + ":" + sessionId;
@@ -15895,9 +15986,10 @@ function indexDetached(project, sessionId, label, text, chunks) {
     process.stderr.write("hooks: index write failed: " + message(err) + "\n");
   });
 }
-async function preCompact(ev, project) {
+async function preCompact(ev, row5, project) {
   const db = await openDb(project);
   metaSet(db, PENDING_COMPACT_META_PREFIX + ev.sessionId, PENDING_COMPACT_FLAG);
+  if (hasRecall(row5)) markCompacted(db, ev.sessionId);
   return ALLOW2;
 }
 function usage(ev, project) {
@@ -22782,17 +22874,17 @@ function cloneIssues(issues) {
   return issues.map((iss) => iss.path ? { ...iss, path: iss.path.slice() } : { ...iss });
 }
 var recursive = /* @__PURE__ */ new WeakMap();
-var NONE2 = 0;
+var NONE3 = 0;
 var ASSUMED = 1;
 var PROVEN = 2;
 function isRecursive(inst, stack, resolve5) {
   const cached4 = recursive.get(inst);
   if (cached4 !== void 0)
-    return cached4 ? PROVEN : NONE2;
+    return cached4 ? PROVEN : NONE3;
   if (stack.has(inst))
     return PROVEN;
   stack.add(inst);
-  let result = NONE2;
+  let result = NONE3;
   const check2 = (child) => {
     if (result !== PROVEN && child?._zod) {
       const answer2 = isRecursive(child, stack, resolve5);
@@ -22801,12 +22893,12 @@ function isRecursive(inst, stack, resolve5) {
     }
   };
   const shape = (sh, spread) => {
-    let answer2 = NONE2;
+    let answer2 = NONE3;
     for (const key of Reflect.ownKeys(sh)) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve5) : NONE2;
+      const child = desc.get ? ASSUMED : desc.value?._zod ? isRecursive(desc.value, stack, resolve5) : NONE3;
       if (child > answer2)
         answer2 = child;
     }
@@ -22970,7 +23062,7 @@ var memo = {
       const wrapped = (payload, ctx) => {
         if (isRecursiveInst === void 0) {
           const walked = isRecursive(inst, /* @__PURE__ */ new Set(), false);
-          if (walked === NONE2) {
+          if (walked === NONE3) {
             inst._zod.parse = base;
             if (inst._zod.run === wrapped)
               inst._zod.run = base;
@@ -30311,17 +30403,17 @@ function cloneIssues2(issues) {
   return issues.map((iss) => iss.path ? { ...iss, path: iss.path.slice() } : { ...iss });
 }
 var recursive2 = /* @__PURE__ */ new WeakMap();
-var NONE3 = 0;
+var NONE4 = 0;
 var ASSUMED2 = 1;
 var PROVEN2 = 2;
 function isRecursive2(inst, stack, resolve5) {
   const cached4 = recursive2.get(inst);
   if (cached4 !== void 0)
-    return cached4 ? PROVEN2 : NONE3;
+    return cached4 ? PROVEN2 : NONE4;
   if (stack.has(inst))
     return PROVEN2;
   stack.add(inst);
-  let result = NONE3;
+  let result = NONE4;
   const check2 = (child) => {
     if (result !== PROVEN2 && child?._zod) {
       const answer2 = isRecursive2(child, stack, resolve5);
@@ -30330,12 +30422,12 @@ function isRecursive2(inst, stack, resolve5) {
     }
   };
   const shape = (sh, spread) => {
-    let answer2 = NONE3;
+    let answer2 = NONE4;
     for (const key of Reflect.ownKeys(sh)) {
       const desc = Object.getOwnPropertyDescriptor(sh, key);
       if (spread && !desc.enumerable)
         continue;
-      const child = desc.get ? ASSUMED2 : desc.value?._zod ? isRecursive2(desc.value, stack, resolve5) : NONE3;
+      const child = desc.get ? ASSUMED2 : desc.value?._zod ? isRecursive2(desc.value, stack, resolve5) : NONE4;
       if (child > answer2)
         answer2 = child;
     }
@@ -30499,7 +30591,7 @@ var memo2 = {
       const wrapped = (payload, ctx) => {
         if (isRecursiveInst === void 0) {
           const walked = isRecursive2(inst, /* @__PURE__ */ new Set(), false);
-          if (walked === NONE3) {
+          if (walked === NONE4) {
             inst._zod.parse = base;
             if (inst._zod.run === wrapped)
               inst._zod.run = base;
@@ -47668,7 +47760,7 @@ if (import.meta.main) {
 function str3(v) {
   return typeof v === "string" ? v : "";
 }
-function textOf(content) {
+function textOf2(content) {
   if (typeof content === "string") return content;
   if (!Array.isArray(content)) return "";
   return content.map((part) => part.type === "text" ? str3(part.text) : "").join("");
@@ -47777,7 +47869,7 @@ function piExtension(pi) {
       toolName: event.toolName,
       toolCallId: event.toolCallId,
       input: event.input,
-      content: textOf(event.content),
+      content: textOf2(event.content),
       isError: event.isError === true
     }, turn);
     if (out.stdout === "") return void 0;

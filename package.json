@@ -1,0 +1,14 @@
+{
+  "name": "context-mode",
+  "pi": {
+    "extensions": [
+      "./pi/index.js"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "private": true,
+  "type": "module",
+  "version": "2.0.0"
+}

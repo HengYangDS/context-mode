@@ -2,7 +2,7 @@
   "mcpServers": {
     "context-mode": {
       "args": [
-        "server.mjs",
+        "${extensionPath}${/}server.mjs",
         "--agent",
         "gemini"
       ],

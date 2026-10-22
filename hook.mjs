@@ -18,7 +18,7 @@ var MAX_CHUNK_BYTES = 4096;
 var READ_MAX_LINES = 200;
 var MAX_CANDIDATES = 85;
 var MAX_CANDIDATES_TOTAL = 340;
-var WEIGHT = Object.freeze({ toolerr: 900, prompt: 500, edit: 400, index: 200 });
+var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var RATIO_SECTION_DECAY = 0.7;
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -253,6 +253,14 @@ var COMPACT_STATE_KEY = "compact-state";
 var PENDING_COMPACT_KEY = "pending-compact";
 var PENDING_COMPACT_META_PREFIX = "pending_compact:";
 var PENDING_COMPACT_FLAG = "1";
+var RECALL_BUDGET_BYTES = 2048;
+var RECALL_MIN_SCORE = 5;
+var RECALL_MAX_ROWS = 340;
+var COMPACTED_META_PREFIX = "compacted:";
+var RECALL_SEEN_META_PREFIX = "recall_seen:";
+var RECALL_OPEN_TAG = "<context_mode_recall>";
+var RECALL_CLOSE_TAG = "</context_mode_recall>";
+var RECALL_KEY = "recall";
 var RESUME_HINT = "This session may have run before. Call {prefix}ctx_resume for a summary of what happened.";
 var SUBAGENT_SOURCE_PREFIX = "subagent:";
 var RUN_WRAPPER_FILE = "run.mjs";
@@ -1034,7 +1042,7 @@ var ADAPTERS = Object.freeze([
     toolNamePrefix: TOOL_NAME_PREFIX7,
     nativeTools: { shell: [] },
     execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
+    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
@@ -1096,6 +1104,10 @@ var BY_ID = new Map(ADAPTERS.map((r) => [r.id, r]));
 var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "pi"]);
 function hasReplace(row) {
   return REPLACE_ROWS.has(row.id);
+}
+var RECALL_ROWS = /* @__PURE__ */ new Set(["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "zcode"]);
+function hasRecall(row) {
+  return RECALL_ROWS.has(row.id);
 }
 function getAdapter(id) {
   return BY_ID.get(id);
@@ -3000,7 +3012,7 @@ function present2(v) {
 function dirOf(kind, src) {
   switch (kind) {
     case "env:CLAUDE_PROJECT_DIR":
-      return present2(src.env.CLAUDE_PROJECT_DIR);
+      return present2(src.env.CLAUDE_PROJECT_DIR) ?? present2(src.cwd) ?? process.cwd();
     case "arg:--agent+cwd":
     case "spawn-cwd":
       return present2(src.cwd);
@@ -3381,6 +3393,10 @@ function readLastPrompt(db, sessionId) {
   const row = db.raw.prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq DESC LIMIT 1").get(sessionId);
   return row === void 0 ? "" : row.body;
 }
+function readRecallRows(db, sessionId, worktree, limit) {
+  if (sessionId === "") return [];
+  return db.raw.prepare("SELECT * FROM events WHERE kind <> 'cost' AND (session_id = ? OR worktree = ?) ORDER BY seq DESC LIMIT ?").all(sessionId, worktree, limit);
+}
 
 // src/core/compaction/candidates.ts
 function firstLine2(body) {
@@ -3396,7 +3412,7 @@ function capSection(list2) {
   return list2.length > MAX_CANDIDATES ? list2.slice(list2.length - MAX_CANDIDATES) : list2;
 }
 function emptySet() {
-  return { lastRequest: null, openErrors: [], changedFiles: [], earlierRequests: [], indexedSources: [] };
+  return { lastRequest: null, openErrors: [], changedFiles: [], decisions: [], earlierRequests: [], indexedSources: [] };
 }
 function buildCandidates(rows, sessionId) {
   if (!sessionId) return emptySet();
@@ -3432,15 +3448,25 @@ function buildCandidates(rows, sessionId) {
     changedFiles.push({ ...c, editCount: e.count });
   }
   changedFiles.sort((a, b) => a.seq - b.seq);
+  const decided = /* @__PURE__ */ new Map();
+  for (const r of own2) {
+    if (r.kind !== "decision" || r.body === "") continue;
+    const key = r.key ?? r.body;
+    decided.set(key, { row: r, count: (decided.get(key)?.count ?? 0) + 1 });
+  }
+  const decisions = [];
+  for (const [key, d] of decided) decisions.push(make("decisions", d.row, "decided #" + d.row.seq + ": " + firstLine2(d.row.body), d.count, key));
+  decisions.sort((a, b) => a.seq - b.seq);
   const indexedSources = own2.filter((r) => r.kind === "index").map((r) => make("indexed_sources", r, "indexed " + (r.key ?? ""), 1, r.key));
   const set = {
     lastRequest,
     openErrors: capSection(openErrors),
     changedFiles: capSection(changedFiles),
+    decisions: capSection(decisions),
     earlierRequests: capSection(earlierRequests),
     indexedSources: capSection(indexedSources)
   };
-  const rest = [...set.openErrors, ...set.changedFiles, ...set.earlierRequests, ...set.indexedSources];
+  const rest = [...set.openErrors, ...set.changedFiles, ...set.decisions, ...set.earlierRequests, ...set.indexedSources];
   const total = rest.length + (lastRequest === null ? 0 : 1);
   if (total <= MAX_CANDIDATES_TOTAL) return set;
   const drop = new Set(rest.map((c) => c.seq).sort((a, b) => a - b).slice(0, total - MAX_CANDIDATES_TOTAL));
@@ -3448,6 +3474,7 @@ function buildCandidates(rows, sessionId) {
     lastRequest,
     openErrors: set.openErrors.filter((c) => !drop.has(c.seq)),
     changedFiles: set.changedFiles.filter((c) => !drop.has(c.seq)),
+    decisions: set.decisions.filter((c) => !drop.has(c.seq)),
     earlierRequests: set.earlierRequests.filter((c) => !drop.has(c.seq)),
     indexedSources: set.indexedSources.filter((c) => !drop.has(c.seq))
   };
@@ -3456,7 +3483,7 @@ function buildCandidates(rows, sessionId) {
 // src/core/compaction/score.ts
 function scoreCandidate(input) {
   if (!Object.hasOwn(WEIGHT, input.section)) {
-    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, prompt, edit and index rows are scored (ADR-0009 \xA73).`);
+    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, decision, prompt, edit and index rows are scored (ADR-0009 \xA73, DECISIONS-r11).`);
   }
   const age = Math.max(0, input.currentTurn - input.itemTurn);
   const decay = DECAY_X1000[Math.min(age, DECAY_X1000.length - 1)];
@@ -3473,6 +3500,8 @@ function weightKey(section) {
       return "toolerr";
     case "changed_files":
       return "edit";
+    case "decisions":
+      return "decision";
     case "indexed_sources":
       return "index";
   }
@@ -3507,7 +3536,7 @@ function renderState(rows, turn) {
   const pinnedLine = set.lastRequest === null ? null : lineOf(set.lastRequest);
   if (pinnedLine !== null) used += bytesOf(pinnedLine) + 1;
   const remaining = scoreCandidates(
-    [...set.openErrors, ...set.changedFiles, ...set.earlierRequests, ...set.indexedSources],
+    [...set.openErrors, ...set.changedFiles, ...set.decisions, ...set.earlierRequests, ...set.indexedSources],
     turn
   );
   const k = /* @__PURE__ */ new Map();
@@ -3536,7 +3565,7 @@ function renderState(rows, turn) {
   }
   const lines = [openTag];
   if (pinnedLine !== null) lines.push(pinnedLine);
-  for (const section of ["open_errors", "changed_files", "earlier_requests", "indexed_sources"]) {
+  for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"]) {
     for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c));
   }
   const queries = [];
@@ -3549,6 +3578,153 @@ function renderState(rows, turn) {
   }
   lines.push(moreLine(queries), STATE_CLOSE_TAG);
   return lines.join("\n");
+}
+
+// src/core/store/fts.ts
+var INSERT_SOURCE = `
+INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts)
+VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_count, :created_ts, :created_at, :created_ts)
+RETURNING id`;
+var INSERT_CHUNK = `
+INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?, ?, ?, ?, ?, ?)`;
+var ESCAPES = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
+function ftsInsert(db, src, chunks) {
+  let total = 0;
+  for (const c of chunks) total += c.bytes;
+  const batches = [];
+  let batch = [];
+  let batchBytes = 0;
+  for (const c of chunks) {
+    if (batch.length > 0 && batchBytes + c.bytes > INDEX_WRITE_CHUNK) {
+      batches.push(batch);
+      batch = [];
+      batchBytes = 0;
+    }
+    batch.push(c);
+    batchBytes += c.bytes;
+  }
+  batches.push(batch);
+  let id = 0;
+  batches.forEach((rows, i) => {
+    withWrite(db, (h) => {
+      if (i === 0) {
+        const row = h.raw.prepare(INSERT_SOURCE).get({
+          session_id: src.sessionId,
+          worktree: src.worktree,
+          agent: src.agent,
+          kind: src.kind,
+          label: src.label,
+          bytes_total: total,
+          chunk_count: chunks.length,
+          created_ts: src.createdAt,
+          created_at: new Date(src.createdAt).toISOString()
+        });
+        id = Number(row.id);
+      }
+      const ins = h.raw.prepare(INSERT_CHUNK);
+      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text);
+    });
+  });
+  return id;
+}
+function toMatch(q) {
+  const words = [];
+  let cur = "";
+  for (const ch of q) {
+    if (ch.trim() === "") {
+      if (cur !== "") words.push(cur);
+      cur = "";
+    } else {
+      cur += ch === '"' ? '""' : ch;
+    }
+  }
+  if (cur !== "") words.push(cur);
+  return words.map((w) => `"${w}"*`).join(" ");
+}
+function toMatchAny(q) {
+  const terms = new Set(toMatch(q).split(" ").filter((t) => t !== ""));
+  return [...terms].join(" OR ");
+}
+var TL_SCOPE = `
+    AND (:scope <> 'session' OR session_id = :session_id)
+    AND (:scope <> 'worktree' OR worktree = :worktree)`;
+var TL_EVENTS = `
+WITH e AS (
+  SELECT seq, kind, key, path, body, created_at FROM events
+  WHERE created_at > :after${TL_SCOPE}
+    AND (:source IS NULL OR kind = :source)
+)
+SELECT seq, kind, key, path, body, created_at FROM e
+WHERE created_at <= IFNULL((SELECT created_at FROM e ORDER BY created_at, seq LIMIT 1 OFFSET :off), created_at)
+ORDER BY created_at ASC, seq ASC`;
+var TL_SOURCES = `
+WITH s AS (
+  SELECT id, label, created_ts FROM sources
+  WHERE created_ts > :after${TL_SCOPE}
+    AND (:source IS NULL OR label = :source)
+    AND label <> :reserved
+)
+SELECT id, label, created_ts FROM s
+WHERE created_ts <= IFNULL((SELECT created_ts FROM s ORDER BY created_ts, id LIMIT 1 OFFSET :off), created_ts)
+ORDER BY created_ts ASC, id ASC`;
+var TL_MORE = `
+SELECT EXISTS(SELECT 1 FROM events WHERE created_at > :after${TL_SCOPE} AND (:source IS NULL OR kind = :source))
+    OR EXISTS(SELECT 1 FROM sources WHERE created_ts > :after${TL_SCOPE} AND (:source IS NULL OR label = :source)
+                 AND label <> :reserved) AS more`;
+var RANK_DDL = `CREATE VIRTUAL TABLE r USING fts5(body, ${FTS_TOKENIZE}, content='')`;
+var RANK_INSERT = "INSERT INTO r(rowid, body) VALUES (?, ?)";
+var RANK_QUERY = "SELECT rowid AS id, bm25(r) AS bm FROM r WHERE r MATCH ?";
+function rankTexts(texts, q, mode = "all") {
+  const scores = texts.map(() => 0);
+  const match = mode === "any" ? toMatchAny(q) : toMatch(q);
+  if (match === "" || texts.length === 0) return scores;
+  const sqlite = process.getBuiltinModule("node:sqlite");
+  if (sqlite === void 0) throw new CtxError("NO_SQLITE");
+  const mem = new sqlite.DatabaseSync(":memory:");
+  try {
+    mem.exec(RANK_DDL);
+    const ins = mem.prepare(RANK_INSERT);
+    mem.exec("BEGIN");
+    for (let i = 0; i < texts.length; i++) ins.run(i + 1, texts[i]);
+    mem.exec("COMMIT");
+    for (const r of mem.prepare(RANK_QUERY).all(match)) {
+      scores[Number(r.id) - 1] = -r.bm;
+    }
+    return scores;
+  } finally {
+    mem.close();
+  }
+}
+
+// src/core/compaction/recall.ts
+var NONE2 = { text: "", seqs: [] };
+function bytesOf2(s) {
+  return Buffer.byteLength(s, "utf8");
+}
+function textOf(r) {
+  return [r.key ?? "", r.path ?? "", r.body].filter((t) => t !== "").join("\n");
+}
+function recallLine(r) {
+  return "#" + r.seq + " " + r.kind + (r.tool === null ? "" : " " + r.tool) + ": " + textOf(r);
+}
+function pickRecall(rows, prompt, seen) {
+  if (prompt.trim() === "") return NONE2;
+  const pool = rows.filter((r) => !seen.has(r.seq) && r.kind !== "cost" && !(r.kind === "prompt" && r.body === prompt) && textOf(r) !== "");
+  if (pool.length === 0) return NONE2;
+  const scores = rankTexts(pool.map(textOf), prompt, "any");
+  const order = pool.map((r, i) => ({ r, score: scores[i] })).filter((x) => x.score >= RECALL_MIN_SCORE).sort((a, b) => b.score - a.score || b.r.seq - a.r.seq);
+  if (order.length === 0) return NONE2;
+  let used = bytesOf2(RECALL_OPEN_TAG) + 1 + bytesOf2(RECALL_CLOSE_TAG);
+  const taken = [];
+  for (const { r } of order) {
+    const cost = bytesOf2(recallLine(r)) + 1;
+    if (used + cost > RECALL_BUDGET_BYTES) continue;
+    used += cost;
+    taken.push(r);
+  }
+  if (taken.length === 0) return NONE2;
+  taken.sort((a, b) => a.seq - b.seq);
+  return { text: [RECALL_OPEN_TAG, ...taken.map(recallLine), RECALL_CLOSE_TAG].join("\n"), seqs: taken.map((r) => r.seq) };
 }
 
 // src/core/index/chunk.ts
@@ -3784,122 +3960,6 @@ function merge(src, blocks, join6, cap, lineCut) {
   return out;
 }
 
-// src/core/store/fts.ts
-var INSERT_SOURCE = `
-INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts)
-VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_count, :created_ts, :created_at, :created_ts)
-RETURNING id`;
-var INSERT_CHUNK = `
-INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?, ?, ?, ?, ?, ?)`;
-var ESCAPES = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
-function ftsInsert(db, src, chunks) {
-  let total = 0;
-  for (const c of chunks) total += c.bytes;
-  const batches = [];
-  let batch = [];
-  let batchBytes = 0;
-  for (const c of chunks) {
-    if (batch.length > 0 && batchBytes + c.bytes > INDEX_WRITE_CHUNK) {
-      batches.push(batch);
-      batch = [];
-      batchBytes = 0;
-    }
-    batch.push(c);
-    batchBytes += c.bytes;
-  }
-  batches.push(batch);
-  let id = 0;
-  batches.forEach((rows, i) => {
-    withWrite(db, (h) => {
-      if (i === 0) {
-        const row = h.raw.prepare(INSERT_SOURCE).get({
-          session_id: src.sessionId,
-          worktree: src.worktree,
-          agent: src.agent,
-          kind: src.kind,
-          label: src.label,
-          bytes_total: total,
-          chunk_count: chunks.length,
-          created_ts: src.createdAt,
-          created_at: new Date(src.createdAt).toISOString()
-        });
-        id = Number(row.id);
-      }
-      const ins = h.raw.prepare(INSERT_CHUNK);
-      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text);
-    });
-  });
-  return id;
-}
-function toMatch(q) {
-  const words = [];
-  let cur = "";
-  for (const ch of q) {
-    if (ch.trim() === "") {
-      if (cur !== "") words.push(cur);
-      cur = "";
-    } else {
-      cur += ch === '"' ? '""' : ch;
-    }
-  }
-  if (cur !== "") words.push(cur);
-  return words.map((w) => `"${w}"*`).join(" ");
-}
-function toMatchAny(q) {
-  const terms = new Set(toMatch(q).split(" ").filter((t) => t !== ""));
-  return [...terms].join(" OR ");
-}
-var TL_SCOPE = `
-    AND (:scope <> 'session' OR session_id = :session_id)
-    AND (:scope <> 'worktree' OR worktree = :worktree)`;
-var TL_EVENTS = `
-WITH e AS (
-  SELECT seq, kind, key, path, body, created_at FROM events
-  WHERE created_at > :after${TL_SCOPE}
-    AND (:source IS NULL OR kind = :source)
-)
-SELECT seq, kind, key, path, body, created_at FROM e
-WHERE created_at <= IFNULL((SELECT created_at FROM e ORDER BY created_at, seq LIMIT 1 OFFSET :off), created_at)
-ORDER BY created_at ASC, seq ASC`;
-var TL_SOURCES = `
-WITH s AS (
-  SELECT id, label, created_ts FROM sources
-  WHERE created_ts > :after${TL_SCOPE}
-    AND (:source IS NULL OR label = :source)
-    AND label <> :reserved
-)
-SELECT id, label, created_ts FROM s
-WHERE created_ts <= IFNULL((SELECT created_ts FROM s ORDER BY created_ts, id LIMIT 1 OFFSET :off), created_ts)
-ORDER BY created_ts ASC, id ASC`;
-var TL_MORE = `
-SELECT EXISTS(SELECT 1 FROM events WHERE created_at > :after${TL_SCOPE} AND (:source IS NULL OR kind = :source))
-    OR EXISTS(SELECT 1 FROM sources WHERE created_ts > :after${TL_SCOPE} AND (:source IS NULL OR label = :source)
-                 AND label <> :reserved) AS more`;
-var RANK_DDL = `CREATE VIRTUAL TABLE r USING fts5(body, ${FTS_TOKENIZE}, content='')`;
-var RANK_INSERT = "INSERT INTO r(rowid, body) VALUES (?, ?)";
-var RANK_QUERY = "SELECT rowid AS id, bm25(r) AS bm FROM r WHERE r MATCH ?";
-function rankTexts(texts, q, mode = "all") {
-  const scores = texts.map(() => 0);
-  const match = mode === "any" ? toMatchAny(q) : toMatch(q);
-  if (match === "" || texts.length === 0) return scores;
-  const sqlite = process.getBuiltinModule("node:sqlite");
-  if (sqlite === void 0) throw new CtxError("NO_SQLITE");
-  const mem = new sqlite.DatabaseSync(":memory:");
-  try {
-    mem.exec(RANK_DDL);
-    const ins = mem.prepare(RANK_INSERT);
-    mem.exec("BEGIN");
-    for (let i = 0; i < texts.length; i++) ins.run(i + 1, texts[i]);
-    mem.exec("COMMIT");
-    for (const r of mem.prepare(RANK_QUERY).all(match)) {
-      scores[Number(r.id) - 1] = -r.bm;
-    }
-    return scores;
-  } finally {
-    mem.close();
-  }
-}
-
 // src/core/index/select.ts
 var SEP = "\n";
 var SEP_BYTES = 1;
@@ -4071,7 +4131,10 @@ function str2(v) {
   return typeof v === "string" ? v : "";
 }
 async function handleHook(agent, raw, env) {
-  if (!isAgentId(agent)) return EMPTY4;
+  if (!isAgentId(agent)) {
+    process.stderr.write("hooks: unknown agent " + JSON.stringify(agent) + "\n");
+    return EMPTY4;
+  }
   const row = getAdapter(agent);
   let ev;
   try {
@@ -4083,7 +4146,8 @@ async function handleHook(agent, raw, env) {
   let project;
   try {
     project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd });
-  } catch {
+  } catch (err) {
+    process.stderr.write("hooks: no project: " + String(err.code ?? "ERROR") + " " + message(err) + "\n");
     return row.encode(ev, ALLOW2);
   }
   let decision;
@@ -4106,7 +4170,7 @@ function dispatch(ev, row, project, env) {
     case "PostToolUse":
       return postToolUse(ev, row, project, env);
     case "PreCompact":
-      return preCompact(ev, project);
+      return preCompact(ev, row, project);
     case "Usage":
       return usage(ev, project);
   }
@@ -4120,6 +4184,7 @@ function compactText(db, ev, row) {
   return renderState(readSessionEvents(db, ev.sessionId), ev.turn ?? 0);
 }
 async function sessionStart(ev, row, project) {
+  if (ev.source === "compact" && hasRecall(row)) markCompacted(await openDb(project), ev.sessionId);
   if (ev.source === "compact" && row.compactDelivery === "sessionstart") {
     const db2 = await openDb(project);
     if (!shouldHint(db2, ev.sessionId, COMPACT_STATE_KEY)) return ALLOW2;
@@ -4151,10 +4216,36 @@ async function userPromptSubmit(ev, row, project) {
     returned_bytes: 0
   });
   echoDetached(ev, project, body);
-  if (row.compactDelivery !== "pending-flag") return ALLOW2;
+  if (row.compactDelivery === "pending-flag") {
+    const db = await openDb(project);
+    if (metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) !== null) {
+      return { kind: "hint", text: compactText(db, ev, row), onceKey: PENDING_COMPACT_KEY };
+    }
+  }
+  return recall(ev, row, project, body);
+}
+function markCompacted(db, sessionId) {
+  if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+}
+function seenSeqs(value) {
+  if (value === null) return [];
+  try {
+    const v = JSON.parse(value);
+    return Array.isArray(v) ? v.filter((n) => typeof n === "number") : [];
+  } catch {
+    return [];
+  }
+}
+async function recall(ev, row, project, prompt) {
+  if (!hasRecall(row) || ev.sessionId === "") return ALLOW2;
   const db = await openDb(project);
-  if (metaTake(db, PENDING_COMPACT_META_PREFIX + ev.sessionId) === null) return ALLOW2;
-  return { kind: "hint", text: compactText(db, ev, row), onceKey: PENDING_COMPACT_KEY };
+  if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW2;
+  const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
+  const seen = seenSeqs(metaGet(db, seenKey));
+  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen));
+  if (picked.text === "") return ALLOW2;
+  metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
 }
 function optionsKey(sessionId) {
   return DECISION_SOURCE + ":" + DECISION_OPTION_KEY + ":" + sessionId;
@@ -4350,9 +4441,10 @@ function indexDetached(project, sessionId, label, text, chunks) {
     process.stderr.write("hooks: index write failed: " + message(err) + "\n");
   });
 }
-async function preCompact(ev, project) {
+async function preCompact(ev, row, project) {
   const db = await openDb(project);
   metaSet(db, PENDING_COMPACT_META_PREFIX + ev.sessionId, PENDING_COMPACT_FLAG);
+  if (hasRecall(row)) markCompacted(db, ev.sessionId);
   return ALLOW2;
 }
 function usage(ev, project) {
