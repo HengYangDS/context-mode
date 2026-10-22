@@ -56,7 +56,7 @@ const EVENTS = {
   qwen: CLAUDE_EVENTS,
   "copilot-cli": { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
   vscode: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
-  kiro: { SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
+  kiro: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
   zcode: CLAUDE_EVENTS,
   pi: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
   // Usage: OpenCode step-finish cost row (DEVIATIONS D-M5-arch-2).

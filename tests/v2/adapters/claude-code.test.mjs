@@ -85,7 +85,7 @@ test("eventMap follows impl/10 §1.4", () => {
     SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse",
   });
   assert.deepEqual(getAdapter("kiro").eventMap, {
-    SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse",
+    SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse",
   });
   assert.deepEqual(getAdapter("pi").eventMap, {
     SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result",

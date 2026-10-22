@@ -124,7 +124,7 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   assert.deepEqual(kiro.hooks.find((h) => h.trigger === "PreToolUse"), {
     action: { command: cmd("kiro"), type: "command" }, enabled: true, matcher: "@mcp", name: "context-mode-PreToolUse", timeout: 5, trigger: "PreToolUse",
   });
-  assert.equal("matcher" in kiro.hooks.find((h) => h.trigger === "PromptSubmit"), false);
+  assert.equal("matcher" in kiro.hooks.find((h) => h.trigger === "UserPromptSubmit"), false);
   const z = readJson(dir, "hooks/zcode.json");
   assert.equal(z.hooks.enabled, true);
   assert.deepEqual(z.hooks.events.PreToolUse, [{ command: cmd("zcode"), matcher: MATCHERS.zcode, timeoutMs: 5000, type: "command" }]);

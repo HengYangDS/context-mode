@@ -16,9 +16,9 @@
         "type": "command"
       },
       "enabled": true,
-      "name": "context-mode-PromptSubmit",
+      "name": "context-mode-UserPromptSubmit",
       "timeout": 5,
-      "trigger": "PromptSubmit"
+      "trigger": "UserPromptSubmit"
     },
     {
       "action": {

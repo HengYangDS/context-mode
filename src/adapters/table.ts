@@ -69,7 +69,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   {
     id: "kiro", installMode: "mcp-entry", projectSource: "arg:--agent+cwd", toolNamePrefix: kiro.TOOL_NAME_PREFIX,
     nativeTools: { shell: [] }, execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "PromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
+    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "hint-only",
     decode: kiro.decode, encode: kiro.encode,
   },
