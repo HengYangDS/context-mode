@@ -8,6 +8,10 @@ Setup for all live runs unless a section says otherwise: Claude Code 2.1.303, mo
 
 Six short tasks from the published gateway benchmark, 8 pairs per task, 2026-10-21, Claude Code 2.1.303, `claude-opus-5-5`, plan pushed first. Summed over 48 pairs, v1 cost 34.6% more than direct and v2 cost 2.2% more. The published gateway rows (2026-09-29, Claude Code 2.1.283) cost 24.5% less over 88 pairs. Full tables, intervals, losses and the bridge drift check: [v1-v2-gateway/README.md](v1-v2-gateway/README.md). Evidence: [v1-v2-gateway/ab.json](v1-v2-gateway/ab.json).
 
+## README try-it prompts: direct vs v1 vs v2 vs the gateway (Opus 5.5)
+
+The six "Try It" prompts from the OSS README, 4 pairs per prompt (session-continuity: 2, demonstration only), 2026-10-22, Claude Code 2.1.303, `claude-opus-5-5`, plan pushed first. Summed over 20 pairs, v1 cost 35.2% more than direct, v2 cost 10.9% more and the gateway cost 43.8% less. The gateway passed the task check in 7 of 20 sessions, against 16 of 20 for the other arms. Of 13 README numbers checked, 2 hold. Full tables, ranges, losses and the claim check: [try-it/README.md](try-it/README.md). Evidence: [try-it/ab.json](try-it/ab.json).
+
 ## Headline: bytes the model sees, and cost
 
 Large-output tasks (multi-1, big-tests, big-json, json-1), 3 runs per task and arm, 2026-10-21. Source: [data/ab-final2.json](data/ab-final2.json).

@@ -1,0 +1,288 @@
+{
+ "title": "README try-it prompts: direct vs OSS v1 vs OSS v2 vs the Context Mode gateway: evidence index",
+ "source": "docs/benchmarks/try-it/analyze.mjs",
+ "files": [
+  {
+   "date": "2026-10-22",
+   "file": "ab.json",
+   "model": "claude-opus-5-5",
+   "client": "Claude Code 2.1.303",
+   "prereg": "docs/benchmarks/try-it/prereg.md",
+   "prompts": [
+    {
+     "id": "repo-research",
+     "label": "Deep repo research",
+     "n": 4,
+     "v1": {
+      "pct": 37.3,
+      "pct_ci95": [
+       -35.5,
+       110
+      ],
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": -20.7,
+      "pct_ci95": [
+       -42.2,
+       0.8
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -29.5,
+      "pct_ci95": [
+       -56,
+       -3
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "3/4"
+     }
+    },
+    {
+     "id": "git-history",
+     "label": "Git history analysis",
+     "n": 4,
+     "v1": {
+      "pct": -2.8,
+      "pct_ci95": [
+       -31.2,
+       25.6
+      ],
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": -2.5,
+      "pct_ci95": [
+       -45.1,
+       40.1
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -46.3,
+      "pct_ci95": [
+       -81.5,
+       -11
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "4/4"
+     }
+    },
+    {
+     "id": "web-scrape",
+     "label": "Web scraping",
+     "n": 4,
+     "v1": {
+      "pct": 21.4,
+      "pct_ci95": [
+       -23.3,
+       66.1
+      ],
+      "verdict": "same"
+     },
+     "v2": {
+      "pct": 28.3,
+      "pct_ci95": [
+       10.7,
+       45.8
+      ],
+      "verdict": "more"
+     },
+     "gateway": {
+      "pct": -50.9,
+      "pct_ci95": [
+       -72.2,
+       -29.6
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "0/4"
+     }
+    },
+    {
+     "id": "large-json",
+     "label": "Large JSON API",
+     "n": 4,
+     "v1": {
+      "pct": 105.3,
+      "pct_ci95": [
+       86.1,
+       124.4
+      ],
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 16.9,
+      "pct_ci95": [
+       -18.2,
+       52
+      ],
+      "verdict": "same"
+     },
+     "gateway": {
+      "pct": -35.3,
+      "pct_ci95": [
+       -52.4,
+       -18.2
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "0/4",
+      "v1": "0/4",
+      "v2": "0/4",
+      "gateway": "0/4"
+     }
+    },
+    {
+     "id": "docs-search",
+     "label": "Documentation search",
+     "n": 4,
+     "v1": {
+      "pct": 25.5,
+      "pct_ci95": [
+       6.3,
+       44.7
+      ],
+      "verdict": "more"
+     },
+     "v2": {
+      "pct": 54.3,
+      "pct_ci95": [
+       18.5,
+       90.2
+      ],
+      "verdict": "more"
+     },
+     "gateway": {
+      "pct": -64.6,
+      "pct_ci95": [
+       -88,
+       -41.1
+      ],
+      "verdict": "less"
+     },
+     "success": {
+      "plain": "4/4",
+      "v1": "4/4",
+      "v2": "4/4",
+      "gateway": "0/4"
+     }
+    },
+    {
+     "id": "session-continuity",
+     "label": "Session continuity",
+     "demonstration_only": true,
+     "n": 2
+    }
+   ],
+   "readme_claims": [
+    {
+     "id": "repo-research",
+     "claim": "5 calls",
+     "verdict": "HOLDS"
+    },
+    {
+     "id": "repo-research",
+     "claim": "62 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "repo-research",
+     "claim": "raw: 986 KB",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "repo-research",
+     "claim": "94% saved",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "git-history",
+     "claim": "1 call",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "git-history",
+     "claim": "5.6 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "web-scrape",
+     "claim": "1 call",
+     "verdict": "HOLDS"
+    },
+    {
+     "id": "web-scrape",
+     "claim": "3.2 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "large-json",
+     "claim": "7.5 MB raw",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "large-json",
+     "claim": "0.9 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "large-json",
+     "claim": "99% saved",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "docs-search",
+     "claim": "2 calls",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "docs-search",
+     "claim": "1.8 KB context",
+     "verdict": "DIFFERS"
+    },
+    {
+     "id": "session-continuity",
+     "claim": "compaction recovery with full state",
+     "verdict": "INCONCLUSIVE"
+    }
+   ]
+  },
+  {
+   "file": "tool-result-bytes.json",
+   "sha256": "d5fa31c65c211dcf1318b38b1dd33f3a56217a384a11d97385b145b3a9a1c3f2",
+   "writer": "measure-bytes.mjs (needs the private transcripts)"
+  }
+ ],
+ "preregistrations": [
+  {
+   "file": "prereg.md",
+   "commit": "f924eda2ec61692f08aa3fe8dc9bcdf1512dc0e6",
+   "committed": "2026-10-22T10:51:33Z"
+  }
+ ],
+ "runs": [
+  "runs/repo-research.jsonl",
+  "runs/git-history.jsonl",
+  "runs/web-scrape.jsonl",
+  "runs/large-json.jsonl",
+  "runs/docs-search.jsonl",
+  "runs/session-continuity.jsonl"
+ ]
+}

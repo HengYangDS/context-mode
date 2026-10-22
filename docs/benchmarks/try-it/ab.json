@@ -1,0 +1,6383 @@
+{
+ "schema": "context-mode.benchmark-evidence/2",
+ "title": "README try-it prompts: direct vs OSS v1 vs OSS v2 vs the Context Mode gateway (Opus 5.5)",
+ "date": "2026-10-22",
+ "client": "Claude Code 2.1.303",
+ "model": "claude-opus-5-5",
+ "harness": "start-cost-ab-arms --workloads tryit (gateway repo worktree, local branch, never pushed) + bench/gateway-ab/tryit.patch",
+ "harness_commit": "bb28f201436a4d03b4a59a4e182552d8b5750654",
+ "prereg": {
+  "file": "docs/benchmarks/try-it/prereg.md",
+  "commit": "f924eda2ec61692f08aa3fe8dc9bcdf1512dc0e6",
+  "committed": "2026-10-22T10:51:33Z",
+  "first_run_commit": "2026-10-22T11:13:39Z"
+ },
+ "arms": {
+  "plain": "Claude Code alone (direct). Empty strict MCP map, no plugin.",
+  "v1": "OSS plugin v1: origin/main a92cf6a77ac02971fb5fafe2155e5ee229491884, version 1.0.169, npm install --omit=dev.",
+  "v2": "OSS plugin v2: v2-design 7f320e1664577c5389f37d0fbd250f867ed69fcc built to release-out (manifest version 0.0.0-dev).",
+  "gateway": "Claude Code talks to Anthropic through the live Context Mode gateway, default tenant flags, one new disposable tenant per prompt."
+ },
+ "plugin_revisions": {
+  "v1": {
+   "git_head": "a92cf6a77ac02971fb5fafe2155e5ee229491884",
+   "version": "1.0.169",
+   "dirty": false
+  },
+  "v2": {
+   "git_head": "7f320e1664577c5389f37d0fbd250f867ed69fcc",
+   "version": "0.0.0-dev",
+   "dirty": false
+  }
+ },
+ "warmup_cycles": 1,
+ "prices": {
+  "as_of": "2026-09-29",
+  "source_url": "https://www.anthropic.com/pricing",
+  "unit": "USD per million tokens",
+  "models": {
+   "claude-opus-5-5": {
+    "in": 4,
+    "out": 20,
+    "cr": 0.2,
+    "cw5": 5,
+    "cw1h": 8
+   }
+  }
+ },
+ "cost_basis": "Client arms: list price on the token counts in each session's result event; cache writes whose lifetime is not split are priced at the 1 hour rate. Gateway arm: list price on the gateway's per-call record for the session, hidden calls included; analyze.mjs prices the record again and stops on a difference. Claude Code's own total_cost_usd is kept as usd_client. The runs used a claude.ai login: every figure is a list-price equivalent, not an invoice.",
+ "bytes_basis": "Sum over every tool_result block in the session transcript (stream-json user events): UTF-8 bytes of each text part; a non-text part counts as the bytes of its JSON. Tool calls: tool_use blocks in assistant events. compact_boundary: system events of that subtype. Gateway arm: the bytes the client sent; the gateway can change them before the model sees them, and the record does not hold that size.",
+ "analysis_method": "Every measured cycle, failures included, no outlier dropped. Per prompt, d = arm - plain per cycle. % = 100 x mean(d) / mean(plain), with the 95% t interval at df = n - 1 (t = 3.182 at n = 4). Verdict: less when the whole interval is below zero, more when above, else same. arm_wins: cycles where the arm cost less than plain. v2 against v1 is secondary. session-continuity: demonstration only.",
+ "success_rules": {
+  "large-json": "the planted record value is in the final answer, read against the served data on disk; fails closed (no-served-data-on-disk) when no served file exists",
+  "git-history": "the final answer names the top git shortlog author over the same 500 commits",
+  "other": "completion check: end_turn, at least one client tool call, non-empty answer. Not a quality check."
+ },
+ "spend_usd_list_price": 18.15003,
+ "stop_rule_usd": 80,
+ "sessions": 108,
+ "warmup_sessions": 20,
+ "void_sessions": 0,
+ "inputs": [
+  {
+   "file": "tool-result-bytes.json",
+   "sha256": "d5fa31c65c211dcf1318b38b1dd33f3a56217a384a11d97385b145b3a9a1c3f2",
+   "sessions": 108
+  },
+  {
+   "file": "runs/repo-research.jsonl",
+   "sha256": "9bc6796925e4eb3d4de850cea163a9f642c9fee8920af6b686e409842f5d699c",
+   "sessions": 20
+  },
+  {
+   "file": "runs/git-history.jsonl",
+   "sha256": "21ffa4ea0e56b63a6110a01c019ae921b06d8215b5ac39cb5e033f4b4424ea9b",
+   "sessions": 20
+  },
+  {
+   "file": "runs/web-scrape.jsonl",
+   "sha256": "3b892b6326890b8f1bbffe015a06f3effd9bb7706d64890026a92d5fe5815115",
+   "sessions": 20
+  },
+  {
+   "file": "runs/large-json.jsonl",
+   "sha256": "33a5c48fc40f9659bb280deed3127f0ae14b7ca707aecbb825d5153bb6cf2db2",
+   "sessions": 20
+  },
+  {
+   "file": "runs/docs-search.jsonl",
+   "sha256": "f826727e887007dcae117e6fe66332b1d9732b685977e535448739dd01ae209b",
+   "sessions": 20
+  },
+  {
+   "file": "runs/session-continuity.jsonl",
+   "sha256": "f66109f9542ca81302601c1361105e622dc082a617c3bb43ea9998c60bad60f3",
+   "sessions": 8
+  }
+ ],
+ "withheld": [
+  "prompt and answer text",
+  "session ids",
+  "tenant ids",
+  "gateway host",
+  "local paths",
+  "raw transcripts",
+  "credentials"
+ ],
+ "pooled": {
+  "note": "Sum over the measured pairs of the five counted prompts. Descriptive only: no interval, the rows are different prompts.",
+  "pairs": 20,
+  "plain_usd": 3.1765,
+  "v1": {
+   "usd": 4.29539,
+   "pct": 35.2,
+   "arm_wins": 4,
+   "success": "16/20"
+  },
+  "v2": {
+   "usd": 3.52244,
+   "pct": 10.9,
+   "arm_wins": 7,
+   "success": "16/20"
+  },
+  "gateway": {
+   "usd": 1.78531,
+   "pct": -43.8,
+   "arm_wins": 20,
+   "success": "7/20"
+  },
+  "plain_success": "16/20"
+ },
+ "readme_claims": {
+  "source": "README.md 'Try It' at origin/main a92cf6a77ac02971fb5fafe2155e5ee229491884",
+  "rule": "HOLDS when the measured median is within 25% of the claimed number, else DIFFERS. A link the run did not exercise is INCONCLUSIVE.",
+  "checks": [
+   {
+    "id": "repo-research",
+    "text": "5 calls",
+    "metric": "v1_calls",
+    "claimed": 5,
+    "unit": "calls",
+    "measured_median": 4,
+    "measured_range": [
+     3,
+     4
+    ],
+    "measured_median_without_toolsearch": 3.5,
+    "basis": "v1 tool_use blocks per session (all tools, ToolSearch included), median of the measured cycles",
+    "verdict": "HOLDS",
+    "relative_to_claim_pct": -20
+   },
+   {
+    "id": "repo-research",
+    "text": "62 KB context",
+    "metric": "v1_bytes",
+    "claimed": 62,
+    "unit": "KB",
+    "measured_median_bytes": 32736.5,
+    "measured_range_bytes": [
+     16030,
+     53116
+    ],
+    "measured_median": 32.7,
+    "measured_median_kib": 32,
+    "basis": "v1 tool_result bytes per session, median (KB = 1,000 bytes)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": -47.3
+   },
+   {
+    "id": "repo-research",
+    "text": "raw: 986 KB",
+    "metric": "plain_bytes",
+    "claimed": 986,
+    "unit": "KB",
+    "measured_median_bytes": 24066.5,
+    "measured_range_bytes": [
+     20856,
+     31365
+    ],
+    "measured_median": 24.1,
+    "measured_median_kib": 23.5,
+    "basis": "plain arm tool_result bytes per session, median (prereg: the unrouted size where only the plain arm can give it)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": -97.6
+   },
+   {
+    "id": "repo-research",
+    "text": "94% saved",
+    "metric": "pct_saved",
+    "claimed": 94,
+    "unit": "%",
+    "measured_median": -33.2,
+    "measured_range": [
+     -154.7,
+     48.9
+    ],
+    "basis": "per cycle 100 x (1 - v1 bytes / plain bytes), median; a negative value means v1 showed more bytes",
+    "verdict": "DIFFERS",
+    "relative_to_claim_pct": -135.3
+   },
+   {
+    "id": "git-history",
+    "text": "1 call",
+    "metric": "v1_calls",
+    "claimed": 1,
+    "unit": "calls",
+    "measured_median": 2,
+    "measured_range": [
+     2,
+     2
+    ],
+    "measured_median_without_toolsearch": 2,
+    "basis": "v1 tool_use blocks per session (all tools, ToolSearch included), median of the measured cycles",
+    "verdict": "DIFFERS",
+    "relative_to_claim_pct": 100
+   },
+   {
+    "id": "git-history",
+    "text": "5.6 KB context",
+    "metric": "v1_bytes",
+    "claimed": 5.6,
+    "unit": "KB",
+    "measured_median_bytes": 2032.5,
+    "measured_range_bytes": [
+     2001,
+     2096
+    ],
+    "measured_median": 2,
+    "measured_median_kib": 2,
+    "basis": "v1 tool_result bytes per session, median (KB = 1,000 bytes)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": -64.3
+   },
+   {
+    "id": "web-scrape",
+    "text": "1 call",
+    "metric": "v1_calls",
+    "claimed": 1,
+    "unit": "calls",
+    "measured_median": 1,
+    "measured_range": [
+     1,
+     3
+    ],
+    "measured_median_without_toolsearch": 1,
+    "basis": "v1 tool_use blocks per session (all tools, ToolSearch included), median of the measured cycles",
+    "verdict": "HOLDS",
+    "relative_to_claim_pct": 0
+   },
+   {
+    "id": "web-scrape",
+    "text": "3.2 KB context",
+    "metric": "v1_bytes",
+    "claimed": 3.2,
+    "unit": "KB",
+    "measured_median_bytes": 2216.5,
+    "measured_range_bytes": [
+     2186,
+     3639
+    ],
+    "measured_median": 2.2,
+    "measured_median_kib": 2.2,
+    "basis": "v1 tool_result bytes per session, median (KB = 1,000 bytes)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": -31.2
+   },
+   {
+    "id": "large-json",
+    "text": "7.5 MB raw",
+    "metric": "plain_bytes",
+    "claimed": 7500,
+    "unit": "KB",
+    "measured_median_bytes": 1624,
+    "measured_range_bytes": [
+     1504,
+     2549
+    ],
+    "measured_median": 1.6,
+    "measured_median_kib": 1.6,
+    "basis": "plain arm tool_result bytes per session, median (prereg: the unrouted size where only the plain arm can give it)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": -100
+   },
+   {
+    "id": "large-json",
+    "text": "0.9 KB context",
+    "metric": "v1_bytes",
+    "claimed": 0.9,
+    "unit": "KB",
+    "measured_median_bytes": 3488,
+    "measured_range_bytes": [
+     1778,
+     4254
+    ],
+    "measured_median": 3.5,
+    "measured_median_kib": 3.4,
+    "basis": "v1 tool_result bytes per session, median (KB = 1,000 bytes)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": 288.9
+   },
+   {
+    "id": "large-json",
+    "text": "99% saved",
+    "metric": "pct_saved",
+    "claimed": 99,
+    "unit": "%",
+    "measured_median": -83.4,
+    "measured_range": [
+     -156,
+     -18.2
+    ],
+    "basis": "per cycle 100 x (1 - v1 bytes / plain bytes), median; a negative value means v1 showed more bytes",
+    "verdict": "DIFFERS",
+    "relative_to_claim_pct": -184.2
+   },
+   {
+    "id": "docs-search",
+    "text": "2 calls",
+    "metric": "v1_calls",
+    "claimed": 2,
+    "unit": "calls",
+    "measured_median": 3,
+    "measured_range": [
+     3,
+     3
+    ],
+    "measured_median_without_toolsearch": 2,
+    "basis": "v1 tool_use blocks per session (all tools, ToolSearch included), median of the measured cycles",
+    "verdict": "DIFFERS",
+    "relative_to_claim_pct": 50
+   },
+   {
+    "id": "docs-search",
+    "text": "1.8 KB context",
+    "metric": "v1_bytes",
+    "claimed": 1.8,
+    "unit": "KB",
+    "measured_median_bytes": 16946,
+    "measured_range_bytes": [
+     16913,
+     17079
+    ],
+    "measured_median": 16.9,
+    "measured_median_kib": 16.5,
+    "basis": "v1 tool_result bytes per session, median (KB = 1,000 bytes)",
+    "verdict": "DIFFERS",
+    "verdict_if_kb_is_1024": "DIFFERS",
+    "relative_to_claim_pct": 838.9
+   },
+   {
+    "id": "session-continuity",
+    "text": "compaction recovery with full state",
+    "metric": "compaction",
+    "claimed": null,
+    "unit": null,
+    "measured": "0 compactions in 2 v1 sessions",
+    "verdict": "INCONCLUSIVE",
+    "why": "No v1 session compacted (no compact_boundary event in the transcript), so recovery was not exercised. Two cycles, demonstration only."
+   }
+  ]
+ },
+ "prompts": [
+  {
+   "id": "repo-research",
+   "label": "Deep repo research",
+   "demonstration_only": false,
+   "pairs_planned": 4,
+   "void_sessions": 0,
+   "warmup_sessions": 4,
+   "analysis": {
+    "n": 4,
+    "arms": {
+     "plain": {
+      "usd_mean": 0.24941,
+      "tokens_mean": 97998,
+      "tool_result_bytes_mean": 25089,
+      "tool_result_bytes_median": 24066.5,
+      "tool_result_bytes": [
+       25190,
+       20856,
+       31365,
+       22943
+      ],
+      "tool_calls": [
+       4,
+       4,
+       3,
+       4
+      ],
+      "tool_calls_median": 4,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ]
+     },
+     "v1": {
+      "usd_mean": 0.34234,
+      "tokens_mean": 144982,
+      "tool_result_bytes_mean": 33655,
+      "tool_result_bytes_median": 32736.5,
+      "tool_result_bytes": [
+       48995,
+       53116,
+       16030,
+       16478
+      ],
+      "tool_calls": [
+       4,
+       3,
+       4,
+       4
+      ],
+      "tool_calls_median": 4,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "2/4"
+     },
+     "v2": {
+      "usd_mean": 0.19787,
+      "tokens_mean": 68487,
+      "tool_result_bytes_mean": 16249,
+      "tool_result_bytes_median": 15286.5,
+      "tool_result_bytes": [
+       13122,
+       17283,
+       21300,
+       13290
+      ],
+      "tool_calls": [
+       2,
+       2,
+       2,
+       2
+      ],
+      "tool_calls_median": 2,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "4/4"
+     },
+     "gateway": {
+      "usd_mean": 0.1759,
+      "tokens_mean": 96076,
+      "tool_result_bytes_mean": 5610,
+      "tool_result_bytes_median": 5496,
+      "tool_result_bytes": [
+       0,
+       4020,
+       6972,
+       11448
+      ],
+      "tool_calls": [
+       0,
+       3,
+       3,
+       2
+      ],
+      "tool_calls_median": 2.5,
+      "success": "3/4",
+      "oracle_reasons": [
+       "no-tool-call",
+       "ok"
+      ],
+      "no_client_tool_call": "1/4",
+      "edge_calls_when_no_client_tool_call": [
+       2
+      ]
+     }
+    },
+    "v1_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.24941,
+     "arm_usd_mean": 0.34234,
+     "pct": 37.3,
+     "pct_ci95": [
+      -35.5,
+      110
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": 0.112954,
+     "arm_wins": 1,
+     "per_1000_tasks_usd": -92.9
+    },
+    "v2_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.24941,
+     "arm_usd_mean": 0.19787,
+     "pct": -20.7,
+     "pct_ci95": [
+      -42.2,
+      0.8
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": -0.0615042,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 51.5
+    },
+    "gateway_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.24941,
+     "arm_usd_mean": 0.1759,
+     "pct": -29.5,
+     "pct_ci95": [
+      -56,
+      -3
+     ],
+     "verdict": "less",
+     "ci_crosses_zero": false,
+     "median_diff_usd": -0.0647294,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 73.5
+    },
+    "v2_vs_v1_secondary": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.34234,
+     "arm_usd_mean": 0.19787,
+     "pct": -42.2,
+     "pct_ci95": [
+      -98.2,
+      13.8
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": -0.1428991,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 144.5
+    }
+   },
+   "pairs": [
+    {
+     "cycle": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.258758,
+      "usd_client": 0.258758,
+      "tokens": 100238,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 25190,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "a52098b189561bbfb55b5a84f76049e42696cd3e5b54d36a093b1cc03a7494e6",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        76490
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        19281
+       ],
+       "out": [
+        4459
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.44282140000000003,
+      "usd_client": 0.44282140000000003,
+      "tokens": 190123,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 48995,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_batch_execute": 2,
+       "Bash": 1
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_batch_execute": 2,
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "274cf56a1c4630dd1b350ae2c7fcf5d59fb0ef32fbbe98dfa51ddeb6a4ec4858",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        146487
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        38253
+       ],
+       "out": [
+        5373
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1852084,
+      "usd_client": 0.1852084,
+      "tokens": 66890,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 13122,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "730e7518b5467a307f9963fda93870e06e74d508d4524c4fdfa3b73e12def6aa",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51062
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11789
+       ],
+       "out": [
+        4033
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.128417,
+      "usd_client": 0.056027600000000004,
+      "tokens": 58670,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "b26f1a34ab9b3918bcc11121d081a5b29a6a3099e7ca4d721e7256b54c9268ea",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        5942
+       ],
+       "cr": [
+        15398
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "out": [
+        1459
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 2,
+       "tokens": {
+        "prompt": 54858,
+        "output": 3812,
+        "cache_read": 44766,
+        "cache_write": 714
+       },
+       "anthropic_usd": 0.128417,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 3436,
+        "output": 2353,
+        "cache_read": 29368,
+        "cache_write": 714
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 2,
+     "order": [
+      "v2",
+      "gateway",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.2409734,
+      "usd_client": 0.2409734,
+      "tokens": 98120,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 20856,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "5169c47b29374cf57fb36006966a509602c3567327534addff34e4c9de02d390",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        76107
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        17865
+       ],
+       "out": [
+        4140
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.4307968,
+      "usd_client": 0.4307968,
+      "tokens": 152181,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 53116,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_batch_execute": 1,
+       "Bash": 1
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_batch_execute": 1,
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "a1c855de0bfadc93f20183c7f81c183a3beb175ad93e294711f66e0e3e7b4edc",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        107364
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        40574
+       ],
+       "out": [
+        4235
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1915146,
+      "usd_client": 0.19151459999999998,
+      "tokens": 66519,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 17283,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "9a75a247dc397655f373cc3e2fe87c45d49947af48bebcb06bc4407d63eef58b",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49733
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        12838
+       ],
+       "out": [
+        3942
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.187228,
+      "usd_client": 0.1276982,
+      "tokens": 121402,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 4020,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "f8a95c3a7256e7e32f000f4f5fcbbd84d74472b9c70bf12e79dbab03f89fa58a",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        6040
+       ],
+       "cr": [
+        71091
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        6035
+       ],
+       "out": [
+        2052
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 4,
+       "edge_calls": 2,
+       "tokens": {
+        "prompt": 117879,
+        "output": 3523,
+        "cache_read": 100459,
+        "cache_write": 6749
+       },
+       "anthropic_usd": 0.187228,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 4631,
+        "output": 1471,
+        "cache_read": 29368,
+        "cache_write": 714
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 3,
+     "order": [
+      "gateway",
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.2812904,
+      "usd_client": 0.2812904,
+      "tokens": 104174,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 31365,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "4eb85f5370b53b272c2782c1f6aa5bfa63ba6831cde9d36ffed1530525b0e380",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        77712
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        21947
+       ],
+       "out": [
+        4507
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.23727920000000002,
+      "usd_client": 0.2372792,
+      "tokens": 100004,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 16030,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "ad436070e00b20deec273f39228e5c3251c4990444e0299e68f1dfde107dc28f",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        79056
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        16447
+       ],
+       "out": [
+        4493
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.20282160000000002,
+      "usd_client": 0.2028216,
+      "tokens": 68007,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 21300,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b3877441f4ba5ba7c7d039ee56709bc40f31946f82fc88678d995af6d9f87413",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49888
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        14120
+       ],
+       "out": [
+        3993
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.205577,
+      "usd_client": 0.152107,
+      "tokens": 120741,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 6972,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "476a4c90ddea9d6e62b9938881f2f6134e14681b5086db29567bda0b53ee6bd0",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        3976
+       ],
+       "cr": [
+        71135
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        7917
+       ],
+       "out": [
+        2932
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 4,
+       "edge_calls": 2,
+       "tokens": {
+        "prompt": 116366,
+        "output": 4375,
+        "cache_read": 100503,
+        "cache_write": 8631
+       },
+       "anthropic_usd": 0.205577,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 3256,
+        "output": 1443,
+        "cache_read": 29368,
+        "cache_write": 714
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 4,
+     "order": [
+      "plain",
+      "v1",
+      "v2",
+      "gateway"
+     ],
+     "plain": {
+      "usd": 0.21659979999999998,
+      "usd_client": 0.2165998,
+      "tokens": 89460,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 22943,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b325d895fbe15b804f2bffe067f511a78956a459780104c58fcf8430c5e9b65d",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        70359
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        14947
+       ],
+       "out": [
+        4146
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2584444,
+      "usd_client": 0.25844439999999996,
+      "tokens": 137620,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 16478,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 4
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "12ff205732a77500e6c114fe6f4996991d711bf0014ce72ab9ae46c241c8ef84",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        114442
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        18987
+       ],
+       "out": [
+        4181
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.2119284,
+      "usd_client": 0.2119284,
+      "tokens": 72531,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 13290,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "61d5d84f9ef8811255aa5dcc0262162775ee8143b541c510225598aac82b991e",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        53542
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        14872
+       ],
+       "out": [
+        4111
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.182378,
+      "usd_client": 0.1559756,
+      "tokens": 83491,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 11448,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "69472a7fe6f5369032c6b3dfe00a4ce6f949c2e9d7776af85f10c8c95d73a4f9",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        1758
+       ],
+       "cr": [
+        52368
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        10019
+       ],
+       "out": [
+        3023
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 3,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 79545,
+        "output": 3946,
+        "cache_read": 67052,
+        "cache_write": 10019
+       },
+       "anthropic_usd": 0.182378,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 716,
+        "output": 923,
+        "cache_read": 14684,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    }
+   ],
+   "warmup_usd": {
+    "plain": 0.23558,
+    "v1": 0.42831,
+    "v2": 0.21535,
+    "gateway": 0.13267
+   }
+  },
+  {
+   "id": "git-history",
+   "label": "Git history analysis",
+   "demonstration_only": false,
+   "pairs_planned": 4,
+   "void_sessions": 0,
+   "warmup_sessions": 4,
+   "analysis": {
+    "n": 4,
+    "arms": {
+     "plain": {
+      "usd_mean": 0.14532,
+      "tokens_mean": 101084,
+      "tool_result_bytes_mean": 2946,
+      "tool_result_bytes_median": 2998.5,
+      "tool_result_bytes": [
+       2115,
+       3383,
+       3672,
+       2614
+      ],
+      "tool_calls": [
+       3,
+       5,
+       5,
+       3
+      ],
+      "tool_calls_median": 4,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ]
+     },
+     "v1": {
+      "usd_mean": 0.14127,
+      "tokens_mean": 66660,
+      "tool_result_bytes_mean": 2041,
+      "tool_result_bytes_median": 2032.5,
+      "tool_result_bytes": [
+       2030,
+       2001,
+       2096,
+       2035
+      ],
+      "tool_calls": [
+       2,
+       2,
+       2,
+       2
+      ],
+      "tool_calls_median": 2,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "0/4"
+     },
+     "v2": {
+      "usd_mean": 0.1417,
+      "tokens_mean": 79161,
+      "tool_result_bytes_mean": 2684,
+      "tool_result_bytes_median": 2673,
+      "tool_result_bytes": [
+       3244,
+       2144,
+       2737,
+       2609
+      ],
+      "tool_calls": [
+       4,
+       3,
+       2,
+       2
+      ],
+      "tool_calls_median": 2.5,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "4/4"
+     },
+     "gateway": {
+      "usd_mean": 0.0781,
+      "tokens_mean": 53092,
+      "tool_result_bytes_mean": 1373,
+      "tool_result_bytes_median": 1389,
+      "tool_result_bytes": [
+       1405,
+       1665,
+       1049,
+       1373
+      ],
+      "tool_calls": [
+       2,
+       2,
+       2,
+       2
+      ],
+      "tool_calls_median": 2,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "no_client_tool_call": "0/4",
+      "edge_calls_when_no_client_tool_call": []
+     }
+    },
+    "v1_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.14532,
+     "arm_usd_mean": 0.14127,
+     "pct": -2.8,
+     "pct_ci95": [
+      -31.2,
+      25.6
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": -0.0038877,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": 4.1
+    },
+    "v2_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.14532,
+     "arm_usd_mean": 0.1417,
+     "pct": -2.5,
+     "pct_ci95": [
+      -45.1,
+      40.1
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": -0.0120473,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": 3.6
+    },
+    "gateway_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.14532,
+     "arm_usd_mean": 0.0781,
+     "pct": -46.3,
+     "pct_ci95": [
+      -81.5,
+      -11
+     ],
+     "verdict": "less",
+     "ci_crosses_zero": false,
+     "median_diff_usd": -0.0569626,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 67.2
+    },
+    "v2_vs_v1_secondary": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.14127,
+     "arm_usd_mean": 0.1417,
+     "pct": 0.3,
+     "pct_ci95": [
+      -22.4,
+      23
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": -0.0060359,
+     "arm_wins": 2,
+     "per_1000_tasks_usd": -0.4
+    }
+   },
+   "pairs": [
+    {
+     "cycle": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.10788160000000001,
+      "usd_client": 0.1078816,
+      "tokens": 70713,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2115,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "1b3cbd7535e2a603d4fcace84e96ee424a19b7c29b5c7c97a61a9c8f9970c561",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        62368
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5947
+       ],
+       "out": [
+        2390
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.12801880000000002,
+      "usd_client": 0.1280188,
+      "tokens": 62096,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2030,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "da6610b9edcc3ccf5dcf22d16ca7c283eb6ab26d27c4f46cb596eda98f266c0b",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50814
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8974
+       ],
+       "out": [
+        2302
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1564442,
+      "usd_client": 0.1564442,
+      "tokens": 108363,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3244,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "f3006b0c60a48ccc81e87b11790e2ce43010316ee0317a0bf5a0d68de84aad21",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        95261
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10374
+       ],
+       "out": [
+        2718
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.062859,
+      "usd_client": 0.0628592,
+      "tokens": 49821,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1405,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "c307c2fa9c0577cce7c6ed1df075c152ca18c8d1b80573d834998f21ae737b0c",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        724
+       ],
+       "cr": [
+        45216
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        2225
+       ],
+       "out": [
+        1656
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 3,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 48165,
+        "output": 1656,
+        "cache_read": 45216,
+        "cache_write": 2225
+       },
+       "anthropic_usd": 0.062859,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 2,
+     "order": [
+      "v2",
+      "gateway",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.179186,
+      "usd_client": 0.179186,
+      "tokens": 128221,
+      "success": true,
+      "oracle": "ok",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3383,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "Bash": 5
+      },
+      "tools_runner": {
+       "Bash": 5
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "7671e722a46593cad62ca0aca5eba837054bacddae96b289df6f912a39ece9cc",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        113830
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10934
+       ],
+       "out": [
+        3445
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.1548554,
+      "usd_client": 0.1548554,
+      "tokens": 71194,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2001,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "7503d5dcec8005d0bafb52450f49a25fedf7563324ec4671337eecdaaadfaa93",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56757
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        12095
+       ],
+       "out": [
+        2336
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1402334,
+      "usd_client": 0.1402334,
+      "tokens": 84236,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2144,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 2,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 2,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "6646d7f4e1f619579f0067c43b252a55c39012b79132b9417c71e4830adc7e51",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        72107
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9720
+       ],
+       "out": [
+        2401
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.067051,
+      "usd_client": 0.06705119999999999,
+      "tokens": 50060,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1665,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "203412f136f40a73c741ba30cbe9a51f1a21bf765d0a3c64937e71bb4c522622",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        724
+       ],
+       "cr": [
+        45096
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        2472
+       ],
+       "out": [
+        1768
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 3,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 48292,
+        "output": 1768,
+        "cache_read": 45096,
+        "cache_write": 2472
+       },
+       "anthropic_usd": 0.067051,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 3,
+     "order": [
+      "gateway",
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.16052260000000002,
+      "usd_client": 0.16052260000000002,
+      "tokens": 125207,
+      "success": true,
+      "oracle": "ok",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3672,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "Bash": 5
+      },
+      "tools_runner": {
+       "Bash": 5
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "3930cc19450d6135573b70f3beed7bd02bfe739fe6659a22819e059d5e925c80",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        112073
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10365
+       ],
+       "out": [
+        2757
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.1319446,
+      "usd_client": 0.1319446,
+      "tokens": 62195,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2096,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b179ea56740a9eeef91ef5013c4b8ca63b0d5eaec517974bd8e2c5fcbb5ff1d8",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50643
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9094
+       ],
+       "out": [
+        2452
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.13369779999999998,
+      "usd_client": 0.13369779999999998,
+      "tokens": 61859,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2737,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "bcc3ef5c932e9f5e664dbc1a3f047d0fab08ebc84ab75d939284ae89537514c1",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        49929
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9566
+       ],
+       "out": [
+        2358
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.09162,
+      "usd_client": 0.09162039999999999,
+      "tokens": 56272,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1049,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "c8114fecf5ab3dbac67cbab3ad49a0ba7d430bcff015baf8fff1ec4fc2df45dd",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        724
+       ],
+       "cr": [
+        48462
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5224
+       ],
+       "out": [
+        1862
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 3,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 54410,
+        "output": 1862,
+        "cache_read": 48462,
+        "cache_write": 5224
+       },
+       "anthropic_usd": 0.09162,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 4,
+     "order": [
+      "plain",
+      "v1",
+      "v2",
+      "gateway"
+     ],
+     "plain": {
+      "usd": 0.1337056,
+      "usd_client": 0.13370559999999998,
+      "tokens": 80193,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2614,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "525dfb2d64c738670bc07bfe6f5f11872b6d711ab3cbb5be2decded7ee950aa5",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        68608
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9299
+       ],
+       "out": [
+        2278
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.1502608,
+      "usd_client": 0.1502608,
+      "tokens": 71156,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2035,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "7cc3accae2a08eb0a6f877365dbab88cb52d24f0d62f75fa16ecd3ed5f2b1a52",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        56984
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        12040
+       ],
+       "out": [
+        2126
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1364358,
+      "usd_client": 0.1364358,
+      "tokens": 62187,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2609,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "976f56dbce6406093b9a2aca35a26991601c74a679ab4b3a448186c74311239e",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        50039
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9703
+       ],
+       "out": [
+        2439
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.090859,
+      "usd_client": 0.09085860000000001,
+      "tokens": 56216,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1373,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "575cf7622b02f1015f54aad2900cf27d21e3959479955b95a2577b5fa383d419",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        724
+       ],
+       "cr": [
+        48373
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5341
+       ],
+       "out": [
+        1778
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 3,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 54438,
+        "output": 1778,
+        "cache_read": 48373,
+        "cache_write": 5341
+       },
+       "anthropic_usd": 0.090859,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    }
+   ],
+   "warmup_usd": {
+    "plain": 0.10678,
+    "v1": 0.1684,
+    "v2": 0.19922,
+    "gateway": 0.21002
+   }
+  },
+  {
+   "id": "web-scrape",
+   "label": "Web scraping",
+   "demonstration_only": false,
+   "pairs_planned": 4,
+   "void_sessions": 0,
+   "warmup_sessions": 4,
+   "analysis": {
+    "n": 4,
+    "arms": {
+     "plain": {
+      "usd_mean": 0.11992,
+      "tokens_mean": 57003,
+      "tool_result_bytes_mean": 2340,
+      "tool_result_bytes_median": 2318.5,
+      "tool_result_bytes": [
+       2224,
+       2413,
+       2205,
+       2516
+      ],
+      "tool_calls": [
+       2,
+       2,
+       2,
+       2
+      ],
+      "tool_calls_median": 2,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ]
+     },
+     "v1": {
+      "usd_mean": 0.14555,
+      "tokens_mean": 57682,
+      "tool_result_bytes_mean": 2565,
+      "tool_result_bytes_median": 2216.5,
+      "tool_result_bytes": [
+       2186,
+       2234,
+       3639,
+       2199
+      ],
+      "tool_calls": [
+       1,
+       1,
+       3,
+       1
+      ],
+      "tool_calls_median": 1,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "1/4"
+     },
+     "v2": {
+      "usd_mean": 0.15382,
+      "tokens_mean": 65982,
+      "tool_result_bytes_mean": 5817,
+      "tool_result_bytes_median": 5852,
+      "tool_result_bytes": [
+       5861,
+       5879,
+       5843,
+       5683
+      ],
+      "tool_calls": [
+       2,
+       2,
+       2,
+       2
+      ],
+      "tool_calls_median": 2,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "4/4"
+     },
+     "gateway": {
+      "usd_mean": 0.05886,
+      "tokens_mean": 34522,
+      "tool_result_bytes_mean": 0,
+      "tool_result_bytes_median": 0,
+      "tool_result_bytes": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "tool_calls": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "tool_calls_median": 0,
+      "success": "0/4",
+      "oracle_reasons": [
+       "no-tool-call"
+      ],
+      "no_client_tool_call": "4/4",
+      "edge_calls_when_no_client_tool_call": [
+       1,
+       1,
+       1,
+       1
+      ]
+     }
+    },
+    "v1_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.11992,
+     "arm_usd_mean": 0.14555,
+     "pct": 21.4,
+     "pct_ci95": [
+      -23.3,
+      66.1
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": 0.0239389,
+     "arm_wins": 1,
+     "per_1000_tasks_usd": -25.6
+    },
+    "v2_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.11992,
+     "arm_usd_mean": 0.15382,
+     "pct": 28.3,
+     "pct_ci95": [
+      10.7,
+      45.8
+     ],
+     "verdict": "more",
+     "ci_crosses_zero": false,
+     "median_diff_usd": 0.0297851,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -33.9
+    },
+    "gateway_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.11992,
+     "arm_usd_mean": 0.05886,
+     "pct": -50.9,
+     "pct_ci95": [
+      -72.2,
+      -29.6
+     ],
+     "verdict": "less",
+     "ci_crosses_zero": false,
+     "median_diff_usd": -0.0667759,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 61.1
+    },
+    "v2_vs_v1_secondary": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.14555,
+     "arm_usd_mean": 0.15382,
+     "pct": 5.7,
+     "pct_ci95": [
+      -27,
+      38.4
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": 0.0140691,
+     "arm_wins": 1,
+     "per_1000_tasks_usd": -8.3
+    }
+   },
+   "pairs": [
+    {
+     "cycle": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.0973948,
+      "usd_client": 0.0973948,
+      "tokens": 52064,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2224,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "bdf4ff399801b2987ed9e41ab6e0dbb1b5042b51dd2f66d25f0518aca413708e",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        44254
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5630
+       ],
+       "out": [
+        2174
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.13711120000000002,
+      "usd_client": 0.1371112,
+      "tokens": 47635,
+      "success": true,
+      "oracle": "ok",
+      "turns": 2,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2186,
+      "tool_result_blocks": 1,
+      "tool_calls": 1,
+      "tool_calls_by_name": {
+       "Bash": 1
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "bc6d0b8cbe4e4c43b100716e2753dece9e13fe4c383f896aa3cd78e51d86cd07",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        34236
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11471
+       ],
+       "out": [
+        1924
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.15035579999999998,
+      "usd_client": 0.15035579999999998,
+      "tokens": 65790,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 5861,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "4861396994c1e10078db634fe4d9b7a687b148eb096e8802de6d99de6b0eb82c",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51979
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11347
+       ],
+       "out": [
+        2458
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.059662,
+      "usd_client": 0.038446799999999996,
+      "tokens": 34608,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "d8dd2fa29600f00a30339a81bcd881bb6041626c5127d2f231d7e16516082147",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        1958
+       ],
+       "cr": [
+        14674
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        716
+       ],
+       "out": [
+        1205
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 32740,
+        "output": 1868,
+        "cache_read": 29348,
+        "cache_write": 716
+       },
+       "anthropic_usd": 0.059662,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 718,
+        "output": 663,
+        "cache_read": 14674,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 2,
+     "order": [
+      "v2",
+      "gateway",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.1282096,
+      "usd_client": 0.12820959999999998,
+      "tokens": 58742,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2413,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "4eef2fdd564260b3c4c190cad12c86da8ad5dc01ea9f1d46a7edbf1c8353a8ee",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47388
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9021
+       ],
+       "out": [
+        2327
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.11747260000000001,
+      "usd_client": 0.11747260000000001,
+      "tokens": 41767,
+      "success": true,
+      "oracle": "ok",
+      "turns": 2,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2234,
+      "tool_result_blocks": 1,
+      "tool_calls": 1,
+      "tool_calls_by_name": {
+       "Bash": 1
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "37b4765a5076b934c247256f97d6de0129a0dbe655f81f860a67080fd9c207fc",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        31083
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8530
+       ],
+       "out": [
+        2150
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1556154,
+      "usd_client": 0.1556154,
+      "tokens": 66165,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 5879,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b746c8fde67b8c3882d2e64083d14d4809c2c0e6d0374200d907dbd199221484",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        52037
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11438
+       ],
+       "out": [
+        2684
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.05797,
+      "usd_client": 0.039094800000000006,
+      "tokens": 34425,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "534845e4f73668dc2bca1d95e59898f3debb5ca0b496332a7c29639ebbf19aa7",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        1835
+       ],
+       "cr": [
+        14674
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        716
+       ],
+       "out": [
+        1262
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 32617,
+        "output": 1808,
+        "cache_read": 29348,
+        "cache_write": 716
+       },
+       "anthropic_usd": 0.05797,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 718,
+        "output": 546,
+        "cache_read": 14674,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 3,
+     "order": [
+      "gateway",
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.1219502,
+      "usd_client": 0.1219502,
+      "tokens": 58264,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2205,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "1285c3d91d75a4599d507cf3cea6bbedceec030fd8101b6d5db9611a93b51602",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47391
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8741
+       ],
+       "out": [
+        2126
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.187327,
+      "usd_client": 0.18732700000000002,
+      "tokens": 96582,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3639,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 1,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 1,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b43babb087ef20ba6eee90acfec422eb4b7fe3a39d53b7338493ce942b05d432",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        79055
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        14908
+       ],
+       "out": [
+        2611
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.15411460000000002,
+      "usd_client": 0.1541146,
+      "tokens": 66005,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 5843,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "657f50fb3066204545a096ccf1ea6c53af023ab0061d282fdd1cf1144be5b500",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51993
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11369
+       ],
+       "out": [
+        2637
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.058638,
+      "usd_client": 0.0387228,
+      "tokens": 34500,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "6b8a856581b146e945bf97a8cfbd814ef068947c5a0cc9f4ca04b2aaff1387c8",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        1887
+       ],
+       "cr": [
+        14674
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        716
+       ],
+       "out": [
+        1233
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 32669,
+        "output": 1831,
+        "cache_read": 29348,
+        "cache_write": 716
+       },
+       "anthropic_usd": 0.058638,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 718,
+        "output": 598,
+        "cache_read": 14674,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 4,
+     "order": [
+      "plain",
+      "v1",
+      "v2",
+      "gateway"
+     ],
+     "plain": {
+      "usd": 0.13211920000000002,
+      "usd_client": 0.1321192,
+      "tokens": 58943,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2516,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "2e4957a9cff065044de791d5add6c33800043113292ff4524655f5e2562f935e",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        47416
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8984
+       ],
+       "out": [
+        2537
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.1402806,
+      "usd_client": 0.1402806,
+      "tokens": 44744,
+      "success": true,
+      "oracle": "ok",
+      "turns": 2,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2199,
+      "tool_result_blocks": 1,
+      "tool_calls": 1,
+      "tool_calls_by_name": {
+       "Bash": 1
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "34ea1a949850460e0192cce2a073fa03b4c08de1e5a632bd4add23b96d220884",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        4
+       ],
+       "cr": [
+        31083
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11591
+       ],
+       "out": [
+        2066
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1551742,
+      "usd_client": 0.1551742,
+      "tokens": 65969,
+      "success": true,
+      "oracle": "ok",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 5683,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "c7a10d897e818faf5f6c8042e8ef4ab45e4ef4418c89663c68d5737cbeccec83",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        51891
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        11389
+       ],
+       "out": [
+        2683
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.059162,
+      "usd_client": 0.0385268,
+      "tokens": 34555,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "f1ae048f0cb85265e03692fd4315b40a762d03e737570304511e67b8cdfed930",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        1923
+       ],
+       "cr": [
+        14674
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        716
+       ],
+       "out": [
+        1216
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 32705,
+        "output": 1850,
+        "cache_read": 29348,
+        "cache_write": 716
+       },
+       "anthropic_usd": 0.059162,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 718,
+        "output": 634,
+        "cache_read": 14674,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    }
+   ],
+   "warmup_usd": {
+    "plain": 0.09412,
+    "v1": 0.14543,
+    "v2": 0.16432,
+    "gateway": 0.06576
+   }
+  },
+  {
+   "id": "large-json",
+   "label": "Large JSON API",
+   "demonstration_only": false,
+   "pairs_planned": 4,
+   "void_sessions": 0,
+   "warmup_sessions": 4,
+   "analysis": {
+    "n": 4,
+    "arms": {
+     "plain": {
+      "usd_mean": 0.1178,
+      "tokens_mean": 75911,
+      "tool_result_bytes_mean": 1825,
+      "tool_result_bytes_median": 1624,
+      "tool_result_bytes": [
+       2549,
+       1662,
+       1586,
+       1504
+      ],
+      "tool_calls": [
+       5,
+       3,
+       2,
+       2
+      ],
+      "tool_calls_median": 2.5,
+      "success": "0/4",
+      "oracle_reasons": [
+       "answer-missing-1-of-4-values",
+       "answer-missing-1-of-8-values",
+       "no-served-data-on-disk"
+      ]
+     },
+     "v1": {
+      "usd_mean": 0.24179,
+      "tokens_mean": 203998,
+      "tool_result_bytes_mean": 3252,
+      "tool_result_bytes_median": 3488,
+      "tool_result_bytes": [
+       3063,
+       4254,
+       3913,
+       1778
+      ],
+      "tool_calls": [
+       8,
+       9,
+       8,
+       6
+      ],
+      "tool_calls_median": 8,
+      "success": "0/4",
+      "oracle_reasons": [
+       "no-served-data-on-disk"
+      ],
+      "routed": "4/4"
+     },
+     "v2": {
+      "usd_mean": 0.1377,
+      "tokens_mean": 109965,
+      "tool_result_bytes_mean": 1716,
+      "tool_result_bytes_median": 1666,
+      "tool_result_bytes": [
+       1544,
+       1788,
+       1494,
+       2037
+      ],
+      "tool_calls": [
+       4,
+       5,
+       4,
+       4
+      ],
+      "tool_calls_median": 4,
+      "success": "0/4",
+      "oracle_reasons": [
+       "no-served-data-on-disk"
+      ],
+      "routed": "3/4"
+     },
+     "gateway": {
+      "usd_mean": 0.0762,
+      "tokens_mean": 41552,
+      "tool_result_bytes_mean": 741,
+      "tool_result_bytes_median": 656,
+      "tool_result_bytes": [
+       683,
+       1243,
+       629,
+       409
+      ],
+      "tool_calls": [
+       1,
+       2,
+       1,
+       1
+      ],
+      "tool_calls_median": 1,
+      "success": "0/4",
+      "oracle_reasons": [
+       "no-served-data-on-disk"
+      ],
+      "no_client_tool_call": "0/4",
+      "edge_calls_when_no_client_tool_call": []
+     }
+    },
+    "v1_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.1178,
+     "arm_usd_mean": 0.24179,
+     "pct": 105.3,
+     "pct_ci95": [
+      86.1,
+      124.4
+     ],
+     "verdict": "more",
+     "ci_crosses_zero": false,
+     "median_diff_usd": 0.1253494,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -124
+    },
+    "v2_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.1178,
+     "arm_usd_mean": 0.1377,
+     "pct": 16.9,
+     "pct_ci95": [
+      -18.2,
+      52
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": 0.0247242,
+     "arm_wins": 1,
+     "per_1000_tasks_usd": -19.9
+    },
+    "gateway_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.1178,
+     "arm_usd_mean": 0.0762,
+     "pct": -35.3,
+     "pct_ci95": [
+      -52.4,
+      -18.2
+     ],
+     "verdict": "less",
+     "ci_crosses_zero": false,
+     "median_diff_usd": -0.0427946,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 41.6
+    },
+    "v2_vs_v1_secondary": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.24179,
+     "arm_usd_mean": 0.1377,
+     "pct": -43.1,
+     "pct_ci95": [
+      -68.7,
+      -17.4
+     ],
+     "verdict": "less",
+     "ci_crosses_zero": false,
+     "median_diff_usd": -0.1006252,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 104.1
+    }
+   },
+   "pairs": [
+    {
+     "cycle": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.11793580000000001,
+      "usd_client": 0.1179358,
+      "tokens": 108698,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2549,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "Bash": 5
+      },
+      "tools_runner": {
+       "Bash": 5
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "ed42e5e2b759ac0d9b2dcfd3a01b391e4fa503a2735d8de5e43742064ece04d7",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        99699
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        6816
+       ],
+       "out": [
+        2171
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.23493060000000002,
+      "usd_client": 0.23493060000000002,
+      "tokens": 180814,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 9,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3063,
+      "tool_result_blocks": 8,
+      "tool_calls": 8,
+      "tool_calls_by_name": {
+       "Write": 1,
+       "Bash": 4,
+       "ToolSearch": 1,
+       "Edit": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Write": 1,
+       "Bash": 3,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "d3f2f9d31cd82bd52cebf0c486333c77de74a2124f674a0c070ef749ef8a2601",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        14
+       ],
+       "cr": [
+        160593
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        16782
+       ],
+       "out": [
+        3425
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.146582,
+      "usd_client": 0.146582,
+      "tokens": 108372,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1544,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b5e70ab90697efd10daedd889d19a171f2a693f5a0d435190896560de4c58eae",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        95830
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10272
+       ],
+       "out": [
+        2260
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.076498,
+      "usd_client": 0.0764984,
+      "tokens": 36646,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 2,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 683,
+      "tool_result_blocks": 1,
+      "tool_calls": 1,
+      "tool_calls_by_name": {
+       "Bash": 1
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "40b77e925fda6a7649bbd26e249c105e96330d063a1138702199986e39f1cdc2",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        720
+       ],
+       "cr": [
+        29412
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5212
+       ],
+       "out": [
+        1302
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 2,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 35344,
+        "output": 1302,
+        "cache_read": 29412,
+        "cache_write": 5212
+       },
+       "anthropic_usd": 0.076498,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 2,
+     "order": [
+      "v2",
+      "gateway",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.1392064,
+      "usd_client": 0.1392064,
+      "tokens": 81924,
+      "success": false,
+      "oracle": "answer-missing-1-of-8-values",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1662,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "9b8922b88c146cf5708ba6d11139daba60ff86330e65ab82dce2a9e20e0be43b",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        69852
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9673
+       ],
+       "out": [
+        2391
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2729104,
+      "usd_client": 0.2729104,
+      "tokens": 245993,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 10,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 4254,
+      "tool_result_blocks": 9,
+      "tool_calls": 9,
+      "tool_calls_by_name": {
+       "Write": 1,
+       "Bash": 6,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Write": 1,
+       "Bash": 5,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "6272cf928d661ad90a8ba493386fcbf4585fc77fd872127cce3e5287ecad650b",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        18
+       ],
+       "cr": [
+        223532
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        18394
+       ],
+       "out": [
+        4049
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.1600086,
+      "usd_client": 0.1600086,
+      "tokens": 131067,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1788,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "Write": 1,
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Write": 1,
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "d79426c44f6291c64a0e24e237b3464958105e5d6e6ffd34f4ca8fb1c5302e13",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        117743
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10819
+       ],
+       "out": [
+        2493
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.095055,
+      "usd_client": 0.09505499999999999,
+      "tokens": 57680,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1243,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "82a84f713318404ac6f17a51e923b641b3c10f71b6da6e1b97c0da0be42ad170",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        724
+       ],
+       "cr": [
+        49135
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        6174
+       ],
+       "out": [
+        1647
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 3,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 56033,
+        "output": 1647,
+        "cache_read": 49135,
+        "cache_write": 6174
+       },
+       "anthropic_usd": 0.095055,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 3,
+     "order": [
+      "gateway",
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.120539,
+      "usd_client": 0.120539,
+      "tokens": 59722,
+      "success": false,
+      "oracle": "answer-missing-1-of-4-values",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1586,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b673aa28ef8a267a8808c3d3b16a819fd3eaad593014ce7970d01f45c4bac181",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        48675
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9170
+       ],
+       "out": [
+        1871
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2582884,
+      "usd_client": 0.2582884,
+      "tokens": 215380,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 9,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3913,
+      "tool_result_blocks": 8,
+      "tool_calls": 8,
+      "tool_calls_by_name": {
+       "Write": 1,
+       "Bash": 5,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Write": 1,
+       "Bash": 4,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "5ef1d39d1fa458db66caade64bc3eb60d6e1d966cd36dfd6e7fcf52766135a1b",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        16
+       ],
+       "cr": [
+        193642
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        17912
+       ],
+       "out": [
+        3810
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.104795,
+      "usd_client": 0.104795,
+      "tokens": 92973,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1494,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 4
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "2eef63949e242937c1b8192ba891f98591e7a4f071ce6a44fe69f7fa842dc11b",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        84735
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        6396
+       ],
+       "out": [
+        1832
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.064778,
+      "usd_client": 0.0647784,
+      "tokens": 35895,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 2,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 629,
+      "tool_result_blocks": 1,
+      "tool_calls": 1,
+      "tool_calls_by_name": {
+       "Bash": 1
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "60b4a9448ca9ea044f5ea69ae9186ccec943f15f20d816c7b52302d32ffb251b",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        720
+       ],
+       "cr": [
+        29412
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4937
+       ],
+       "out": [
+        826
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 2,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 35069,
+        "output": 826,
+        "cache_read": 29412,
+        "cache_write": 4937
+       },
+       "anthropic_usd": 0.064778,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 4,
+     "order": [
+      "plain",
+      "v1",
+      "v2",
+      "gateway"
+     ],
+     "plain": {
+      "usd": 0.09350439999999999,
+      "usd_client": 0.0935044,
+      "tokens": 53300,
+      "success": false,
+      "oracle": "answer-missing-1-of-8-values",
+      "turns": 3,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1504,
+      "tool_result_blocks": 2,
+      "tool_calls": 2,
+      "tool_calls_by_name": {
+       "Bash": 2
+      },
+      "tools_runner": {
+       "Bash": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "df707cb26f186400bd3584730ab68221a4e7ff98270a74d7a104f9dcb732898a",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        6
+       ],
+       "cr": [
+        45542
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        5889
+       ],
+       "out": [
+        1863
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2010472,
+      "usd_client": 0.20104719999999998,
+      "tokens": 173805,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 7,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1778,
+      "tool_result_blocks": 6,
+      "tool_calls": 6,
+      "tool_calls_by_name": {
+       "Write": 1,
+       "Bash": 3,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Write": 1,
+       "Bash": 3,
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "06360c26a364183e4a4c2d6aebe7987ebc835ca585d487d741924c356044a108",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        14
+       ],
+       "cr": [
+        155996
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        15509
+       ],
+       "out": [
+        2286
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.13940260000000002,
+      "usd_client": 0.13940260000000002,
+      "tokens": 107449,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2037,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "tools_runner": {
+       "Bash": 3,
+       "mcp__context-mode__ctx_execute": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "1b3159d3bb58e92d01f6d21183d9b32af5feecc5badc8602401c07c1ef9c1904",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        95353
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10119
+       ],
+       "out": [
+        1967
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.06847,
+      "usd_client": 0.06847039999999999,
+      "tokens": 35986,
+      "success": false,
+      "oracle": "no-served-data-on-disk",
+      "turns": 2,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 409,
+      "tool_result_blocks": 1,
+      "tool_calls": 1,
+      "tool_calls_by_name": {
+       "Bash": 1
+      },
+      "tools_runner": {
+       "Bash": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "6b2fe79aae7bcc81b609ab1133381e33b29f4c6e4af2818e4c22fd8a69ae0658",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        720
+       ],
+       "cr": [
+        29412
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4781
+       ],
+       "out": [
+        1073
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 2,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 34913,
+        "output": 1073,
+        "cache_read": 29412,
+        "cache_write": 4781
+       },
+       "anthropic_usd": 0.06847,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    }
+   ],
+   "warmup_usd": {
+    "plain": 0.10531,
+    "v1": 0.16053,
+    "v2": 0.12701,
+    "gateway": 0.07867
+   }
+  },
+  {
+   "id": "docs-search",
+   "label": "Documentation search",
+   "demonstration_only": false,
+   "pairs_planned": 4,
+   "void_sessions": 0,
+   "warmup_sessions": 4,
+   "analysis": {
+    "n": 4,
+    "arms": {
+     "plain": {
+      "usd_mean": 0.16168,
+      "tokens_mean": 101448,
+      "tool_result_bytes_mean": 11604,
+      "tool_result_bytes_median": 11724,
+      "tool_result_bytes": [
+       8493,
+       14475,
+       9449,
+       13999
+      ],
+      "tool_calls": [
+       3,
+       4,
+       5,
+       4
+      ],
+      "tool_calls_median": 4,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ]
+     },
+     "v1": {
+      "usd_mean": 0.2029,
+      "tokens_mean": 106053,
+      "tool_result_bytes_mean": 16971,
+      "tool_result_bytes_median": 16946,
+      "tool_result_bytes": [
+       16940,
+       16952,
+       17079,
+       16913
+      ],
+      "tool_calls": [
+       3,
+       3,
+       3,
+       3
+      ],
+      "tool_calls_median": 3,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "4/4"
+     },
+     "v2": {
+      "usd_mean": 0.24953,
+      "tokens_mean": 215064,
+      "tool_result_bytes_mean": 19971,
+      "tool_result_bytes_median": 20120,
+      "tool_result_bytes": [
+       15285,
+       24358,
+       24145,
+       16095
+      ],
+      "tool_calls": [
+       8,
+       9,
+       10,
+       5
+      ],
+      "tool_calls_median": 8.5,
+      "success": "4/4",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "4/4"
+     },
+     "gateway": {
+      "usd_mean": 0.05727,
+      "tokens_mean": 39599,
+      "tool_result_bytes_mean": 0,
+      "tool_result_bytes_median": 0,
+      "tool_result_bytes": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "tool_calls": [
+       0,
+       0,
+       0,
+       0
+      ],
+      "tool_calls_median": 0,
+      "success": "0/4",
+      "oracle_reasons": [
+       "no-tool-call"
+      ],
+      "no_client_tool_call": "4/4",
+      "edge_calls_when_no_client_tool_call": [
+       1,
+       1,
+       2,
+       1
+      ]
+     }
+    },
+    "v1_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.16168,
+     "arm_usd_mean": 0.2029,
+     "pct": 25.5,
+     "pct_ci95": [
+      6.3,
+      44.7
+     ],
+     "verdict": "more",
+     "ci_crosses_zero": false,
+     "median_diff_usd": 0.0443299,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -41.2
+    },
+    "v2_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.16168,
+     "arm_usd_mean": 0.24953,
+     "pct": 54.3,
+     "pct_ci95": [
+      18.5,
+      90.2
+     ],
+     "verdict": "more",
+     "ci_crosses_zero": false,
+     "median_diff_usd": 0.0954189,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -87.8
+    },
+    "gateway_vs_plain": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.16168,
+     "arm_usd_mean": 0.05727,
+     "pct": -64.6,
+     "pct_ci95": [
+      -88,
+      -41.1
+     ],
+     "verdict": "less",
+     "ci_crosses_zero": false,
+     "median_diff_usd": -0.1056968,
+     "arm_wins": 4,
+     "per_1000_tasks_usd": 104.4
+    },
+    "v2_vs_v1_secondary": {
+     "n": 4,
+     "t": 3.182,
+     "base_usd_mean": 0.2029,
+     "arm_usd_mean": 0.24953,
+     "pct": 23,
+     "pct_ci95": [
+      -10.2,
+      56.1
+     ],
+     "verdict": "same",
+     "ci_crosses_zero": true,
+     "median_diff_usd": 0.0380432,
+     "arm_wins": 0,
+     "per_1000_tasks_usd": -46.6
+    }
+   },
+   "pairs": [
+    {
+     "cycle": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.1474758,
+      "usd_client": 0.1474758,
+      "tokens": 81238,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 8493,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "741ba329ec5c1aaf76fd0c7c23e0c75a7b8033836b657357a92b44bccae66a2f",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        67939
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        10997
+       ],
+       "out": [
+        2294
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2056274,
+      "usd_client": 0.20562740000000002,
+      "tokens": 107726,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 16940,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "db2f6f82310ee35ebc095db0fc491697ae8feefe8d3fe635ebf0ec608c8b2533",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        86437
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        19776
+       ],
+       "out": [
+        1505
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.23591520000000002,
+      "usd_client": 0.2359152,
+      "tokens": 201768,
+      "success": true,
+      "oracle": "ok",
+      "turns": 9,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 15285,
+      "tool_result_blocks": 8,
+      "tool_calls": 8,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 1,
+       "mcp__context-mode__ctx_search": 2,
+       "mcp__context-mode__ctx_execute": 4
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 1,
+       "mcp__context-mode__ctx_search": 2,
+       "mcp__context-mode__ctx_execute": 4
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "620871fef05064f21d050381349653c88405df810aa0e4b2575b14f8618ef9ee",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        18
+       ],
+       "cr": [
+        182776
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        15016
+       ],
+       "out": [
+        3958
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 7,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.0486,
+      "usd_client": 0.027173000000000003,
+      "tokens": 34048,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "1681850dc58c97d5d4e21cea9f5845e042e550a9c99c98c887d376a0afe1007d",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        1961
+       ],
+       "cr": [
+        14670
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        715
+       ],
+       "out": [
+        641
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 32733,
+        "output": 1315,
+        "cache_read": 29340,
+        "cache_write": 715
+       },
+       "anthropic_usd": 0.0486,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 717,
+        "output": 674,
+        "cache_read": 14670,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 2,
+     "order": [
+      "v2",
+      "gateway",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.184498,
+      "usd_client": 0.184498,
+      "tokens": 110800,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 14475,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 4
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "360f5b8038abc0468ab296187a06d3464f28b327e14b8786f540ff7ea44af63a",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        94130
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        13964
+       ],
+       "out": [
+        2696
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2025624,
+      "usd_client": 0.20256239999999998,
+      "tokens": 104494,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 16952,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "857e42993c7f57a0b1567058bbeeecfb96320ac34ba03907fafc4d7e7beaaa79",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        83312
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        19801
+       ],
+       "out": [
+        1373
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.3075098,
+      "usd_client": 0.30750980000000006,
+      "tokens": 264374,
+      "success": true,
+      "oracle": "ok",
+      "turns": 10,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 24358,
+      "tool_result_blocks": 9,
+      "tool_calls": 9,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 1,
+       "mcp__context-mode__ctx_search": 2,
+       "mcp__context-mode__ctx_execute": 5
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 1,
+       "mcp__context-mode__ctx_search": 2,
+       "mcp__context-mode__ctx_execute": 5
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "c24a076450e3c889fcfc4e67c04e95ba75bd58fb81962d774e6be2b609fabb1e",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        20
+       ],
+       "cr": [
+        238149
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        22025
+       ],
+       "out": [
+        4180
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 8,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.05306,
+      "usd_client": 0.031713,
+      "tokens": 35307,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "7b31c38a0a475253537d67d5f3afcf9786cda58eb887f2ce3a441c980f29ee48",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        3256
+       ],
+       "cr": [
+        14670
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        715
+       ],
+       "out": [
+        609
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 34028,
+        "output": 1279,
+        "cache_read": 29340,
+        "cache_write": 715
+       },
+       "anthropic_usd": 0.05306,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 717,
+        "output": 670,
+        "cache_read": 14670,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 3,
+     "order": [
+      "gateway",
+      "plain",
+      "v1",
+      "v2"
+     ],
+     "plain": {
+      "usd": 0.14589560000000001,
+      "usd_client": 0.14589560000000001,
+      "tokens": 110326,
+      "success": true,
+      "oracle": "ok",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 9449,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "Bash": 5
+      },
+      "tools_runner": {
+       "Bash": 5
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "be8b715ec06112e26116a74e1ee0fe233dd65fdbdc8b88373631d06baf46a436",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        98418
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        9313
+       ],
+       "out": [
+        2583
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.2024954,
+      "usd_client": 0.20249540000000002,
+      "tokens": 107588,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 17079,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b7bd98e34cb43303c742e4ca380fd0c0b3e17dc2beca7dbbec07c04c19c333c8",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        86437
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        19807
+       ],
+       "out": [
+        1336
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.248294,
+      "usd_client": 0.248294,
+      "tokens": 253263,
+      "success": true,
+      "oracle": "ok",
+      "turns": 11,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 24145,
+      "tool_result_blocks": 10,
+      "tool_calls": 10,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 2,
+       "mcp__context-mode__ctx_search": 4,
+       "mcp__context-mode__ctx_execute": 3
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 2,
+       "mcp__context-mode__ctx_search": 4,
+       "mcp__context-mode__ctx_execute": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "9d28e60e4c7a455334c25e6448d58b3a2edb9621a524932c95d8e137d5e0f3c4",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        22
+       ],
+       "cr": [
+        232650
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        17512
+       ],
+       "out": [
+        3079
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 9,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.071089,
+      "usd_client": 0.028981,
+      "tokens": 53290,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "d821bd8097ed5eb00748d4c128c9d73fb784c14b2db4fa2950ebe999b121077a",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        3336
+       ],
+       "cr": [
+        15385
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "out": [
+        628
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 2,
+       "tokens": {
+        "prompt": 51726,
+        "output": 1564,
+        "cache_read": 44725,
+        "cache_write": 715
+       },
+       "anthropic_usd": 0.071089,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 2950,
+        "output": 936,
+        "cache_read": 29340,
+        "cache_write": 715
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 4,
+     "order": [
+      "plain",
+      "v1",
+      "v2",
+      "gateway"
+     ],
+     "plain": {
+      "usd": 0.16885779999999997,
+      "usd_client": 0.1688578,
+      "tokens": 103426,
+      "success": true,
+      "oracle": "ok",
+      "turns": 5,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 13999,
+      "tool_result_blocks": 4,
+      "tool_calls": 4,
+      "tool_calls_by_name": {
+       "Bash": 4
+      },
+      "tools_runner": {
+       "Bash": 4
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "74cc2872949c3aa18c0120cbc50d0c9b4933e1d094703415f7bdcdd20f08e047",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        10
+       ],
+       "cr": [
+        87869
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        13308
+       ],
+       "out": [
+        2239
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.20091779999999998,
+      "usd_client": 0.2009178,
+      "tokens": 104404,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 16913,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_fetch_and_index": 1,
+       "mcp__context-mode__ctx_search": 1
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "99259cfc5cff5d4e9f1218455ab35a64a305801d8cb8f0a3a9ab721e217d2a16",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        8
+       ],
+       "cr": [
+        83309
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        19793
+       ],
+       "out": [
+        1294
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 2,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.2063916,
+      "usd_client": 0.2063916,
+      "tokens": 140850,
+      "success": true,
+      "oracle": "ok",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 16095,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 1,
+       "mcp__context-mode__ctx_search": 3
+      },
+      "tools_runner": {
+       "ToolSearch": 1,
+       "mcp__context-mode__ctx_index": 1,
+       "mcp__context-mode__ctx_search": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "f53558930e117f1cbe10d805e74cfbf62bd0feb017fabc41e972e2757db62c40",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        121098
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        17723
+       ],
+       "out": [
+        2017
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 4,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.05634,
+      "usd_client": 0.034233,
+      "tokens": 35751,
+      "success": false,
+      "oracle": "no-tool-call",
+      "turns": 1,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 0,
+      "tool_result_blocks": 0,
+      "tool_calls": 0,
+      "tool_calls_by_name": {},
+      "tools_runner": {},
+      "compact_boundary": 0,
+      "transcript_sha256": "6feb35342af0d3f371aaf092fb9fe937f57d3dc90d7db73f83a913e4f16d016e",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        3606
+       ],
+       "cr": [
+        14670
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        0
+       ],
+       "cwx": [
+        715
+       ],
+       "out": [
+        665
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 1,
+       "edge_calls": 1,
+       "tokens": {
+        "prompt": 34378,
+        "output": 1373,
+        "cache_read": 29340,
+        "cache_write": 715
+       },
+       "anthropic_usd": 0.05634,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 717,
+        "output": 708,
+        "cache_read": 14670,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    }
+   ],
+   "warmup_usd": {
+    "plain": 0.18139,
+    "v1": 0.20166,
+    "v2": 0.24645,
+    "gateway": 0.0565
+   }
+  },
+  {
+   "id": "session-continuity",
+   "label": "Session continuity",
+   "demonstration_only": true,
+   "pairs_planned": 2,
+   "void_sessions": 0,
+   "warmup_sessions": 0,
+   "analysis": {
+    "n": 2,
+    "arms": {
+     "plain": {
+      "usd_mean": 0.24229,
+      "tokens_mean": 144485,
+      "tool_result_bytes_mean": 1438,
+      "tool_result_bytes_median": 1437.5,
+      "tool_result_bytes": [
+       1571,
+       1304
+      ],
+      "tool_calls": [
+       5,
+       6
+      ],
+      "tool_calls_median": 5.5,
+      "success": "2/2",
+      "oracle_reasons": [
+       "ok"
+      ]
+     },
+     "v1": {
+      "usd_mean": 0.33307,
+      "tokens_mean": 223226,
+      "tool_result_bytes_mean": 3006,
+      "tool_result_bytes_median": 3006,
+      "tool_result_bytes": [
+       3640,
+       2372
+      ],
+      "tool_calls": [
+       14,
+       8
+      ],
+      "tool_calls_median": 11,
+      "success": "2/2",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "0/2"
+     },
+     "v2": {
+      "usd_mean": 0.29955,
+      "tokens_mean": 212951,
+      "tool_result_bytes_mean": 2611,
+      "tool_result_bytes_median": 2610.5,
+      "tool_result_bytes": [
+       3084,
+       2137
+      ],
+      "tool_calls": [
+       16,
+       11
+      ],
+      "tool_calls_median": 13.5,
+      "success": "2/2",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "routed": "2/2"
+     },
+     "gateway": {
+      "usd_mean": 0.14854,
+      "tokens_mean": 75061,
+      "tool_result_bytes_mean": 638,
+      "tool_result_bytes_median": 637.5,
+      "tool_result_bytes": [
+       473,
+       802
+      ],
+      "tool_calls": [
+       3,
+       3
+      ],
+      "tool_calls_median": 3,
+      "success": "2/2",
+      "oracle_reasons": [
+       "ok"
+      ],
+      "no_client_tool_call": "0/2",
+      "edge_calls_when_no_client_tool_call": []
+     }
+    },
+    "note": "Demonstration only (prereg): no interval, no verdict, no claim."
+   },
+   "pairs": [
+    {
+     "cycle": 1,
+     "order": [
+      "v1",
+      "v2",
+      "gateway",
+      "plain"
+     ],
+     "plain": {
+      "usd": 0.2542922,
+      "usd_client": 0.2542922,
+      "tokens": 134548,
+      "success": true,
+      "oracle": "ok",
+      "turns": 6,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1571,
+      "tool_result_blocks": 5,
+      "tool_calls": 5,
+      "tool_calls_by_name": {
+       "Bash": 5
+      },
+      "tools_runner": {
+       "Bash": 5
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "56ab949c958e631a98ecca7646f3630d5d34e3d8b3e5b21f70bb3563de35e7d6",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        12
+       ],
+       "cr": [
+        114941
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        13387
+       ],
+       "out": [
+        6208
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.30103420000000003,
+      "usd_client": 0.30103420000000003,
+      "tokens": 195685,
+      "success": true,
+      "oracle": "ok",
+      "turns": 15,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3640,
+      "tool_result_blocks": 14,
+      "tool_calls": 14,
+      "tool_calls_by_name": {
+       "Bash": 7,
+       "Write": 7
+      },
+      "tools_runner": {
+       "Bash": 7
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "e2f88fc263f5fe3dae57a00d7244610a84e949fcd86883ceba1206a65a5a2fca",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        16
+       ],
+       "cr": [
+        172811
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        15896
+       ],
+       "out": [
+        6962
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.3359018,
+      "usd_client": 0.3359018,
+      "tokens": 254954,
+      "success": true,
+      "oracle": "ok",
+      "turns": 17,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 3084,
+      "tool_result_blocks": 16,
+      "tool_calls": 16,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "Bash": 4,
+       "mcp__context-mode__ctx_resume": 1,
+       "Write": 8,
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "tools_runner": {
+       "Bash": 4,
+       "mcp__context-mode__ctx_resume": 1,
+       "Write": 2,
+       "mcp__context-mode__ctx_execute": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "072266d9cc2df1a47cbd18ec7a8efe700432f70541379188b38ae860c806fc8d",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        20
+       ],
+       "cr": [
+        230269
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        16961
+       ],
+       "out": [
+        7704
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 3,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.165151,
+      "usd_client": 0.165151,
+      "tokens": 79747,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 473,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "4adbb311a5095efb3fbfd42c65f125ee2bace70e9dfe6f6ef3df76f3032b9178",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        730
+       ],
+       "cr": [
+        66315
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        8756
+       ],
+       "out": [
+        3946
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 4,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 75801,
+        "output": 3946,
+        "cache_read": 66315,
+        "cache_write": 8756
+       },
+       "anthropic_usd": 0.165151,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    },
+    {
+     "cycle": 2,
+     "order": [
+      "v2",
+      "gateway",
+      "plain",
+      "v1"
+     ],
+     "plain": {
+      "usd": 0.230293,
+      "usd_client": 0.230293,
+      "tokens": 154422,
+      "success": true,
+      "oracle": "ok",
+      "turns": 7,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 1304,
+      "tool_result_blocks": 6,
+      "tool_calls": 6,
+      "tool_calls_by_name": {
+       "Bash": 6
+      },
+      "tools_runner": {
+       "Bash": 6
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "186e4aedea76df506624c3969b663a27b000d706b3136977761c2eb13d32563e",
+      "order_position": 2,
+      "calls": {
+       "in": [
+        14
+       ],
+       "cr": [
+        136865
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        12333
+       ],
+       "out": [
+        5210
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      }
+     },
+     "v1": {
+      "usd": 0.36511479999999996,
+      "usd_client": 0.3651148,
+      "tokens": 250766,
+      "success": true,
+      "oracle": "ok",
+      "turns": 9,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2372,
+      "tool_result_blocks": 8,
+      "tool_calls": 8,
+      "tool_calls_by_name": {
+       "Bash": 8
+      },
+      "tools_runner": {
+       "Bash": 8
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "868bcedc7144671cbb02c3fbb982a0d462f03884456eaceffdbcd7105744bacd",
+      "order_position": 3,
+      "calls": {
+       "in": [
+        18
+       ],
+       "cr": [
+        223254
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        19124
+       ],
+       "out": [
+        8370
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 0,
+      "plugin_tools_listed": 11
+     },
+     "v2": {
+      "usd": 0.2631886,
+      "usd_client": 0.2631886,
+      "tokens": 170947,
+      "success": true,
+      "oracle": "ok",
+      "turns": 12,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 2137,
+      "tool_result_blocks": 11,
+      "tool_calls": 11,
+      "tool_calls_by_name": {
+       "ToolSearch": 1,
+       "Bash": 4,
+       "mcp__context-mode__ctx_resume": 1,
+       "Write": 5
+      },
+      "tools_runner": {
+       "Bash": 4,
+       "mcp__context-mode__ctx_resume": 1,
+       "Write": 2
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "7a12936cc5a338c7f3df9c2c78377f77e2f883cbaea4ffb322a66de55eead1d0",
+      "order_position": 0,
+      "calls": {
+       "in": [
+        16
+       ],
+       "cr": [
+        152003
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        12153
+       ],
+       "out": [
+        6775
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "plugin_tool_calls": 1,
+      "plugin_tools_listed": 9
+     },
+     "gateway": {
+      "usd": 0.131937,
+      "usd_client": 0.13193680000000002,
+      "tokens": 70375,
+      "success": true,
+      "oracle": "ok",
+      "turns": 4,
+      "result_subtype": "success",
+      "timed_out": false,
+      "rate_limited": false,
+      "budget_hit": false,
+      "tool_result_bytes": 802,
+      "tool_result_blocks": 3,
+      "tool_calls": 3,
+      "tool_calls_by_name": {
+       "Bash": 3
+      },
+      "tools_runner": {
+       "Bash": 3
+      },
+      "compact_boundary": 0,
+      "transcript_sha256": "b773a5018d76b8a91aaafba518026f945ab2f135b5af83f124e46f72196a115a",
+      "order_position": 1,
+      "calls": {
+       "in": [
+        730
+       ],
+       "cr": [
+        61004
+       ],
+       "cw5": [
+        0
+       ],
+       "cw1h": [
+        4667
+       ],
+       "out": [
+        3974
+       ],
+       "model": [
+        0
+       ],
+       "models": [
+        "claude-opus-5-5"
+       ]
+      },
+      "gateway_record": {
+       "requests": 4,
+       "edge_calls": 0,
+       "tokens": {
+        "prompt": 66401,
+        "output": 3974,
+        "cache_read": 61004,
+        "cache_write": 4667
+       },
+       "anthropic_usd": 0.131937,
+       "covers_client": true,
+       "unseen_by_client": {
+        "input": 0,
+        "output": 0,
+        "cache_read": 0,
+        "cache_write": 0
+       }
+      },
+      "flags": {
+       "memory": true,
+       "skills": true
+      }
+     }
+    }
+   ]
+  }
+ ]
+}
