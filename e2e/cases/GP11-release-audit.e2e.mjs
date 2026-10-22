@@ -16,9 +16,10 @@ function names(dir, out = []) {
   return out;
 }
 
-// D-FU-RM-PI-1 (ADR-0002 GS7 amended): one root package.json is allowed, the Pi-only shape (name, version, private,
-// type, pi). It must carry no dependency key and no scripts; no package.json below the root.
-const ALLOWED_ROOT_KEYS = ["name", "pi", "private", "type", "version"];
+// D-FU-RM-PI-1 (ADR-0002 GS7 amended) + ADR-0019 D1 (PO-NPM-2): one root package.json is allowed, the D1 npm shape
+// (name, version, bin, type, engines, files, pi). It must carry no dependency key, no scripts and no private (D1
+// publishes it); no package.json below the root.
+const ALLOWED_ROOT_KEYS = ["bin", "engines", "files", "name", "pi", "type", "version"];
 
 test("[M6] GP11/npm-audit-zero-high-critical: release-out has no runtime dependencies, no node_modules, no nested package.json (#1225)", () => {
   assert.ok(existsSync(OUT), "release-out missing (run build/build.mjs first)");
@@ -33,6 +34,8 @@ test("[M6] GP11/npm-audit-zero-high-critical: release-out has no runtime depende
     for (const k of ["dependencies", "optionalDependencies", "peerDependencies", "bundleDependencies", "bundledDependencies", "scripts"]) {
       assert.ok(!(k in pkg), `release-out/package.json has ${k}`);
     }
-    assert.equal(pkg.private, true, "release-out/package.json private must be true");
+    assert.ok(!("private" in pkg), "release-out/package.json has private (ADR-0019 D1 publishes it)");
+    assert.deepEqual(pkg.bin, { "context-mode": "cli.mjs" }, "release-out/package.json bin");
+    assert.deepEqual(pkg.engines, { node: ">=24.15.0" }, "release-out/package.json engines");
   }
 });
