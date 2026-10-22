@@ -1,0 +1,48 @@
+{
+  "hasNodeModules": false,
+  "keys": [
+    "bin",
+    "engines",
+    "files",
+    "name",
+    "pi",
+    "type",
+    "version"
+  ],
+  "packageJson": {
+    "bin": {
+      "context-mode": "cli.mjs"
+    },
+    "engines": {
+      "node": ">=24.15.0"
+    },
+    "files": [
+      ".claude-plugin",
+      "SHA256SUMS",
+      "cli.mjs",
+      "copilot",
+      "fixtures",
+      "gemini-extension.json",
+      "hook.mjs",
+      "hooks",
+      "opencode",
+      "pi",
+      "qwen-extension.json",
+      "run.mjs",
+      "search.mjs",
+      "server.mjs",
+      "skills"
+    ],
+    "name": "context-mode",
+    "pi": {
+      "extensions": [
+        "./pi/index.js"
+      ],
+      "skills": [
+        "./skills"
+      ]
+    },
+    "type": "module"
+  },
+  "topLevelEqualsFiles": true
+}
