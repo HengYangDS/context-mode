@@ -68,7 +68,8 @@ Columns: Input | Output | 5m writes | 1h writes | Hits and refreshes. The rows, 
 
 The page's rule (Long context pricing): "Claude Haiku 5.5 is priced by prompt length: a request whose prompt is over
 100,000 tokens pays higher prices. A request's prompt length counts all of its input tokens, including cache reads and
-cache writes. Each request is priced on its own".
+cache writes. Each request is priced on its own: a request over the threshold pays the higher prices even when part
+of its prompt is a cache hit, and earlier requests keep the prices they were billed at."
 
 Tier rule in the harness:
 
@@ -86,3 +87,8 @@ Check on the smoke transcript that stopped: helper usage 5,605 input and 2,451 o
 
 Harness: `bench/gateway-ab/tryit.patch` now diffs from the first-run commit to the commit with this price, SHA-256
 `eec3114ef0478bfd2f0f1bee542d9b20bf6ce00012a688fbe854fea2454185c2`. Unit tests: `scripts/e2e/oss-arms-lib.test.mjs`, 16 pass (2 new: both tiers, and the proven/assumed flag).
+
+Verification note: the first push of this addendum (ffb8040c) went out before the page was fetched in that work
+session. A later fetch the same day (HTTP 200) read the table header "Model | Base tokens | Prompt caching; Name |
+Input | Output | 5m writes | 1h writes | Hits and refreshes" and the two Haiku 5.5 rows above. Every value matched, so
+no price changed. The rule quote is now complete. The smoke run came after this check.
