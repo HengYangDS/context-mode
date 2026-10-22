@@ -24,7 +24,7 @@ const EXPECTED_FILES = [
   "hooks/claude-code.json",
   "hooks/codex.json",
   "hooks/copilot-cli.json",
-  "hooks/gemini.json",
+  "hooks/hooks.json",
   "hooks/kiro.json",
   "hooks/qwen.json",
   "hooks/vscode.json",
@@ -96,7 +96,9 @@ test("plugin and extension manifests carry name, dev version and the --agent MCP
   assert.deepEqual(readJson(dir, ".claude-plugin/plugin.json"), {
     hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", version: "0.0.0-dev",
   });
-  assert.deepEqual(readJson(dir, "gemini-extension.json"), { mcpServers: entry("gemini"), name: "context-mode", version: "0.0.0-dev" });
+  // D-FU-RM-GEMINI-1: Gemini expands ${extensionPath} and ${/} in the manifest and reads hooks only from <ext>/hooks/hooks.json.
+  const geminiEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "gemini"] } };
+  assert.deepEqual(readJson(dir, "gemini-extension.json"), { mcpServers: geminiEntry, name: "context-mode", version: "0.0.0-dev" });
   // D-FU-RM-QWEN-1: Qwen expands ${extensionPath} and ${/} in the manifest and reads config.hooks (a path relative to the extension).
   const qwenEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "qwen"] } };
   assert.deepEqual(readJson(dir, "qwen-extension.json"), {
@@ -119,8 +121,12 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   const qwen = readJson(dir, "hooks/qwen.json");
   assert.deepEqual(qwen.hooks.PreToolUse, [{ hooks: [{ command: qwenCmd, timeout: 5, type: "command" }], matcher: MATCHERS.qwen }]);
   assert.deepEqual(qwen.hooks.SessionStart, [{ hooks: [{ command: qwenCmd, timeout: 5, type: "command" }] }]);
-  assert.deepEqual(Object.keys(readJson(dir, "hooks/gemini.json").hooks), ["AfterTool", "BeforeAgent", "BeforeTool", "PreCompress", "SessionStart"]);
-  assert.deepEqual(readJson(dir, "hooks/gemini.json").hooks.BeforeTool, [{ hooks: [{ command: cmd("gemini"), timeout: 5000, type: "command" }] }]);
+  // D-FU-RM-GEMINI-1: Gemini reads hooks only from hooks/hooks.json and expands ${extensionPath} and ${/} in commands.
+  const geminiCmd = 'node "${extensionPath}${/}hook.mjs" --agent gemini';
+  const gemini = readJson(dir, "hooks/hooks.json");
+  assert.deepEqual(Object.keys(gemini.hooks), ["AfterTool", "BeforeAgent", "BeforeTool", "PreCompress", "SessionStart"]);
+  assert.deepEqual(gemini.hooks.BeforeTool, [{ hooks: [{ command: geminiCmd, timeout: 5000, type: "command" }] }]);
+  assert.deepEqual(gemini.hooks.SessionStart, [{ hooks: [{ command: geminiCmd, timeout: 5000, type: "command" }] }]);
   const copilot = readJson(dir, "hooks/copilot-cli.json");
   assert.equal(copilot.version, 1);
   assert.deepEqual(copilot.hooks.preToolUse, [{ command: cmd("copilot-cli"), timeoutSec: 5, type: "command" }]);
