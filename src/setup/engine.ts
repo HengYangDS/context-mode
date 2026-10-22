@@ -30,7 +30,13 @@ export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
 }
 export interface SetupResult { exitCode: number; agents: AgentResult[]; backupDir?: string; error?: string; }
-export interface SetupOptions extends SetupContext { agents?: AgentId[]; runId?: string; dryRun?: boolean; }
+export interface SetupOptions extends SetupContext {
+  agents?: AgentId[]; runId?: string; dryRun?: boolean;
+  /** D7 Ctrl-C: on abort the agent in progress is rolled back and the lock released, synchronously. */
+  signal?: AbortSignal;
+  /** Live checklist: called before and after each agent. */
+  onAgent?: (id: AgentId, phase: "start" | "done", res?: AgentResult) => void;
+}
 
 interface Entry { agent: AgentId; file?: string; existed?: boolean; backup?: string; undo?: { bin: string; args: string[] }; }
 interface Manifest { runId: string; path: string; entries: Entry[]; }
@@ -263,7 +269,7 @@ function takeLock(root: string, runId: string): string | undefined {
 
 // ---------- detect ----------
 
-function detectAgents(reg: CheckRow[], ctx: SetupContext): AgentId[] {
+export function detectAgents(reg: CheckRow[], ctx: SetupContext): AgentId[] {
   return reg.filter((r) => existsSync(path.join(ctx.home, ...AGENT_HOME_DIR[r.id]))
     || (r.listCommand && which(r.listCommand.bin, ctx.env))).map((r) => r.id);
 }
@@ -286,13 +292,25 @@ export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
   }
   const run = new Run(root, runId);
   const agents: AgentResult[] = [];
+  let current: AgentId | undefined;
+  const onAbort = (): void => {
+    if (current !== undefined && !opts.dryRun) run.rollback(current, ctx.env);
+    if (!opts.dryRun) rmSync(path.join(root, LOCK_FILE), { force: true });
+  };
+  opts.signal?.addEventListener("abort", onAbort, { once: true });
   try {
     for (const id of ids) {
       const row = reg.find((r) => r.id === id);
       if (!row) { agents.push({ id, status: "FAIL", reason: `unknown agent ${id}`, v1: [], changes: [], checks: [] }); continue; }
-      agents.push(await setupRow(row, ctx, run, !!opts.dryRun));
+      current = id;
+      opts.onAgent?.(id, "start");
+      const res = await setupRow(row, ctx, run, !!opts.dryRun);
+      current = undefined;
+      agents.push(res);
+      opts.onAgent?.(id, "done", res);
     }
   } finally {
+    opts.signal?.removeEventListener("abort", onAbort);
     if (!opts.dryRun) rmSync(path.join(root, LOCK_FILE), { force: true });
   }
   return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents, backupDir: run.manifest ? run.dir : undefined };
@@ -330,6 +348,39 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
     return { ...res, status: "FAIL", reason: (e as Error).message, rolledBack: true };
   }
   return res;
+}
+
+/** doctor (read-only): plan each agent without writing; pending changes or v1 entries are a FAIL that names the
+ *  setup command; an agent with nothing to change runs the same verify checks as setup. */
+export const V1_FORM_REASON = "v1 form, run context-mode setup";
+export const NOT_SET_UP_REASON = "not set up, run context-mode setup";
+export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
+  const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
+  const reg = buildRegistry(ctx);
+  for (const f of ["server.mjs", "hook.mjs"]) {
+    if (!existsSync(path.join(ctx.pkgDir, f))) return { exitCode: 1, agents: [], error: `preflight: ${path.join(ctx.pkgDir, f)} is missing` };
+  }
+  const ids = opts.agents ?? detectAgents(reg, ctx);
+  const run = new Run(path.join(ctx.home, STATE_DIR), "doctor"); // dry run: never records or writes
+  const agents: AgentResult[] = [];
+  for (const id of ids) {
+    const row = reg.find((r) => r.id === id);
+    if (!row) { agents.push({ id, status: "FAIL", reason: `unknown agent ${id}`, v1: [], changes: [], checks: [] }); continue; }
+    opts.onAgent?.(id, "start");
+    const res = await setupRow(row, ctx, run, true);
+    if (res.status === "PASS") {
+      if (res.v1.length) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
+      else if (res.changes.length) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
+      else {
+        res.checks = await verifyRow(row, ctx.env);
+        const bad = res.checks.filter((c) => !c.ok);
+        if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); }
+      }
+    }
+    agents.push(res);
+    opts.onAgent?.(id, "done", res);
+  }
+  return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents };
 }
 
 /** setup --remove: undo every recorded run, newest first, so each touched file gets its pre-setup bytes back. */
