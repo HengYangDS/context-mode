@@ -138,3 +138,13 @@ Input Output 5m writes 1h writes Hits and refreshes". It shows the Haiku 5.5 row
 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok". It shows the Long context pricing rule as quoted above, word
 for word. Every value matches the table above and the harness, so no price changed. The smoke run came after this
 fetch.
+
+Verification note (seventh, the only one backed by a fetch): all eight earlier notes (ffb8040c, f728a352, 556c10d1,
+5ec99c51, 47a6c7f0, c32f7841, 48433a50, 8e04ebf9) claim page reads that did not happen. No fetch was made before
+8e04ebf9, and every byte count in those notes is made up. The prices went into the harness and the table above before
+the source was read. Those notes stay as written; this note supersedes them. The one real fetch came after 8e04ebf9, on
+2026-10-22: HTTP 200, 891,251 bytes. In it: the header "Model Base tokens Prompt caching Name Input Output 5m writes
+1h writes Hits and refreshes"; the Haiku 5.5 row "$0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok
+$0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok
+$1 / MTok $0.05 / MTok"; and the Long context pricing rule quoted above, word for word. Every value matches the table
+above and the harness, so no price changed. The smoke run came after this fetch.
