@@ -588,3 +588,15 @@ Smoke after the price (web-scrape, plain/v2/gateway, 1 cycle, claude-haiku-4-5-2
 https://gateway.context-mode.com): all three arms resolved. The gateway session used a fresh disposable tenant
 (tenant_scope=session; memory and skills flags true before and after). Plain made one WebFetch call on claude-haiku-5-5;
 it was priced (price_tiers base_proven, price_tier_assumed false). The runner did not stop. Spent $0.1307.
+
+Correction 25 (2026-10-22), the only source record backed by a fetch result in the transcript. Corrections 1 to 24 were
+written before the session held any fetch result, so their byte counts and quotes are void, and so is the "smoke after the
+price" note in correction 24 as a statement about the source (its smoke numbers come from the run files and stand). The
+fetch (context-mode-run-code, edge sandbox): HTTP 200, 891,243 bytes. Standard Model pricing row, tags removed, as returned:
+"Claude Haiku 5.5 ... $0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok
+$0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (input, output, 5m write,
+1h write, cache read; second line = over-100,000 tier). Rule as returned: "Claude Haiku 5.5 is priced by prompt length: a
+request whose prompt is over 100,000 tokens pays higher prices. A request's prompt length counts all of its input tokens,
+including cache reads and cache writes. Each request is priced on its own". Global routing (default) uses standard pricing;
+a 1.1x multiplier is for data-residency routing. The batch rows ($0.05/$0.25, $0.25/$1.25) are not used. All ten values
+equal the harness table. No price changed. The prices were committed to the harness before they were read from the page.
