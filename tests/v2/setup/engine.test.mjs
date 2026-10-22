@@ -51,7 +51,7 @@ function sandbox(t) {
   mkdirSync(home, { recursive: true });
   const bin = path.join(root, "bin");
   mkdirSync(bin, { recursive: true });
-  return { root, home, bin, pkgDir: fakePkg(root), env: { PATH: bin, HOME: home } };
+  return { root, home, bin, pkgDir: fakePkg(root), env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home } };
 }
 
 function put(file, text) {

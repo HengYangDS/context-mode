@@ -502,6 +502,12 @@ function applyEdits(agent: AgentId, path: string, text: string, format: HostConf
   return { text: out, format, edits };
 }
 
+/** ADR-0019 section 3 step 6 (setup engine): set the given key paths in `text`, touching only those spans.
+ *  Same edit path as mergeOwnEntries, with the values chosen by the caller. CONFIG_PARSE_FAILED on bad text. */
+export function editHostConfigText(agent: AgentId, path: string, text: string, format: HostConfigFormat, wanted: [readonly string[], unknown][]): HostConfigResult {
+  return applyEdits(agent, path, text, format, wanted);
+}
+
 /** impl/07 §2: regenerate only context-mode's own entries; every other key and user value is kept. */
 export function mergeOwnEntries(agent: AgentId, current: string, format: HostConfigFormat, row: AdapterRow): HostConfigResult {
   const parsed = parseHostConfig(row.id, HOST_CONFIG_TEXT_PATH, current, format);
