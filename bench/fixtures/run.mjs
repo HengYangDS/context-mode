@@ -109,7 +109,7 @@ const home = path.join(tmp, "home"), project = path.join(tmp, "project");
 mkdirSync(home); mkdirSync(project);
 cpSync(DATA, path.join(project, "data"), { recursive: true });
 execFileSync("git", ["init", "-q", project]);
-const env = { PATH: process.env.PATH ?? "", SystemRoot: process.env.SystemRoot ?? "", HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp, CLAUDE_PROJECT_DIR: project };
+const env = { PATH: process.env.PATH ?? "", SystemRoot: process.env.SystemRoot ?? "", PATHEXT: process.env.PATHEXT ?? "", ComSpec: process.env.ComSpec ?? "", HOME: home, USERPROFILE: home, TMPDIR: tmp, TMP: tmp, TEMP: tmp, CLAUDE_PROJECT_DIR: project };
 
 const rows = [];
 try {
