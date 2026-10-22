@@ -49,3 +49,14 @@ Same steps on the fixed v2-design (bcda6561), with the old `release` and `releas
 - End state: no refs/tags/v2*, no v2 GitHub Release, main stays a92cf6a77ac02971fb5fafe2155e5ee229491884.
 - Notes: `publish.mjs --stage` leaves the clone on `release-staging` and removes node_modules; check out v2-design and reinstall before smoke.
 - Still open: release.yml on main, delete `release`/`release-staging` before the real release, gemini smoke.
+
+## Re-run 2 (manifests)
+Same steps on v2-design bcf7e406, with the old `release` and `release-staging` branches (04385377) left in place.
+- plan.mjs: 2.0.0 with the rehearsal branch present.
+- Build: 15 top-level entries, SHA256SUMS all OK, prompt lint OK.
+- Stage: `release-staging` = 87a17f8f8fd62b1d7cc9f0afdd39f0afe5a630ec, tag v2.0.0 local only. `publish.mjs --stage` pushes, so it needs git credentials; a temp HOME has none. Run it with the normal HOME (it only reads credentials). A failed stage leaves a local tag v2.0.0 and a local `release-staging`; delete both before a retry.
+- Smoke on release-staging: claude-code PASS (real binary), codex PASS, gemini SKIPPED (not installed).
+- Promote to a local bare clone: `release` and tag v2.0.0 moved, `gh release` skipped (remote not origin).
+- GitHub `release` updated with `git push --force-with-lease=refs/heads/release:04385377... origin 87a17f8f:refs/heads/release --no-follow-tags` (rehearsal branch only): 04385377 -> 87a17f8f.
+- Install from GitHub (`git clone --depth 1 --branch release`): 24 files, SHA256SUMS OK. Root package.json has the `pi` key (private, type, version). `gemini-extension.json` and `hooks/hooks.json` present. Fixed `qwen-extension.json`, `hooks/qwen.json`, `hooks/codex.json`, `hooks/vscode.json`, `hooks/copilot-cli.json`, `hooks/kiro.json` present.
+- End state: no refs/tags/v2*, no v2 GitHub Release (latest is v1.0.169), main stays a92cf6a77ac02971fb5fafe2155e5ee229491884.
