@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ADAPTERS } from "../src/adapters/table.ts";
 import type { AgentId } from "../src/core/contracts/agents.ts";
-import { SERVER_KEY } from "../src/core/contracts/constants.ts";
+import { RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
 import type { AdapterRow } from "../src/core/contracts/types.ts";
 
 // Build-tool literals (same rule as build.mjs DEFAULT_OUT/BUNDLES; DEVIATIONS D-M3-A7-5).
@@ -145,31 +145,46 @@ function manifestFor(row: AdapterRow, version: string): [string, JsonObject] | n
   }
 }
 
-// D-FU-RM-PI-1 (ADR-0002 GS7 amended): Pi reads package.json "pi".extensions/skills from the package dir. The out
-// tree holds ONE package.json of exactly this shape: no dependencies, no scripts, so the npm install Pi runs on a
-// git install does nothing.
+// ADR-0019 Owner decisions D1 (PO-NPM-2): the out tree is the npm package. Its ONE package.json is the D1 shape:
+// name, version, bin (no "./": npm 11 strips it), type, engines, files = the release tree, and the Pi key that
+// D-FU-RM-PI-1 needs (Pi reads "pi".extensions/skills from the package dir). No dependencies, no scripts, no
+// private: an npm or Pi install of the tree runs nothing.
 const OUT_PACKAGE_JSON = "package.json";
 const PI_EXTENSION = "./pi/index.js";
 const PI_SKILLS = "./skills";
-const OUT_PACKAGE_KEYS: readonly string[] = ["name", "pi", "private", "type", "version"];
+const CLI_BUNDLE = "cli.mjs";
+const NODE_ENGINE = ">=24.15.0"; // D1
+
+// D1 "files = the release tree": every top-level name build.mjs writes, except package.json (npm always packs it).
+// build.mjs assertOutTree fails the build when the real tree and this list differ.
+export const OUT_FILES: readonly string[] = [
+  ".claude-plugin", CLI_BUNDLE, "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
+  "qwen-extension.json", "run.mjs", "search.mjs", SERVER_BUNDLE, "skills", RELEASE_SUMS_FILE,
+].slice().sort();
+const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "engines", "files", "name", "pi", "type", "version"];
 const PI_KEYS: readonly string[] = ["extensions", "skills"];
 
-function piPackageJson(version: string): JsonObject {
-  return { name: SERVER_KEY, version, private: true, type: "module", pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] } };
+function npmPackageJson(version: string): JsonObject {
+  return {
+    name: SERVER_KEY, version, type: "module", bin: { [SERVER_KEY]: CLI_BUNDLE }, engines: { node: NODE_ENGINE },
+    files: [...OUT_FILES], pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] },
+  };
 }
 
-// Throws unless `pkg` is the Pi-only shape above (any extra key, e.g. dependencies or scripts, is a hard stop).
+// Throws unless `pkg` is the D1 shape above (any extra key, e.g. dependencies, scripts or private, is a hard stop).
 export function assertOutPackageJson(pkg: unknown): void {
   if (pkg === null || typeof pkg !== "object" || Array.isArray(pkg)) throw new Error("package.json: not an object");
   const obj = pkg as Record<string, unknown>;
   for (const key of Object.keys(obj)) {
-    if (!OUT_PACKAGE_KEYS.includes(key)) throw new Error("package.json: key " + key + " not allowed (ADR-0002 GS7)");
+    if (!OUT_PACKAGE_KEYS.includes(key)) throw new Error("package.json: key " + key + " not allowed (ADR-0019 D1)");
   }
   for (const key of OUT_PACKAGE_KEYS) if (!(key in obj)) throw new Error("package.json: missing " + key);
   if (obj.name !== SERVER_KEY) throw new Error("package.json: name must be " + SERVER_KEY);
   if (typeof obj.version !== "string") throw new Error("package.json: version must be a string");
-  if (obj.private !== true) throw new Error("package.json: private must be true");
   if (obj.type !== "module") throw new Error("package.json: type must be module");
+  if (JSON.stringify(obj.bin) !== JSON.stringify({ [SERVER_KEY]: CLI_BUNDLE })) throw new Error("package.json: bin must be {" + SERVER_KEY + ": " + CLI_BUNDLE + "}");
+  if (JSON.stringify(obj.engines) !== JSON.stringify({ node: NODE_ENGINE })) throw new Error("package.json: engines must be {node: " + NODE_ENGINE + "}");
+  if (JSON.stringify(obj.files) !== JSON.stringify(OUT_FILES)) throw new Error("package.json: files must be " + OUT_FILES.join(","));
   const pi = obj.pi;
   if (pi === null || typeof pi !== "object" || Array.isArray(pi)) throw new Error("package.json: pi must be an object");
   const piObj = pi as Record<string, unknown>;
@@ -204,6 +219,6 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
     const shape = HOOK_SHAPES[row.id];
     if (shape !== null) files.push([hookFile(row), shape(row)]);
   }
-  if (rows.some((row) => row.id === "pi")) files.push([OUT_PACKAGE_JSON, piPackageJson(version)]); // D-FU-RM-PI-1
+  if (rows.some((row) => row.id === "pi")) files.push([OUT_PACKAGE_JSON, npmPackageJson(version)]); // D-FU-RM-PI-1, ADR-0019 D1
   for (const [rel, value] of files) writeJson(outDir, rel, value);
 }

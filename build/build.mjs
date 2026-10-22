@@ -28,7 +28,7 @@ import {
   SURFACE_CAP,
   BUNDLE_SHA_DEFINE,
 } from "../src/core/contracts/constants.ts";
-import { assertOutPackageJson, generateManifests } from "./manifests.ts";
+import { OUT_FILES, assertOutPackageJson, generateManifests } from "./manifests.ts";
 import { writeHashes } from "./hash.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,6 +59,8 @@ const BUNDLES = Object.freeze([
   { name: "search", entry: "src/entries/run.ts", out: "search.mjs" },
   { name: "pi", entry: "src/entries/pi.ts", out: "pi/index.js" }, // impl/13 §2.2 step 2 (D-M5-arch-1)
   { name: "opencode", entry: "src/entries/opencode.ts", out: "opencode/plugin.js" }, // impl/13 §2.2 step 2 (D-M5-P2-1)
+  // ADR-0019 D1 (PO-NPM-2): the npm bin; the shebang lets the npm bin link run it.
+  { name: "cli", entry: "src/entries/cli.ts", out: "cli.mjs", banner: { js: "#!/usr/bin/env node" } },
 ]);
 
 // Same options for every row (impl/13 §2.2 step 2, "same").
@@ -162,7 +164,8 @@ async function buildBundle(bundle, outDir, define) {
   const entry = path.join(REPO_ROOT, bundle.entry);
   let result;
   try {
-    result = await esbuild.build({ ...ESBUILD_COMMON, define, entryPoints: [entry], outfile: path.join(outDir, bundle.out) });
+    const banner = bundle.banner === undefined ? {} : { banner: bundle.banner };
+    result = await esbuild.build({ ...ESBUILD_COMMON, ...banner, define, entryPoints: [entry], outfile: path.join(outDir, bundle.out) });
   } catch (err) {
     const first = err && Array.isArray(err.errors) && err.errors.length > 0 ? err.errors[0] : undefined;
     const where = first && first.location ? ` (${first.location.file}:${first.location.line})` : "";
@@ -171,16 +174,20 @@ async function buildBundle(bundle, outDir, define) {
   assertStaticImports(bundle, result.metafile);
 }
 
-// ADR-0002 GS7 (amended, D-FU-RM-PI-1): no node_modules; one package.json of the Pi-only shape (name, version,
-// private, type, pi) with no dependencies and no scripts.
+// ADR-0002 GS7 (amended, D-FU-RM-PI-1) and ADR-0019 D1 (PO-NPM-2): no node_modules; one package.json of the D1
+// shape (no dependencies, no scripts); its "files" equals the real top-level tree, so the npm tarball is exactly the
+// tree SHA256SUMS lists. Runs after writeHashes (it only reads).
 function assertOutTree(outDir) {
   const names = readdirSync(outDir);
   if (names.includes("node_modules")) throw new BuildError(`node_modules in ${outDir}`);
-  if (!names.includes("package.json")) return;
   try {
     assertOutPackageJson(JSON.parse(readFileSync(path.join(outDir, "package.json"), "utf8")));
   } catch (err) {
     throw new BuildError(`${outDir}/package.json: ${err && err.message ? err.message : String(err)}`);
+  }
+  const top = names.filter((n) => n !== "package.json").sort();
+  if (JSON.stringify(top) !== JSON.stringify(OUT_FILES)) {
+    throw new BuildError(`package.json files ${OUT_FILES.join(",")} differ from the tree ${top.join(",")}`);
   }
 }
 
@@ -226,8 +233,8 @@ async function main(outDir, sha, version) {
   generateManifests(outDir, version); // §2.2 step 4: manifests + hook configs from adapters/table.ts (impl/13 §3)
   copyFixture(outDir); // §2.2 step 5
   copySkills(outDir); // §2.2 step 6
-  assertOutTree(outDir);
   writeHashes(outDir); // §2.2 step 8: last, so SHA256SUMS covers the full tree
+  assertOutTree(outDir); // read-only check of the finished tree (ADR-0019 D1)
 }
 
 try {
