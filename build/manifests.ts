@@ -23,10 +23,17 @@ const HOOKS_DIR = "hooks";
 // D-M3-F-5: Claude Code runs plugin hooks and the plugin MCP server with cwd = the user's project, so a bare
 // "hook.mjs"/"server.mjs" is not found (live: MODULE_NOT_FOUND, server "failed"). The host expands this
 // variable to the plugin dir in both places (v1 hooks.json and plugin.json used it the same way).
-const PLUGIN_ROOT_VAR: Readonly<Partial<Record<AgentId, string>>> = { "claude-code": "${CLAUDE_PLUGIN_ROOT}" };
+const PLUGIN_ROOT_VAR: Readonly<Partial<Record<AgentId, string>>> = { "claude-code": "${CLAUDE_PLUGIN_ROOT}", qwen: "${CLAUDE_PLUGIN_ROOT}" };
+// D-FU-RM-QWEN-1: Qwen expands ${extensionPath} and ${/} in qwen-extension.json (server path), but in hook commands
+// it replaces only ${CLAUDE_PLUGIN_ROOT}. So the server path and the hook command use different variables.
+const SERVER_PATH_PREFIX: Readonly<Partial<Record<AgentId, string>>> = { qwen: "${extensionPath}${/}" };
 const bundleArg = (row: AdapterRow, file: string): string => {
   const root = PLUGIN_ROOT_VAR[row.id];
   return root === undefined ? file : root + "/" + file;
+};
+const serverArg = (row: AdapterRow): string => {
+  const prefix = SERVER_PATH_PREFIX[row.id];
+  return prefix === undefined ? bundleArg(row, SERVER_BUNDLE) : prefix + SERVER_BUNDLE;
 };
 const bundleCmd = (row: AdapterRow, file: string): string =>
   PLUGIN_ROOT_VAR[row.id] === undefined ? file : '"' + bundleArg(row, file) + '"';
@@ -107,7 +114,7 @@ function mcpManifest(row: AdapterRow, version: string): JsonObject {
   return {
     name: SERVER_KEY,
     version,
-    mcpServers: { [SERVER_KEY]: { command: NODE_COMMAND, args: [bundleArg(row, SERVER_BUNDLE), AGENT_FLAG, row.id] } },
+    mcpServers: { [SERVER_KEY]: { command: NODE_COMMAND, args: [serverArg(row), AGENT_FLAG, row.id] } },
   };
 }
 
@@ -116,8 +123,8 @@ function manifestFor(row: AdapterRow, version: string): [string, JsonObject] | n
   switch (row.installMode) {
     case "marketplace":
       return [".claude-plugin/plugin.json", { ...mcpManifest(row, version), hooks: "./" + hookFile(row) }]; // D-M3-A7-3
-    case "extension":
-      return [row.id + "-extension.json", mcpManifest(row, version)];
+    case "extension": // qwen reads config.hooks, a path relative to the extension (D-FU-RM-QWEN-1)
+      return [row.id + "-extension.json", row.id === "qwen" ? { ...mcpManifest(row, version), hooks: hookFile(row) } : mcpManifest(row, version)];
     case "plugin":
       return ["copilot/plugin.json", mcpManifest(row, version)];
     case "config-mcp": // codex: ctx_upgrade writes config.toml (A2, tools-ops)
