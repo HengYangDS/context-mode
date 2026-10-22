@@ -47,7 +47,7 @@ The v1 code strings are byte-exact (`bench/fixtures/scenarios.json`). v2 adds on
 
 **Subtotal: 314.9 KB raw → v1 5.4 KB (98%), v2 tool 5.6 KB (98%)**
 
-v2 tool is 16 B larger on every row: v2 puts a status line (`exit 0 · N B`) before the output. The summaries are the same text.
+v2 tool is 16 B larger on every row but one (Issues (React): 17 B, because N there has four digits): v2 puts a status line (`exit 0 · N B`) before the output. The summaries are the same text.
 
 ## Part 2: `ctx_index` + `ctx_search` (knowledge retrieval)
 
