@@ -81,7 +81,7 @@ jobs:
         if: ${{ !cancelled() && env.GATE_MILESTONE == 'M7' }}
 
   # ADR-0019 D1/D2: npm pack -> npm i -g (temp prefix, temp HOME) -> context-mode setup/doctor/--remove with fake agent CLIs.
-  # No network beyond npm tooling, no real agent CLI, no secrets. Windows runs the .cmd shim path.
+  # No network beyond npm tooling, no real agent CLI, no key. Windows runs the .cmd shim path.
   setup-e2e:
     name: setup e2e (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
