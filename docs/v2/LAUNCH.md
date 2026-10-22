@@ -37,7 +37,7 @@ runs, search results, docs.
 
 | Agent | Install mode |
 |---|---|
-| Claude Code | marketplace plugin |
+| Claude Code | marketplace plugin (works after the owner-only ADR-0011 step b: `marketplace.json` source -> github ref `release` on `main`; until then `claude mcp add`) |
 | Codex CLI | `config.toml` MCP entry |
 | Gemini CLI | extension |
 | Qwen Code | extension |

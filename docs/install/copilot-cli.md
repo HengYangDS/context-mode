@@ -2,6 +2,8 @@
 
 This guide adds the MCP server with `copilot mcp add` and writes `~/.copilot/hooks/context-mode.json` with one command. The plugin install does not work yet: the release branch has no `marketplace.json`.
 
+The shipped `hooks/copilot-cli.json` is a template: the writer fills the path; do not copy hooks/copilot-cli.json by hand.
+
 ## Install
 
 Get the files first. See [Get the files](./README.md#get-the-files).

@@ -2,6 +2,8 @@
 
 VS Code (GitHub Copilot agent mode) reads MCP servers from `.vscode/mcp.json` and hooks from `.github/hooks/` in your project. Run the command below in the root folder of each project. It writes both files with the real path to the context-mode files.
 
+The shipped `hooks/vscode.json` is a template: the writer fills the path; do not copy hooks/vscode.json by hand.
+
 ## Install
 
 Get the files first. See [Get the files](./README.md#get-the-files).

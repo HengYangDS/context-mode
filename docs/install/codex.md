@@ -2,6 +2,8 @@
 
 This guide adds the MCP server with `codex mcp add` and writes the hooks to `~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`) with one command. A Codex plugin install does not work yet: the release branch has no `.agents/plugins/marketplace.json`.
 
+The shipped `hooks/codex.json` is a template: the writer fills the path; do not copy hooks/codex.json by hand.
+
 ## Install
 
 Get the files first. See [Get the files](./README.md#get-the-files).

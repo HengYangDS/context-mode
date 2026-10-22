@@ -97,6 +97,8 @@ Note (DECISIONS-r9 V9): Claude Code's `compactSummary: "host"` row stays `"host"
 | `pi` | `session_start` (compact: `session_compact`) | `input` | `tool_call` | `tool_result` | — (`session_compact` event covers it) |
 | `opencode` | session hook `context` | session hook `prompt` | `execute.before` | `execute.after` | session hook `compaction` |
 
+Template hook files: `hooks/codex.json`, `hooks/vscode.json` and `hooks/copilot-cli.json` are templates. These hosts have no documented plugin-root variable, so the commands hold the bare `node hook.mjs` form; the install docs one-line writer fills the absolute path (D-FU-RM-TEMPLATES-1). Do not copy them by hand.
+
 Citation: `tickets/spike-hooks-verified.md` §1 matrix, per-agent rows. Kiro and Copilot CLI dual-casing (`sessionStart`/`SessionStart` etc.) — spike §2 per-agent write-up.
 
 ### 1.5 Hook config format, matcher and timeout key per host

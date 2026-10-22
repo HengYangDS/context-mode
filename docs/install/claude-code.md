@@ -1,6 +1,6 @@
 # Install context-mode v2 on Claude Code
 
-This guide adds the context-mode MCP server with `claude mcp add` and writes the hooks to `~/.claude/settings.json` with one command. The plugin install (`claude plugin marketplace add`) does not work yet: the release branch has no `.claude-plugin/marketplace.json`.
+This guide adds the context-mode MCP server with `claude mcp add` and writes the hooks to `~/.claude/settings.json` with one command. The marketplace command (`claude plugin marketplace add mksglu/context-mode`) works after the owner-only ADR-0011 step b (`marketplace.json` source -> github ref `release` on `main`). Until then, use `claude mcp add` as this guide does.
 
 ## Install
 
