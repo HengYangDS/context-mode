@@ -32,7 +32,7 @@ v2 against v1: 42% lower, likely 98% lower to 14% more, same. The gateway failur
 | | Direct | v1 | v2 | Context Mode Gateway |
 |---|---:|---:|---:|---:|
 | Mean cost | $0.145 | $0.141 | $0.142 | $0.078 |
-| Saving vs direct | – | 3% lower, likely 31% lower to 26% more, **same** (range crosses zero) | 3% lower, likely 45% lower to 40% more, **same** (range crosses zero) | **46% lower**, likely 11 to 82%, **less** |
+| Saving vs direct | – | 3% lower, likely 31% lower to 26% more, **same** (range crosses zero) | 2% lower, likely 45% lower to 40% more, **same** (range crosses zero) | **46% lower**, likely 11 to 81%, **less** |
 | Head-to-head | – | 2 of 4 | 2 of 4 | 4 of 4 |
 | tool_result bytes seen | 2,946 | 2,041 | 2,684 | 1,373 |
 | Tool calls (median) | 4 | 2 | 2.5 | 2 |
@@ -71,7 +71,7 @@ v2 against v1: **43% lower**, likely 17 to 69%, less. No arm passed. 13 of 16 se
 | | Direct | v1 | v2 | Context Mode Gateway |
 |---|---:|---:|---:|---:|
 | Mean cost | $0.162 | $0.203 | $0.250 | $0.057 |
-| Saving vs direct | – | cost **26% more**, likely 6 to 45% more, **more** | cost **54% more**, likely 19 to 90% more, **more** | **65% lower**, likely 41 to 88%, **less** |
+| Saving vs direct | – | cost **25% more**, likely 6 to 45% more, **more** | cost **54% more**, likely 18 to 90% more, **more** | **65% lower**, likely 41 to 88%, **less** |
 | Head-to-head | – | 0 of 4 | 0 of 4 | 4 of 4 |
 | tool_result bytes seen | 11,604 | 16,971 | 19,971 | 0 |
 | Tool calls (median) | 4 | 3 | 8.5 | 0 |
@@ -110,7 +110,7 @@ With n = 4, these rows show no clear difference from direct: v1 on repo-research
 - In 9 of 20 measured gateway sessions (web-scrape 4, docs-search 4, repo-research 1) the client made no tool call and the session ended after 1 turn. The completion check needs at least one client tool call, so these count as failures. That is the prereg rule and we did not change it.
 - In each of these 9 sessions the gateway's own record counts 1 or 2 edge calls, and tokens the client did not see. We did not check what those calls did, and we do not use the model's answer text as evidence. So whether the gateway did the task in these sessions is **INCONCLUSIVE**.
 - The gateway cost includes those hidden calls: it comes from the gateway's per-call record, not from the client.
-- A lower cost with a failed check is not a saving you can claim. On git-history, where every arm passed a real check, the gateway cost 46% less (likely 11 to 82%).
+- A lower cost with a failed check is not a saving you can claim. On git-history, where every arm passed a real check, the gateway cost 46% less (likely 11 to 81%).
 
 ## README claims checked
 
