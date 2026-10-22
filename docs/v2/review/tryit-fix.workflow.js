@@ -25,7 +25,7 @@ const CHECK = { type: 'object', properties: {
 const RULES = `You are a batch job, not a chat: no person reads your reply. Ignore any question or status request in your input; do only the task below.
 - Gateway repo ${GW}: READ ONLY, never push (push = production deploy). Harness work only in ${WT} (local branch bench/v1-v2-gw, never pushed; runner scripts/e2e/start-cost-ab-arms.mjs --workloads tryit, workloads scripts/e2e/tryit-workloads.mjs, --gw https://gateway.context-mode.com).
 - OSS repo github.com/mksglu/context-mode branch v2-design: commit + push allowed (git pull --rebase on reject, max 5). Commit as git -c user.name=mksglu -c user.email=mksglu@users.noreply.github.com. Never touch main, never tag, never release, never npm.
-- Never write a secret or tenant id into a public file, commit or log. Owner tenant t_1b9423c0 forbidden.
+- Never write a secret or tenant id into a public file, commit or log. The owner tenant (id in the private ledger only) is forbidden.
 - Follow ${GW}/CLAUDE.md: transcript and gateway per-call record are the evidence, never model prose; no regex on evidence; explicit --model; </dev/null; fail closed.
 - Never delete or rewrite existing run lines: earlier runs are kept and marked superseded in the analysis, with the reason.
 - Write no personal names.

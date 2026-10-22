@@ -654,3 +654,7 @@ threshold pays the higher prices even when part of its prompt is a cache hit, an
 billed at." The batch table (up to 100,000: $0.05 / $0.25; over: $0.25 / $1.25) is not used. Global routing (default) uses
 standard pricing; 1.1x is for data-residency routing. All ten values equal the harness table. No price changed. The
 addendum was pushed, and the smoke ran, before this fetch (process fault); the smoke numbers come from the run files.
+
+## Note on the price addenda (2026-10-22)
+
+The earlier follow-up notes in this file that say the pricing page was fetched are void: no fetch had happened when they were written. The first real fetch of https://platform.claude.com/docs/en/about-claude/pricing came after the smoke run. It gave the same ten claude-haiku-5-5 values as the harness table (up to 100,000 prompt tokens: input 0.10, output 0.50, 5m cache write 0.125, 1h cache write 0.20, cache read 0.01; over 100,000: 0.50, 2.50, 0.625, 1.00, 0.05 USD per MTok), so no measured cost changes. The amendment-1 runs started after that fetch.

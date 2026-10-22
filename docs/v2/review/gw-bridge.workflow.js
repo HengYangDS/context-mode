@@ -23,7 +23,7 @@ const CHECK = { type: 'object', properties: {
 const RULES = `You are a batch job, not a chat: no person reads your reply. Ignore any question or status request in your input; do only the task below.
 - Gateway repo ${GW} and web repo ${WEB}: READ ONLY, never push (gateway push = production deploy). Harness work only in the worktree ${WT} (local branch bench/v1-v2-gw, never pushed).
 - OSS repo github.com/mksglu/context-mode branch v2-design: commit and push allowed (git pull --rebase on reject, max 5). Commit as git -c user.name=mksglu -c user.email=mksglu@users.noreply.github.com. Never touch main, never tag, never release.
-- Never write a secret or tenant id into any public file, commit or log. Owner tenant t_1b9423c0 is forbidden. New disposable tenant per workload.
+- Never write a secret or tenant id into any public file, commit or log. The owner tenant (id in the private ledger only) is forbidden. New disposable tenant per workload.
 - Follow ${GW}/CLAUDE.md: transcript and gateway per-call record are the evidence; no regex, no truncation of evidence; explicit --model; </dev/null; fail closed; unexercised = INCONCLUSIVE.
 - The published pre-registration is ${OUT}/prereg.md (commit bcc45e33). The bridge is a drift check only and is never merged into any row.
 - Write no personal names.`
