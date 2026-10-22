@@ -117,3 +117,11 @@ test("[M5] doctor/handler-never-isError and no baked paths in the report", async
   assert.ok(!reply.text.includes("/Users/") || reply.text.includes(home), "any path shown must be the live resolved path");
   assert.equal(ctxDoctor.schema.safeParse({ x: 1 }).success, false, "unknown key rejected");
 });
+
+test("[M7] doctor/cli-command: the ctx_doctor report prints the exact context-mode command to run (ADR-0019 D7)", async (t) => {
+  const home = tmp(t);
+  const reply = await ctxDoctor.handler({}, ctxFor(home, "codex"));
+  assert.match(reply.text, /^Run in a terminal: context-mode (doctor|setup) --agents codex$/m);
+  if (reply.text.includes("| FAIL |")) assert.match(reply.text, /context-mode setup --agents codex/);
+  assert.ok(Buffer.byteLength(reply.text, "utf8") <= 4096, "report stays within REPORT_CAP");
+});

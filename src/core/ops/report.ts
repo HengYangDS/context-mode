@@ -18,6 +18,7 @@ export interface ReportInput {
   agent: AgentId; // <host> in the ADR-0010 FAIL string
   rows: DoctorRow[]; // D1..D10 order, D5b between D5 and D6; never re-sorted here
   env: Readonly<Record<string, string>>; // raw env; only typed facts about it reach the output
+  command?: string; // ADR-0019 D7: the exact context-mode CLI command to run in a terminal; built from typed ids only
 }
 
 // ADR-0014 §3: a key passes only if every char is A-Z, 0-9 or "_" (char scanner, no regex).
@@ -49,6 +50,7 @@ export function buildReport(input: ReportInput): string {
     REPORT_HEADER,
     REPORT_HEADER_RULE,
     ...input.rows.map((row) => rowLine(input.agent, row)),
+    ...(input.command === undefined ? [] : ["Run in a terminal: " + input.command]),
     ...Object.keys(input.env).sort().map((key) => envLine(key, input.env[key])),
   ];
   const text = lines.join("\n");

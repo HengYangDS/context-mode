@@ -141,7 +141,9 @@ async function handler(_input: CtxDoctorInput, ctx: ToolContext): Promise<ToolRe
   const adapter = getAdapter(ctx.project.agent); // step 1
   const host: DoctorHost = { env: process.env, bundleDir: dirname(process.argv[1] as string), piCwd: undefined };
   const rows = await runDoctorChecks(ctx, adapter, host); // step 2
-  const text = buildReport({ agent: adapter.id, rows, env: reportEnv(process.env) }); // step 3
+  // ADR-0019 D7: name the CLI command; setup when a row failed (it repairs and verifies), else doctor.
+  const command = `context-mode ${rows.some((r) => r.status === "FAIL") ? "setup" : "doctor"} --agents ${adapter.id}`;
+  const text = buildReport({ agent: adapter.id, rows, env: reportEnv(process.env), command }); // step 3
   return { text, isError: false, sandboxBytes: Buffer.byteLength(text, "utf8") }; // step 4
 }
 
