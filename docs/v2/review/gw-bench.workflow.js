@@ -37,7 +37,7 @@ Hard rules:
 - Web repo ${WEB}: READ ONLY. Never edit, commit or push it.
 - The OSS repo (github.com/mksglu/context-mode) branch v2-design, clone ${OSS}: here you may commit and push (owner approved; push without asking; git pull --rebase on reject, max 5). Commit as git -c user.name=mksglu -c user.email=mksglu@users.noreply.github.com. Never touch main, never tag, never release, never npm.
 - Never write a secret (admin key, OAuth token, credential, tenant id of a real account) into any file, commit or log. Evidence files withhold tenant ids, the way the web evidence does.
-- Tenants: every workload runs in its own new disposable tenant. The owner tenant t_1b9423c0 is forbidden; the harness must refuse it.
+- Tenants: every workload runs in its own new disposable tenant. The owner tenant (id in the private ledger only) is forbidden; the harness must refuse it.
 - Follow ${GW}/CLAUDE.md: the transcript and the gateway's per-call record are the evidence, never model prose; no regex, no truncation of evidence; explicit --model; </dev/null on every claude -p; fail closed (a non-200 or unknown shape is an error); an unexercised link is INCONCLUSIVE, not a pass.
 - Never use the user's own checkout /Users/mksglu/Server/Mert/context-mode for v1: use your own clone of origin/main.
 - Write no personal names.`
