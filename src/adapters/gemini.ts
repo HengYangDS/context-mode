@@ -1,5 +1,5 @@
 // impl/10 §4 + shared decode/encode pseudocode. Gemini CLI (gemini-cli@51617c1, spike-hooks-verified.md Gemini row).
-// Native events: SessionStart / BeforeAgent / BeforeTool / AfterTool, plus PreCompress -> aux PreCompact (impl/10 §1.4).
+// Native events: SessionStart (decoded, but no hook entry since D-FU-GCH-1) / BeforeAgent / BeforeTool / AfterTool, plus PreCompress -> aux PreCompact (impl/10 §1.4).
 // Own prefix mcp_context-mode_ (single underscore, TECH-SPEC §3.8). No subagent field, no BeforeTool hint field,
 // no replace field. Deny is the JSON `decision` field on exit 0 (DEVIATIONS D-M3-A1-1).
 import type { CanonicalHookEvent, Decision, HookOutput, ToolResultInfo } from "../core/contracts/types.ts";

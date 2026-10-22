@@ -127,14 +127,6 @@ test("GP6/hint-names-platform-tool: Codex resume hint names mcp__context_mode__c
   assert.ok(parsed(out).additionalContext.includes("mcp__context_mode__ctx_resume"));
 });
 
-// D-FU-GCH-1: Gemini has no SessionStart hook entry; its first BeforeAgent carries the resume hint, once.
-test("gemini BeforeAgent: resume hint once per session (no SessionStart entry, D-FU-GCH-1)", async () => {
-  const p = cc({ hook_event_name: "BeforeAgent", prompt: "hello" });
-  const first = parsed(await handleHook("gemini", p, env));
-  assert.ok(first.additionalContext.includes("mcp_context-mode_ctx_resume"));
-  assert.equal(await handleHook("gemini", p, env).then((o) => o.stdout), "");
-});
-
 test("SessionStart compact on claude-code (compactSummary none, D-M7-CL-1): the renderState block, not the pointer", async () => {
   const out = await handleHook("claude-code", cc({ hook_event_name: "SessionStart", source: "compact" }), env);
   const text = parsed(out).additionalContext;

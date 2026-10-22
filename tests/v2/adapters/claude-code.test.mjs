@@ -78,8 +78,9 @@ test("eventMap follows impl/10 §1.4", () => {
   assert.deepEqual(getAdapter("qwen").eventMap, claudeShape);
   assert.deepEqual(getAdapter("vscode").eventMap, { ...claudeShape, PreCompact: "PreCompact" }); // DEVIATIONS D-M3-A4-1
   assert.deepEqual(getAdapter("zcode").eventMap, claudeShape);
+  // D-FU-GCH-1: no gemini SessionStart (Claude Code also runs hooks/hooks.json entries it knows).
   assert.deepEqual(getAdapter("gemini").eventMap, {
-    SessionStart: "SessionStart", UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress",
+    UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress",
   });
   assert.deepEqual(getAdapter("copilot-cli").eventMap, {
     SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse",
