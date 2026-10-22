@@ -6,8 +6,7 @@ Keeps large tool output out of your coding agent's context window.
 [![GitHub stars](https://img.shields.io/github/stars/mksglu/context-mode?style=flat&color=yellow)](https://github.com/mksglu/context-mode/stargazers)
 [![License: ELv2](https://img.shields.io/badge/License-ELv2-blue.svg)](LICENSE)
 
-> **v2 installs from git, not npm.**
-> Coming from v1? See [Upgrading from v1](#upgrading-from-v1).
+> **v2 installs from git, or from npm as the `@next` preview.** Coming from v1? See [Upgrading from v1](#upgrading-from-v1).
 
 ## What it does
 
@@ -21,19 +20,15 @@ Context Mode stops the big output before it lands, keeps it on disk, and gives b
 
 See [docs/how-it-works.md](docs/how-it-works.md) for the full picture.
 
-## v2 preview
+## Install
 
-Install the v2 preview from npm, then run the guided setup:
+v2 preview from npm, then the guided setup. `@next` is the v2 preview; a plain `npm i -g context-mode` still installs v1 until v2 is released.
 
 ```sh
 npm i -g context-mode@next && context-mode setup
 ```
 
-`@next` is the v2 preview. A plain `npm i -g context-mode` still installs v1 until v2 is released.
-
-## Install
-
-Pick your agent and follow its guide. A row shows a command only after a live install test on that agent passes.
+Or pick your agent and follow its guide. A row shows a command only after a live install test on that agent passes.
 No agent has passed that test yet, so each row says "see guide" for now. [docs/install/README.md](docs/install/README.md) shows how far each guide is checked.
 
 | Agent | Command | Guide |
@@ -50,7 +45,7 @@ No agent has passed that test yet, so each row says "see guide" for now. [docs/i
 | ZCode | see guide | [docs/install/zcode.md](docs/install/zcode.md#install) |
 
 You need Node 24.15.0 or later; v2 uses the built-in `node:sqlite`.
-You do not need npm. Each agent installs Context Mode from the `release` branch of this repo.
+Without npm, each agent installs Context Mode from the `release` branch of this repo.
 
 After the install, run `/ctx-doctor` in the agent.
 Every check prints PASS, or a FAIL line with the exact command that fixes it.
