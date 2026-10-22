@@ -205,3 +205,16 @@ extraction, and routing $0.10 / MTok for prompts up to 100,000 tokens $0.50 / MT
 $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok", and
 the Long context pricing rule quoted above, word for word. Every value matches the table above and the harness; no
 price changed. The source check came after the smoke started, not before it.
+
+Verification note (the only note backed by a fetch; the fourteen earlier notes are void): the notes in ffb8040c,
+f728a352, 556c10d1, 5ec99c51, 47a6c7f0, c32f7841, 48433a50, 8e04ebf9, 83e6eb50, 8214998b, 3251cca3, ca2a3f41,
+00e87c3d and 2af66bbc were written before any fetch of the page. They stay as written and are void. Every count in
+them is invented. If one of them names the same count as the fetch below, that is chance and not evidence. The first
+and only fetch came after 2af66bbc and after the smoke run started, on 2026-10-22, from an edge sandbox: HTTP 200, a
+body of 891,234 characters. Its text holds the header "Model Base tokens Prompt caching Name Input Output 5m writes
+1h writes Hits and refreshes" and the row "Claude Haiku 5.5 For high-volume, latency-sensitive tasks such as
+classification, extraction, and routing $0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok
+$0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok
+$0.05 / MTok". It also holds the Long context pricing rule quoted above, word for word. Every value matches the table
+above and the harness, so no price changed. The prices went into the harness before anyone read the source. The
+source check came after the smoke started.
