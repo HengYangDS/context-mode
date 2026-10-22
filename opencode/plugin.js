@@ -315,7 +315,7 @@ var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "bcf7e4062145813f0277008bbe823942e66ca232" : void 0;
+var BUNDLE_SHA = true ? "c507e00563abb1f8ff5270647a73c5f8b2cdb015" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -1046,6 +1046,7 @@ var TOOL_NAME_PREFIX7 = "mcp_context-mode_";
 var KIRO_EVENTS = {
   SessionStart: "SessionStart",
   agentSpawn: "SessionStart",
+  UserPromptSubmit: "UserPromptSubmit",
   PromptSubmit: "UserPromptSubmit",
   userPromptSubmit: "UserPromptSubmit",
   PreToolUse: "PreToolUse",

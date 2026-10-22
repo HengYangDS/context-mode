@@ -709,6 +709,7 @@ var TOOL_NAME_PREFIX7 = "mcp_context-mode_";
 var KIRO_EVENTS = {
   SessionStart: "SessionStart",
   agentSpawn: "SessionStart",
+  UserPromptSubmit: "UserPromptSubmit",
   PromptSubmit: "UserPromptSubmit",
   userPromptSubmit: "UserPromptSubmit",
   PreToolUse: "PreToolUse",
