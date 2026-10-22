@@ -1,8 +1,8 @@
 # ADR-0019: One interactive `context-mode setup`, npm as the user channel
 
-- Status: Proposed (2026-10-22). Accepted when the spikes in "Open items" pass.
+- Status: Proposed (2026-10-22). Spike results are in "Results" (2026-10-22): 3 PASS, 3 FAIL. Accepted when the owner closes "Owner decisions" and the follow-ups in "Results" pass.
 - Owner request, 2026-10-22: install steps are too complex; setup must be interactive (in the style of the Vercel `skills` CLI), live inside doctor, verify and validate every step, leave nothing to the user, and report every failure as an issue.
-- Supersedes: ADR-0011 step d (npm deprecate) and the "no `package.json` on `release`" rule; ADR-0002 GS7 (out-tree `package.json` shape); the per-agent install docs as the main install path.
+- Supersedes: ADR-0011 step d (npm deprecate) and the "no `package.json` on `release`" rule (the `release` branch now carries the publishable `package.json`, S-NPM); ADR-0002 GS7 (out-tree `package.json` shape); the per-agent install docs as the main install path.
 - Amends: ADR-0010 (doctor gets a CLI form that can fix), ADR-0013 (release also publishes to npm), ADR-0014 (setup failures use the same debug report).
 - Keeps: ADR-0004 / D11 (no writes to instruction files), ADR-0003 (E2E-style tests only), ADR-0001 (one fixed path per agent, no runtime fallback).
 
@@ -26,11 +26,13 @@ The two reasons npm was dropped no longer hold:
 
 ### 1. Channel
 
-- **npm is the user channel.** Package `context-mode`, `bin: {"context-mode": "./cli.mjs"}`, no `dependencies`, no install scripts.
-- **The git `release` branch stays, for agents that install from git only** (Claude Code marketplace, Gemini and Qwen extensions). Users never type its name: `setup` runs those commands.
-- Both come from one build in one `release.yml` run. The job fails if the npm tarball file list and hashes differ from `release` `SHA256SUMS`.
-- v2 is published with dist-tag `next`. The owner moves `latest` by hand (one approval). Until then, v1 configs that run `npx -y context-mode mcp` keep getting v1.
+- **npm is the user channel.** Package `context-mode`, `bin: {"context-mode": "cli.mjs"}` (no `./`: npm 11.19.0 removes `"./cli.mjs"` at publish, S-NPM), `type`, `license`, `repository.url` equal to `github.com/mksglu/context-mode` (provenance needs it), no `private`, no `dependencies`, no install scripts.
+- **The git `release` branch stays, for the Claude Code marketplace only.** Gemini and Qwen link the npm package dir instead (S-EXT). Users never type the branch name: `setup` runs those commands.
+- Both come from one build in one `release.yml` run. The build writes `package.json` and `cli.mjs` before `SHA256SUMS`, so one hash list covers the tarball. Gate `check-npm-tarball.mjs`: `npm pack`, compare file list and hashes to `SHA256SUMS`, and fail if `npm pkg fix` would change the manifest (S-NPM).
+- Publish job `publish-npm` in `release.yml` (proposal in S-NPM): cloud runner, `environment: npm-publish`, `id-token: write`, trusted publishing with `--provenance`, no npm token. It checks npm >= 11.5.1, runs after `publish-promote` (git tag first), and skips if `npm view context-mode@<version>` exists, so a rerun is safe.
+- v2 is published with dist-tag `next`. CI never sets `latest`; the owner moves it by hand (one approval). Until then, v1 configs that run `npx -y context-mode mcp` keep getting v1.
 - v2 accepts `mcp` as an alias of `server`, so a v1 config still starts a working server after `latest` moves; `doctor` then flags it and offers `setup`.
+- `npm i -g context-mode@2` takes over the v1 `context-mode` bin, so every v1 hook command `context-mode hook <platform> <event>` then runs the v2 CLI (S-V1). How v2 handles that: Owner decision O3.
 
 ### 2. One command
 
@@ -45,21 +47,21 @@ npm i -g context-mode && context-mode setup
 | `context-mode setup` | CLI, interactive | yes, after consent |
 | `context-mode doctor` | CLI, interactive | read-only; on FAIL it offers "fix now", which runs `setup` for that agent |
 | `ctx_doctor` (`/ctx-doctor`) | MCP tool | read-only; prints the exact `context-mode` command to run (an MCP tool cannot prompt) |
-| `context-mode upgrade` | CLI | `npm i -g context-mode@<tag>`, then `setup --repair` |
+| `context-mode upgrade` | CLI | `npm i -g context-mode@<tag>`, then `setup --repair` (no extension step for Gemini and Qwen: the link points at the updated files, S-EXT) |
 
 ### 3. Setup flow (every agent, every run)
 
-1. **Preflight:** Node version (`node:sqlite` present), npm global prefix writable, the package's own files match `SHA256SUMS`. Fail stops here with the fix.
-2. **Detect:** for each adapter row, binary on PATH, its version, config dir present, existing context-mode entries (v1 or v2). Agents not in the table are listed as "not supported" (section 6).
+1. **Preflight:** Node version (`node:sqlite` present), npm global prefix writable, the package's own files match `SHA256SUMS`. Setup finds its own dir with `fileURLToPath(import.meta.url)` then `realpathSync`; never `process.argv[1]` (a symlink), `npm root -g` or a PATH lookup. No `lib/` assumption: Unix `<prefix>/lib/node_modules/<pkg>`, Windows `<prefix>\node_modules\<pkg>` (S-PATH). Fail stops here with the fix.
+2. **Detect:** for each adapter row, binary on PATH, its version, config dir present, existing context-mode entries (v1 or v2). The normative v1 detect list is the table in [S-V1](../spikes/setup/S-V1.md) (9 agents with v1 entries; zcode has none); each row is a test fixture. v1 files may already be changed by v1 `upgrade` (#187, #628, #738); detect must accept those shapes. Agents not in the table are listed as "not supported" (section 6).
 3. **Choose:** multi-select of detected agents, pre-selected; unsupported and missing agents shown greyed with the reason.
-4. **Plan:** per agent, the exact change: the agent's own command (`claude plugin install`, `codex mcp add`, `gemini extensions install`, `pi install npm:context-mode`, ...) or the exact config keys to add. Shown as a diff. Absolute paths to the installed package (`node /abs/.../server.mjs`), never `npx`, never a PATH lookup in hooks (hook budget 40 ms, Windows `.cmd`, nvm switches).
+4. **Plan:** per agent, the exact change: the agent's own command (`claude plugin install`, `codex mcp add`, `gemini extensions link <abs pkg dir> --consent`, `qwen extensions link <abs pkg dir>` with `y` on stdin because Qwen has no consent flag, `pi install npm:context-mode`, ...) or the exact config keys to add. Shown as a diff. Server and hook commands are `process.execPath` plus the absolute file (`/abs/node /abs/.../server.mjs`), never the bin name, never `npx`, never a PATH lookup. Data: `npx` hook p95 is about 235 ms against 48 ms for the absolute form; the bin shim adds 1 to 5 ms and a PATH lookup (S-HOOK); on Windows, `shell:false` spawn of the bin fails with ENOENT or EINVAL (S-PATH). Claude Code: replace v1 through the `claude plugin` CLI and re-add the marketplace at `release`; never write `installed_plugins.json` (S-V1).
 5. **Consent:** one confirm for the plan. `--dry-run` stops after the plan.
 6. **Apply, per agent:** take a lock (`~/.context-mode/setup.lock`); back up each file to `~/.context-mode/backups/<run-id>/`; refuse a file that does not parse (report, never "fix" it); write atomically (temp file + rename); touch only keys context-mode owns; prefer the agent's own CLI over writing its files.
 7. **Verify, per agent** (all must pass, else roll back that agent from its backup and report):
    - the written entry parses and equals the plan;
-   - the agent's own list command shows context-mode, where it has one;
+   - the agent's own list command shows context-mode, where it has one; for Gemini and Qwen the listed version equals the package version and the link target exists (S-EXT);
    - the exact server command from the config answers MCP `initialize` + `tools/list` with the expected tools;
-   - the exact hook command from the config, fed that agent's golden payload, returns the expected shape inside the hook budget;
+   - the exact hook command from the config, fed that agent's golden payload, returns the expected shape inside the hook budget (budget rule: Owner decision O2; the check prints the bare `node -e ""` time next to the hook time, S-HOOK);
    - the `doctor` checks for that agent pass.
 8. **Summary:** table of agents, PASS / FAIL / SKIPPED with reason, what was written, backup path, and the next step (`/ctx-doctor` inside the agent).
 
@@ -70,7 +72,9 @@ Non-interactive (no TTY, or `--yes`): same steps, no prompts, `--agents a,b`, `-
 ### 4. Interface
 
 - In the style of the Vercel `skills` CLI: arrow-key multi-select, spinners per step, a live checklist, colours that degrade to plain text (`NO_COLOR`, no TTY), every prompt answerable by flag.
-- No runtime dependency. Prompt UI either bundled at build time (candidate: `@clack/prompts`, if MIT and the bundle stays small) or a small module on `node:readline`. Spike S-UI decides.
+- No runtime dependency. Prompt UI is `@clack/prompts` (MIT, 1.8.1 tested), a `devDependency` bundled at build time (24171 bytes minified, S-UI). Changed from "S-UI decides": clack gives the `skills` look in 10 lines with tested cancel, resize and redraw; an own `node:readline` module is 13x smaller but we would own those bugs.
+- The TTY check (`stdin.isTTY && stdout.isTTY`) and the `--yes` / `--agents` / `--json` path run before any clack call: clack without a TTY exits 13. `isCancel` maps to exit 130.
+- Build gates: prompt layer at most 40 KB minified; licence check in CI.
 
 ### 5. Failure reporting
 
@@ -84,6 +88,7 @@ Non-interactive (no TTY, or `--yes`): same steps, no prompts, `--agents a,b`, `-
 - `context-mode setup` lists every detected agent with one of: **full** (MCP + hooks), **MCP only**, **not supported**, each with the reason.
 - `context-mode setup --list` prints the same table for all supported agents without touching anything.
 - A detected MCP-capable agent that is not in the adapter table is shown as "not supported yet" with an offer to open a support request (same consent rule).
+- A v1 entry for an agent not in the v2 table (v1 wrote entries for cursor, jetbrains-copilot, antigravity, antigravity-cli, kimi, omp, openclaw, zed, kilo; S-V1) is shown as "v1 entry, agent not supported in v2"; setup offers removal only, with a diff and consent.
 - README carries the same table, generated from the adapter table at build time.
 
 ### 7. Instruction files
@@ -92,7 +97,7 @@ Non-interactive (no TTY, or `--yes`): same steps, no prompts, `--agents a,b`, `-
 
 Why: these files belong to the user and their team; some agents and some companies treat edits there as a policy breach; v1 issues came from such edits.
 
-Guard: each adapter row lists the only files setup may write. A test fails if setup writes any other path. `doctor` reports a v1 routing block left in an instruction file and offers to remove only that block, with a diff and consent.
+Guard: each adapter row lists the only files setup may write. A test fails if setup writes any other path. v1 wrote routing blocks into 7 files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `QWEN.md`, `KIRO.md`, `.github/copilot-instructions.md`, `SYSTEM.md`; S-V1). `setup` only detects them. `doctor` reports a v1 routing block left in an instruction file and offers to remove only that block, with a diff and consent.
 
 ## Consequences
 
@@ -100,25 +105,40 @@ Guard: each adapter row lists the only files setup may write. A test fails if se
 - 10 install docs become one page plus per-agent troubleshooting.
 - `check-install-docs.mjs` changes: it allows `npm i -g context-mode` and `context-mode setup`, still bans user paths.
 - npm download counts return as a metric; GitHub traffic (G23) stays as a second source.
-- The release job gets npm credentials (trusted publishing, no long-lived token; spike S-NPM).
+- The release job publishes by npm trusted publishing (OIDC, provenance, no long-lived token), behind the `npm-publish` environment with the owner as required reviewer (S-NPM).
+- The stored absolute path holds the node version dir under nvm, fnm, Volta and the CI toolcache, so it can go stale after a node switch. `doctor` checks that the stored path exists; `setup` and `upgrade` rewrite it (S-PATH).
 - More code than a doc page. It replaces the `node -e` writers in the docs, and it reuses the adapter table and `ctx_upgrade` logic.
 
-## Open items (spikes before Accepted)
+## Results (spikes, 2026-10-22)
 
-| Id | Question | Pass |
-|---|---|---|
-| S-NPM | npm trusted publishing from GitHub Actions for `context-mode` | a dry-run publish with provenance from `release.yml` on a test package |
-| S-PATH | where `npm i -g` puts the package with system Node, nvm, fnm, Volta, Homebrew, Windows; can setup find its own absolute path every time | 6 of 6 layouts |
-| S-HOOK | hook p95 with `node /abs/hook.mjs` vs `context-mode hook` vs `npx` | absolute path under 40 ms; record the others |
-| S-EXT | can Gemini/Qwen extensions install from the npm package dir (link) instead of git, and update with `npm i -g` | both agents list the extension and fire a hook |
-| S-UI | bundled prompt library vs own `node:readline` module | pty test of the full flow on macOS, Linux, Windows |
-| S-V1 | v1 entries per agent that setup must find and replace | list from v1 `main` install code, each covered by a test |
+Synthesis: [S-SYN](../spikes/setup/S-SYN.md). Each spike ran in its own temp HOME and prefix; nothing was published.
+
+| Id | Result | Evidence | Pass/fail |
+|---|---|---|---|
+| S-NPM | Local `npm publish --dry-run --provenance --tag next` with the section 1 shape: 25 files, 911399 B packed. Tarball did not equal `SHA256SUMS` as built (`package.json` private, no `cli.mjs`); the other 22 files matched. `"./cli.mjs"` bin removed by npm 11.19.0. OIDC and provenance run only in a real Actions publish. | [S-NPM](../spikes/setup/S-NPM.md), commit a111aac0 | FAIL (pass not testable by dry-run; pass column changed to "first real `next` publish by the owner flow, provenance visible") |
+| S-PATH | 6 of 6 CI layouts (ubuntu, macOS, Windows x Node 24.15.0, 26) gave the real absolute path via `import.meta.url` + `realpathSync`; `argv[1]` did not. nvm, fnm, Volta not run; Homebrew and the CI toolcache stood in. | [S-PATH](../spikes/setup/S-PATH.md), commit 68cca1e, run 39777443062 | PASS (follow-up: nvm, fnm, Volta) |
+| S-HOOK | p95 absolute form: Post 47.8 ms, Pre 41.1 ms; bin shim +1 to 5 ms; `npx` about 235 ms warm. Bare `node -e ""` p95 is 31.7 ms on the same host. One host, Node 26.8.1, noisy. | [S-HOOK](../spikes/setup/S-HOOK.md), commit 284b1f82 | FAIL (40 ms rule; O2) |
+| S-EXT | Gemini 0.65.0 and Qwen 0.26.0 list the linked extension, enabled, and the server answers `tools/list` (10 tools) before and after `npm i -g` of 2.0.1, with no re-link. Hook run by hand, not by a live session. Gemini allowed a curl payload that Qwen denied (cause open). | [S-EXT](../spikes/setup/S-EXT.md), commit 26cb995c | PASS (follow-up: golden Gemini payload, curl gap, live-session E2E) |
+| S-UI | macOS pty: clack and readline both gave `["claude","gemini"]`; `NO_COLOR` gave 0 colour codes; clack exits 13 without a TTY. Linux and Windows pty not run. | [S-UI](../spikes/setup/S-UI.md), commit 64391d8e | PASS on macOS only (follow-up: Linux, Windows via ConPTY) |
+| S-V1 | v1 detect list for 10 of 10 table rows (9 with v1 entries, zcode none), plus 9 unsupported agents and 7 instruction files. No test per row yet; per-row issue links, the kiro default-agent path and the pi `settings.json` path are not verified. | [S-V1](../spikes/setup/S-V1.md), commit 25329b29 | FAIL (tests missing; O3) |
+
+Follow-ups before Accepted (no owner action needed): S-V1 one fixture HOME per row (v1 shape in, v2 shape out, second run no change); S-UI Linux and Windows pty; S-PATH nvm, fnm, Volta; S-EXT golden Gemini hook payload and the curl gap; S-HOOK re-run on a quiet host and on each supported Node major. Gemini `hooks.json` has no `matcher`, so its hook runs on every tool call; S-HOOK re-run counts that cost.
 
 ## Tests (ADR-0003 style)
 
 - Per agent, clean HOME: `npm i -g <local tarball> && context-mode setup --yes --agents <id>` passes every verify step.
+- Per S-V1 row, fixture HOME with the v1 shape: setup writes the v2 shape; a second run changes nothing.
+- Release: the tarball gate (section 1) runs on every release build.
 - Pty-driven run of the interactive flow, golden screen states.
 - Fault injection, each must leave files byte-identical or fully applied: unwritable config, config that does not parse, agent binary missing, server that fails `tools/list`, kill during write, two setups at once.
 - Second run: no changes. `--remove`: byte-identical restore.
 - Guard: no write outside the per-agent allowlist; no instruction file touched.
 - Windows CI job for the agents that run there.
+
+## Owner decisions
+
+| Id | Decision | Recommendation |
+|---|---|---|
+| O1 | npm trusted publisher for `context-mode` (S-NPM). Only the package owner can do this on npmjs.com. | Do the S-NPM owner steps: Trusted Publisher = `mksglu/context-mode`, workflow `release.yml`, environment `npm-publish`; publishing access "require 2FA, disallow tokens"; revoke old tokens; GitHub environment `npm-publish` with the owner as required reviewer. First publish within 2 days of setup, as `2.0.0` with tag `next`; then check `npm view context-mode@2.0.0 dist.attestations`. That publish closes S-NPM. |
+| O2 | Hook budget rule (S-HOOK FAIL): bare node start is 31.7 ms p95, so 40 ms wall leaves about 8 ms for the hook. Options: (a) judge hook time minus bare node start, measured in the same run; (b) raise `HOOK_P95_MS` after re-runs; (c) cut `hook.mjs` work (155 KB bundle, git lookup). | (a) now, so doctor D5 and setup verify do not blame the hook for a slow node start; keep `HOOK_P95_MS` at 40 until the re-run on a quiet host and each supported Node major; do (c) in parallel. |
+| O3 | v1 hook commands after `npm i -g context-mode@2` (S-V1): every v1 `context-mode hook <platform> <event>` then runs the v2 CLI. Options: v2 accepts that form, or setup rewrites all v1 hook commands in the same run. Must be closed before `latest` moves. | Both: v2 CLI accepts `hook <platform> <event>` as a compat form (like the `mcp` alias), so a half-migrated user keeps working hooks; setup still rewrites to the absolute form and doctor flags the old form. |
