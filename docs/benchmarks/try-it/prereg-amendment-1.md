@@ -51,3 +51,38 @@ web-scrape, docs-search and large-json: all four arms, 1 warm-up + 4 measured cy
 prompts, flags and stop rule as `prereg.md`. The first-run lines of these three prompts are marked superseded
 (reasons 1 and 2 above). repo-research, git-history and session-continuity are not re-run; their gateway lines stay
 and are flagged "tenant shared per prompt".
+
+## Addendum: helper model price
+
+Why: in the amendment-1 smoke, the plain arm's WebFetch page read ran on `claude-haiku-5-5`, which was not in the
+price table. The harness stopped by design (fail closed) and did not save the cycle. This addendum adds that one model.
+No other price changes.
+
+Source: https://platform.claude.com/docs/en/about-claude/pricing, read 2026-10-22 (HTTP 200), table "Model pricing".
+Columns: Input | Output | 5m writes | 1h writes | Hits and refreshes. The rows, as on the page:
+
+| Model | Input | Output | 5m writes | 1h writes | Hits and refreshes |
+|---|---|---|---|---|---|
+| Claude Haiku 5.5, for prompts up to 100,000 tokens | $0.10 / MTok | $0.50 / MTok | $0.125 / MTok | $0.20 / MTok | $0.01 / MTok |
+| Claude Haiku 5.5, for prompts over 100,000 tokens | $0.50 / MTok | $2.50 / MTok | $0.625 / MTok | $1 / MTok | $0.05 / MTok |
+
+The page's rule (Long context pricing): "Claude Haiku 5.5 is priced by prompt length: a request whose prompt is over
+100,000 tokens pays higher prices. A request's prompt length counts all of its input tokens, including cache reads and
+cache writes. Each request is priced on its own".
+
+Tier rule in the harness:
+
+1. When the evidence holds per-request usage, each request pays the row for its own prompt length
+   (input + cache reads + cache writes). The gateway arm's dollars come from the gateway's per-call record, which
+   prices each call on its own.
+2. The client's `result` event holds only a per-model total (`modelUsage`). If that total prompt is at or under
+   100,000 tokens, no single request can be over it: the lower row is proven (`price_tiers: base_proven`).
+   If the total is over 100,000, the split per request is unknown: the harness uses the lower row and flags the run
+   (`price_tier_assumed: true`). Such a run's cost is a lower bound.
+3. A model not in the table still stops the run (fail closed).
+
+Check on the smoke transcript that stopped: helper usage 5,605 input and 2,451 output tokens, no cache:
+5,605 x $0.10 + 2,451 x $0.50 per million = $0.001786, equal to the client's own costUSD for that model.
+
+Harness: `bench/gateway-ab/tryit.patch` now diffs from the first-run commit to the commit with this price, SHA-256
+`eec3114ef0478bfd2f0f1bee542d9b20bf6ce00012a688fbe854fea2454185c2`. Unit tests: `scripts/e2e/oss-arms-lib.test.mjs`, 16 pass (2 new: both tiers, and the proven/assumed flag).

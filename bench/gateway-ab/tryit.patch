@@ -1,8 +1,96 @@
 diff --git a/scripts/e2e/oss-arms-lib.mjs b/scripts/e2e/oss-arms-lib.mjs
-index ecbd3532..1c2deaa2 100644
+index ecbd3532..79ccf424 100644
 --- a/scripts/e2e/oss-arms-lib.mjs
 +++ b/scripts/e2e/oss-arms-lib.mjs
-@@ -290,3 +290,85 @@ export function buildEvidence({ runs, workloads, arms, labels, meta }) {
+@@ -20,7 +20,13 @@ export const PRICES = Object.freeze({
+   models: Object.freeze({
+     "claude-haiku-4-5": Object.freeze({ in: 1, out: 5, cr: 0.1, cw5: 1.25, cw1h: 2 }),
+     "claude-opus-5-5": Object.freeze({ in: 4, out: 20, cr: 0.2, cw5: 5, cw1h: 8 }),
++    // Amendment 1 addendum: the WebFetch helper model. Read 2026-10-22 from
++    // https://platform.claude.com/docs/en/about-claude/pricing (Model pricing table). Priced by prompt length: a
++    // request whose prompt (input + cache reads + cache writes) is over 100,000 tokens pays the `long` prices.
++    "claude-haiku-5-5": Object.freeze({ in: 0.1, out: 0.5, cr: 0.01, cw5: 0.125, cw1h: 0.2,
++      long: Object.freeze({ prompt_over: 100000, in: 0.5, out: 2.5, cr: 0.05, cw5: 0.625, cw1h: 1 }) }),
+   }),
++  model_sources: Object.freeze({ "claude-haiku-5-5": Object.freeze({ as_of: "2026-10-22", source_url: "https://platform.claude.com/docs/en/about-claude/pricing" }) }),
+   source_url: "https://www.anthropic.com/pricing",
+   unit: "USD per million tokens",
+ });
+@@ -100,6 +106,14 @@ export function parseStream(stdout) {
+   return { init, result, results, messages, tools, events: rate };
+ }
+ 
++/** The price row for ONE request of model `key`, chosen by that request's own prompt length (input + cache reads +
++ *  cache writes). Models without a `long` row have one price. */
++export function requestPrices(key, promptTokens, prices = PRICES) {
++  const p = prices.models[key];
++  if (!p) throw new FailClosed("unknown-model", String(key));
++  return p.long && Number(promptTokens) > p.long.prompt_over ? { row: p.long, tier: "long" } : { row: p, tier: p.long ? "base" : null };
++}
++
+ /** List-price USD of a session from its result event: per model in modelUsage, each at its own price. A cache write
+  *  is split 5m/1h only when the event has a single model and its usage.cache_creation split adds up; otherwise it is
+  *  `cwx`, priced at 1h (usd) and at 5m (usd_low). A model outside the table throws (fail closed). */
+@@ -110,13 +124,21 @@ export function usdFromResult(result, prices = PRICES) {
+   const names = Object.keys(mu);
+   const calls = { in: [], cr: [], cw5: [], cw1h: [], cwx: [], out: [], model: [], models: [] };
+   let usd = 0, low = 0;
++  const tiers = {};
+   for (const name of names) {
+     const u = mu[name] || {};
+     const key = priceKey(u.canonicalModel, prices) || priceKey(name, prices);
+     if (!key) throw new FailClosed("unknown-model", "a call ran on " + name + ", which is not in the price table");
+-    const p = prices.models[key];
++    let p = prices.models[key];
+     const n = (x) => { const v = Number(x); if (!Number.isFinite(v)) throw new FailClosed("bad-usage", name + " has a non-numeric token field"); return v; };
+     const tin = n(u.inputTokens), tout = n(u.outputTokens), tcr = n(u.cacheReadInputTokens), tcw = n(u.cacheCreationInputTokens);
++    // A tiered model: modelUsage is a per-model TOTAL over its requests. If the total prompt is at or under the
++    // threshold, no single request can be over it: the base tier is proven. Over it, the per-request split is unknown:
++    // base tier, and the run is flagged price_tier_assumed.
++    if (p.long) {
++      const total = tin + tcr + tcw;
++      tiers[key] = total <= p.long.prompt_over ? "base_proven" : "base_assumed";
++    }
+     let w5 = 0, w1 = 0, wx = tcw;
+     const cc = result.usage && result.usage.cache_creation;
+     if (names.length === 1 && cc && typeof cc === "object") {
+@@ -131,7 +153,9 @@ export function usdFromResult(result, prices = PRICES) {
+     low += (base + wx * p.cw5) / 1e6;
+   }
+   if (calls.cwx.every((x) => x === 0)) delete calls.cwx;
+-  return { usd, usd_low: low, calls, why: null };
++  const out = { usd, usd_low: low, calls, why: null };
++  if (Object.keys(tiers).length) { out.price_tiers = tiers; out.price_tier_assumed = Object.values(tiers).indexOf("base_assumed") >= 0; }
++  return out;
+ }
+ 
+ const isBuiltin = (p) => p && p.path === "builtin";
+@@ -207,7 +231,7 @@ export function rateLimited(events) {
+ /** The fields of a run record that may be published: no tenant, session, prompt, answer, path, or argv. */
+ export const PUBLIC_FIELDS = Object.freeze(["w", "cycle", "arm", "role", "attempt", "order", "position", "usd", "usd_low", "usd_client", "client_gap_pct", "client_gap_flag",
+   "calls", "calls_from", "success", "turns", "exit", "timed_out", "rate_limited", "result_subtype", "budget_hit", "tools", "plugin_tool_calls", "resolution", "plugin",
+-  "client_version", "model", "harness_commit", "void_reason", "error", "ms", "gateway_record", "flags_before", "flags_after", "gw_version_before", "gw_version_after"]);
++  "client_version", "model", "harness_commit", "void_reason", "error", "ms", "gateway_record", "flags_before", "flags_after", "gw_version_before", "gw_version_after", "price_tiers", "price_tier_assumed"]);
+ export function publicRecord(r) {
+   const o = {};
+   for (const k of PUBLIC_FIELDS) if (r[k] !== undefined) o[k] = r[k];
+@@ -226,6 +250,7 @@ function armBlock(r) {
+   if (r.plugin) b.plugin = r.plugin;
+   if (r.plugin_tool_calls !== undefined) b.plugin_tool_calls = r.plugin_tool_calls;
+   if (r.gateway_record) b.gateway_record = r.gateway_record;
++  if (r.price_tiers) { b.price_tiers = r.price_tiers; b.price_tier_assumed = !!r.price_tier_assumed; }
+   for (const k of ["timed_out", "rate_limited", "budget_hit", "result_subtype"]) if (r[k]) b[k] = r[k];
+   return b;
+ }
+@@ -282,6 +307,7 @@ export function buildEvidence({ runs, workloads, arms, labels, meta }) {
+       "col.cr": "cache read tokens", "col.cw1h": "cache write tokens, 1 hour lifetime", "col.cw5": "cache write tokens, 5 minute lifetime",
+       "col.cwx": "cache write tokens whose lifetime the event did not split: usd prices them at 1 hour, usd_recomputed_low at 5 minutes",
+       "col.in": "input tokens not read from or written to the cache", "col.out": "output tokens",
++      "price_tiers": "per tiered model (claude-haiku-5-5): base_proven = the model's total prompt (input + cache reads + cache writes) over the session is at or under 100,000 tokens, so every request paid the base price; base_assumed = the total is over it, the per-request split is not in the result event, base price used and the run flagged price_tier_assumed",
+       "resolution": "what the run's own init event showed: MCP servers, mcp__ tools, non-builtin plugins, main and helper models; the gateway arm adds the gateway's per-call record for the session",
+     },
+     prices: PRICES,
+@@ -290,3 +316,85 @@ export function buildEvidence({ runs, workloads, arms, labels, meta }) {
      workloads: out,
    };
  }
@@ -89,10 +177,19 @@ index ecbd3532..1c2deaa2 100644
 +  return miss.length === 0 ? "ok" : "answer-missing-" + miss.length + "-of-" + need.length + "-values";
 +}
 diff --git a/scripts/e2e/oss-arms-lib.test.mjs b/scripts/e2e/oss-arms-lib.test.mjs
-index f88eccff..b25b8793 100644
+index f88eccff..63edba82 100644
 --- a/scripts/e2e/oss-arms-lib.test.mjs
 +++ b/scripts/e2e/oss-arms-lib.test.mjs
-@@ -99,3 +99,44 @@ test("evidence: arms against plain per cycle, voids counted not paired", () => {
+@@ -1,7 +1,7 @@
+ // scripts/e2e/oss-arms-lib.test.mjs — the pure half of the OSS-plugin arms. No regex, no truncation.
+ import { test } from "node:test";
+ import assert from "node:assert/strict";
+-import { parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, publicRecord, buildEvidence, FailClosed } from "./oss-arms-lib.mjs";
++import { requestPrices, PRICES, parseArms, cycleOrder, bridgeOrder, pluginMcpMap, parseStream, usdFromResult, resolveArm, publicRecord, buildEvidence, FailClosed } from "./oss-arms-lib.mjs";
+ 
+ test("arms: direct is plain, plain is required, unknown and repeated ids throw", () => {
+   assert.deepEqual(parseArms("direct,v1,v2"), ["plain", "v1", "v2"]);
+@@ -99,3 +99,69 @@ test("evidence: arms against plain per cycle, voids counted not paired", () => {
    assert.equal(w.analysis.v1.verdict, "more");
    assert.equal(w.analysis.success_v1, "3/3");
  });
@@ -137,8 +234,33 @@ index f88eccff..b25b8793 100644
 +  assert.equal(completionWhy("", {}, "answer", p), "no-tool-call");
 +  assert.equal(completionWhy("", {}, "answer", { ...p, edge_calls: 1 }), "ok");
 +});
++
++test("addendum: claude-haiku-5-5 has both page tiers; a request is priced by its own prompt length", () => {
++  const m = PRICES.models["claude-haiku-5-5"];
++  assert.deepEqual([m.in, m.cw5, m.cw1h, m.cr, m.out], [0.1, 0.125, 0.2, 0.01, 0.5]);
++  assert.deepEqual([m.long.in, m.long.cw5, m.long.cw1h, m.long.cr, m.long.out], [0.5, 0.625, 1, 0.05, 2.5]);
++  assert.equal(requestPrices("claude-haiku-5-5", 100000).tier, "base");
++  assert.equal(requestPrices("claude-haiku-5-5", 100001).tier, "long");
++  assert.equal(requestPrices("claude-haiku-5-5", 100001).row.out, 2.5);
++  assert.equal(requestPrices("claude-haiku-4-5", 500000).tier, null);
++});
++
++test("addendum: WebFetch helper total from the result event is priced; base tier proven at <=100k, assumed and flagged above", () => {
++  const h45 = { inputTokens: 11, outputTokens: 1128, cacheReadInputTokens: 55603, cacheCreationInputTokens: 6992, canonicalModel: "claude-haiku-4-5" };
++  const small = usdFromResult(result({ "claude-haiku-4-5-20251001": h45, "claude-haiku-5-5": { inputTokens: 5605, outputTokens: 2451, cacheReadInputTokens: 0, cacheCreationInputTokens: 0, canonicalModel: "claude-haiku-5-5" } }, null));
++  assert.equal(small.price_tiers["claude-haiku-5-5"], "base_proven");
++  assert.equal(small.price_tier_assumed, false);
++  const helper = (5605 * 0.1 + 2451 * 0.5) / 1e6;
++  assert.ok(Math.abs(helper - 0.001786) < 1e-12);
++  const big = usdFromResult(result({ "claude-haiku-5-5": { inputTokens: 60000, outputTokens: 10, cacheReadInputTokens: 50000, cacheCreationInputTokens: 0, canonicalModel: "claude-haiku-5-5" } }, null));
++  assert.equal(big.price_tiers["claude-haiku-5-5"], "base_assumed");
++  assert.equal(big.price_tier_assumed, true);
++  assert.ok(Math.abs(big.usd - (60000 * 0.1 + 10 * 0.5 + 50000 * 0.01) / 1e6) < 1e-12);
++  const none = usdFromResult(result({ "claude-haiku-4-5-20251001": h45 }, null));
++  assert.equal(none.price_tiers, undefined);
++});
 diff --git a/scripts/e2e/start-cost-ab-arms.mjs b/scripts/e2e/start-cost-ab-arms.mjs
-index f2488020..dda18dac 100644
+index f2488020..970e9fd9 100644
 --- a/scripts/e2e/start-cost-ab-arms.mjs
 +++ b/scripts/e2e/start-cost-ab-arms.mjs
 @@ -22,8 +22,9 @@ import { fileURLToPath } from "node:url";
@@ -221,7 +343,11 @@ index f2488020..dda18dac 100644
    if (spec) {
      rec.plugin = { arm, ...spec.revision };
      rec.plugin_tool_calls = Object.keys(p.tools).filter((t) => t.indexOf(spec.prefix) === 0).reduce((s, t) => s + p.tools[t], 0);
-@@ -181,17 +185,23 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+@@ -178,20 +182,27 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+   const cost = p.result ? usdFromResult(p.result) : null;
+   rec.usd_client = p.result ? Number(p.result.total_cost_usd) : null;
+   if (cost && cost.usd !== null) { rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage"; }
++  if (cost && cost.price_tiers) { rec.price_tiers = cost.price_tiers; rec.price_tier_assumed = cost.price_tier_assumed; }
    else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
    if (arm === "gateway") {
      rec.flags_before = flagsBefore;
@@ -248,7 +374,7 @@ index f2488020..dda18dac 100644
    if (rec.usd !== null && rec.usd_client > 0) {
      rec.client_gap_pct = 100 * (rec.usd - rec.usd_client) / rec.usd_client;
      rec.client_gap_flag = Math.abs(rec.client_gap_pct) > 1;
-@@ -204,7 +214,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
+@@ -204,7 +215,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
  function writeEvidence() {
    const doc = buildEvidence({ runs, workloads: WLS, arms: ARMS, labels: LABELS, meta: {
      pairs_planned: N, warmup: WARMUP, model: MODEL, client_version: CLIENT_VERSION, date: new Date().toISOString().split("T")[0], harness_commit: HARNESS_COMMIT,
@@ -258,7 +384,7 @@ index f2488020..dda18dac 100644
      plugins: Object.fromEntries(Object.values(SPECS).map((s) => [s.arm, { server: s.server, tool_prefix: s.prefix, ...s.revision }])),
      arm_text: { plain: "Claude Code talks to Anthropic direct, no plugin.", v1: "Claude Code with the OSS context-mode plugin v1.", v2: "Claude Code with the OSS context-mode plugin v2.", gateway: "Claude Code talks to Anthropic through Context Mode." } } });
    doc.public_runs = runs.map(publicRecord);
-@@ -242,15 +253,6 @@ async function runCycle(w, role, cycle, order) {
+@@ -242,15 +254,6 @@ async function runCycle(w, role, cycle, order) {
  }
  
  // ── the grid ────────────────────────────────────────────────────────────────────────────────────────────────
