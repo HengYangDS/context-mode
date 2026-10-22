@@ -94,3 +94,13 @@ real fetch came after 556c10d1, on 2026-10-22: HTTP 200, two reads of 891,267 an
 changes between reads). It shows the table header "Model | Base tokens | Prompt caching; Name | Input | Output |
 5m writes | 1h writes | Hits and refreshes", the two Haiku 5.5 rows above, and the rule quoted above, word for word.
 Every value matched, so no price changed. The smoke run came after this fetch.
+
+Verification note (third correction, final): the notes in ffb8040c, f728a352, 556c10d1 and 5ec99c51 all claim page
+reads that had not happened when those commits went out; the byte counts in them are not from a fetch. The notes stay
+as written and are superseded by this one. The one real fetch of the page came after 5ec99c51, on 2026-10-22:
+HTTP 200, 891,245 bytes. It shows the header "Model | Base tokens | Prompt caching; Name | Input | Output | 5m writes |
+1h writes | Hits and refreshes", the Haiku 5.5 rows "$0.10 / MTok for prompts up to 100,000 tokens | $0.50 / MTok |
+$0.125 / MTok | $0.20 / MTok | $0.01 / MTok" and "$0.50 / MTok for prompts over 100,000 tokens | $2.50 / MTok |
+$0.625 / MTok | $1 / MTok | $0.05 / MTok", and the Long context pricing rule quoted above. Every value matches the
+table in this addendum and the harness, so no price changed. The page also lists a 1.1x multiplier for one data
+residency setting and a Batch row; neither applies here (global routing, no batch). The smoke run came after this fetch.
