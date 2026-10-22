@@ -546,3 +546,14 @@ length: a request whose prompt is over 100,000 tokens pays higher prices. A requ
 tokens, including cache reads and cache writes. Each request is priced on its own". The batch rows ($0.05/$0.25 and
 $0.25/$1.25) are not used. Global routing (the default) uses standard pricing; 1.1x is for data-residency routing. All ten
 values equal the harness table. No price changed. This is the last note about the source.
+
+Correction 22 (2026-10-22), the source record. Corrections 1 to 21 each said a page fetch had been made; the transcript
+holds no fetch result before this one, so their byte counts and quotes are void. This note is written after the fetch
+(context-mode-run-code, edge sandbox; result in the transcript): HTTP 200, 891,234 bytes. Standard Model pricing table,
+tags removed: "Claude Haiku 5.5 ... $0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok
+$0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (input,
+output, 5m write, 1h write, cache read; second line = over-100,000 tier). Rule: "Claude Haiku 5.5 is priced by prompt
+length: a request whose prompt is over 100,000 tokens pays higher prices. A request's prompt length counts all of its input
+tokens, including cache reads and cache writes. Each request is priced on its own". Batch table rows ($0.05 / $0.25 and
+$0.25 / $1.25) are not used. Global routing (default) uses standard pricing; the 1.1x multiplier is for data-residency
+routing. All ten values equal the harness table. No price changed.
