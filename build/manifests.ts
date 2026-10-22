@@ -145,6 +145,40 @@ function manifestFor(row: AdapterRow, version: string): [string, JsonObject] | n
   }
 }
 
+// D-FU-RM-PI-1 (ADR-0002 GS7 amended): Pi reads package.json "pi".extensions/skills from the package dir. The out
+// tree holds ONE package.json of exactly this shape: no dependencies, no scripts, so the npm install Pi runs on a
+// git install does nothing.
+const OUT_PACKAGE_JSON = "package.json";
+const PI_EXTENSION = "./pi/index.js";
+const PI_SKILLS = "./skills";
+const OUT_PACKAGE_KEYS: readonly string[] = ["name", "pi", "private", "type", "version"];
+const PI_KEYS: readonly string[] = ["extensions", "skills"];
+
+function piPackageJson(version: string): JsonObject {
+  return { name: SERVER_KEY, version, private: true, type: "module", pi: { extensions: [PI_EXTENSION], skills: [PI_SKILLS] } };
+}
+
+// Throws unless `pkg` is the Pi-only shape above (any extra key, e.g. dependencies or scripts, is a hard stop).
+export function assertOutPackageJson(pkg: unknown): void {
+  if (pkg === null || typeof pkg !== "object" || Array.isArray(pkg)) throw new Error("package.json: not an object");
+  const obj = pkg as Record<string, unknown>;
+  for (const key of Object.keys(obj)) {
+    if (!OUT_PACKAGE_KEYS.includes(key)) throw new Error("package.json: key " + key + " not allowed (ADR-0002 GS7)");
+  }
+  for (const key of OUT_PACKAGE_KEYS) if (!(key in obj)) throw new Error("package.json: missing " + key);
+  if (obj.name !== SERVER_KEY) throw new Error("package.json: name must be " + SERVER_KEY);
+  if (typeof obj.version !== "string") throw new Error("package.json: version must be a string");
+  if (obj.private !== true) throw new Error("package.json: private must be true");
+  if (obj.type !== "module") throw new Error("package.json: type must be module");
+  const pi = obj.pi;
+  if (pi === null || typeof pi !== "object" || Array.isArray(pi)) throw new Error("package.json: pi must be an object");
+  const piObj = pi as Record<string, unknown>;
+  const piKeys = Object.keys(piObj).sort();
+  if (piKeys.join(",") !== PI_KEYS.join(",")) throw new Error("package.json: pi keys must be " + PI_KEYS.join(","));
+  if (JSON.stringify(piObj.extensions) !== JSON.stringify([PI_EXTENSION])) throw new Error("package.json: pi.extensions must be [" + PI_EXTENSION + "]");
+  if (JSON.stringify(piObj.skills) !== JSON.stringify([PI_SKILLS])) throw new Error("package.json: pi.skills must be [" + PI_SKILLS + "]");
+}
+
 // impl/13 §3.1 step 3: alphabetical keys inside every object, array order kept.
 function sortKeys(value: Json): Json {
   if (Array.isArray(value)) return value.map(sortKeys);
@@ -170,5 +204,6 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
     const shape = HOOK_SHAPES[row.id];
     if (shape !== null) files.push([hookFile(row), shape(row)]);
   }
+  if (rows.some((row) => row.id === "pi")) files.push([OUT_PACKAGE_JSON, piPackageJson(version)]); // D-FU-RM-PI-1
   for (const [rel, value] of files) writeJson(outDir, rel, value);
 }

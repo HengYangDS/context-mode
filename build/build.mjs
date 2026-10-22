@@ -28,7 +28,7 @@ import {
   SURFACE_CAP,
   BUNDLE_SHA_DEFINE,
 } from "../src/core/contracts/constants.ts";
-import { generateManifests } from "./manifests.ts";
+import { assertOutPackageJson, generateManifests } from "./manifests.ts";
 import { writeHashes } from "./hash.mjs";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -171,11 +171,16 @@ async function buildBundle(bundle, outDir, define) {
   assertStaticImports(bundle, result.metafile);
 }
 
-// ADR-0002 GS7: the output tree carries no package.json and no node_modules.
+// ADR-0002 GS7 (amended, D-FU-RM-PI-1): no node_modules; one package.json of the Pi-only shape (name, version,
+// private, type, pi) with no dependencies and no scripts.
 function assertOutTree(outDir) {
   const names = readdirSync(outDir);
-  for (const forbidden of ["package.json", "node_modules"]) {
-    if (names.includes(forbidden)) throw new BuildError(`${forbidden} in ${outDir}`);
+  if (names.includes("node_modules")) throw new BuildError(`node_modules in ${outDir}`);
+  if (!names.includes("package.json")) return;
+  try {
+    assertOutPackageJson(JSON.parse(readFileSync(path.join(outDir, "package.json"), "utf8")));
+  } catch (err) {
+    throw new BuildError(`${outDir}/package.json: ${err && err.message ? err.message : String(err)}`);
   }
 }
 

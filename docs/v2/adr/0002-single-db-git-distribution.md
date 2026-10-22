@@ -30,6 +30,7 @@
    - This trades v1's mid-session self-heal (lossless VACUUM-INTO rebuild, added across 50aafdce/a5c449df/8a1607e9) for hard-error + `ctx_doctor`, per owner rule P1 ("no fallback chains, hard deny"). That is a named decision, not a silent loss of capability.
 4. **Cleanup:** a DB file for a project with no live owner PID is eligible for deletion. The live-PID check runs inside the same transaction/lock as the delete itself, not as a separate step, so a server cannot start between the check and the delete and have its file removed out from under it (closes the #880 race class). This path has a contract test asserting the check and the delete are atomic.
 5. **Distribution:** CI builds a git `#release` branch. No npm publish, no CLI, and no npm install at runtime.
+   - GS7 (amended 2026-10-22, D-FU-RM-PI-1): the `#release` tree has no `node_modules`. It may hold ONE `package.json`, with only `name`, `version`, `private: true`, `type: "module"` and a `pi` key (`extensions: ["./pi/index.js"]`, `skills: ["./skills"]`). It has no `dependencies` and no `scripts`, so the `npm install` that Pi runs on a git install does nothing. Pi reads `pi.extensions` from this file to find the extension. `build/build.mjs` fails the build on any other key.
 6. **Migration order (G22):**
    1. version bump
    2. marketplace `ref:"release"`
