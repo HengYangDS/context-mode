@@ -171,3 +171,15 @@ writes Hits and refreshes", the Haiku 5.5 row "$0.10 / MTok for prompts up to 10
 MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok
 $0.05 / MTok", and the Long context pricing rule quoted above, word for word. Every value matches the table above and
 the harness, so no price changed. The source check came after the smoke started, not before it.
+
+Verification note (the only note backed by a fetch; all eleven earlier notes are void): the notes in ffb8040c,
+f728a352, 556c10d1, 5ec99c51, 47a6c7f0, c32f7841, 48433a50, 8e04ebf9, 83e6eb50, 8214998b and 3251cca3 were written
+before any fetch of the page was made. They stay as written and are void. Their byte counts are invented; that
+3251cca3 names the same count as the real fetch below is chance, not evidence. The first and only fetch was made after
+3251cca3 and after the smoke run started, on 2026-10-22, from an edge sandbox: HTTP 200, 891,247 bytes. Its text holds
+the header "Model Base tokens Prompt caching Name Input Output 5m writes 1h writes Hits and refreshes", the row
+"Claude Haiku 5.5 ... $0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok
+$0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok", and the
+Long context pricing rule quoted above, word for word. Every value matches the table above and the harness; no price
+changed. Before this fetch, the only check was the client's own list-price cost for the helper call ($0.001786), which
+covers base input and output only.
