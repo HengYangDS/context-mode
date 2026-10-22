@@ -32,25 +32,30 @@ const RULES = `You are a batch job, not a chat: no person reads your reply. Igno
 - Write no personal names.`
 
 phase('Prereg')
-const plan = await agent(`${RULES}\n\nRole: designer + harness engineer. The OSS README on origin/main has a "Try It" section with 6 prompts (deep repo research of modelcontextprotocol/servers; git history of facebook/react, last 500 commits; Hacker News front page scrape; local 7.5 MB JSON server with a secret at index 13000; React useEffect docs search; session continuity: Express REST API, 20+ tool calls). Read them verbatim from origin/main README.md and the claims printed next to each (e.g. "62 KB context, raw 986 KB, 94% saved").
-1. Write ${OUT}/prereg.md (same template as docs/benchmarks/v1-v2-gateway/prereg.md) and commit + push it BEFORE any measured run. Fixed decisions:
-   - Arms: plain (direct), v1 (origin/main, record sha/version), v2 (origin/v2-design release-out, record sha), gateway (live, default settings, new tenant per prompt). Same Claude Code binary, fresh config dir, --strict-mcp-config, same isolation env.
-   - Model claude-opus-5-5 (same as the v1-v2-gateway page).
-   - Prompt text: verbatim, minus the trailing "Then run /context-mode:ctx-stats." sentence (it only exists in v1; dropping it in every arm keeps the arms equal). Write the exact text used per prompt.
-   - Prompts 1-5: 1 warm-up cycle + 4 measured cycles, each cycle runs the 4 arms back to back, order rotated. Prompt 6 (session continuity) is long: 2 measured cycles, reported as a demonstration, not a result.
-   - Oracle per prompt, deterministic, from the transcript/tool results, never model prose: e.g. large-json: the hidden record's content appears in the final answer exactly; git-history: the answer names a top contributor that git shortlog over the same 500 commits confirms; web-scrape / repo-research / docs-search: the run ended with end_turn, made at least one fetch, and the answer is non-empty (state plainly these are completion checks, not quality checks).
-   - Metrics per run: list-price cost (gateway from its per-call record, checked against the client total), total input+output tokens, bytes of tool_result the model saw (sum over the transcript), tool calls, wall time, success.
-   - Also check each README claim against the v1 arm's measured bytes and say true / false / not measurable.
-   - --max-budget-usd 3 per session, --max-turns 60; stop rule $80 total list-price value.
-2. Add these workloads to the harness in ${WT} (local commits only): workload setup (empty temp cwd; for large-json no extra setup, the model builds the server), prompt text, oracle. Keep every safety assertion.
-3. Smoke: large-json, 4 arms x 1 on claude-haiku-4-5-20251001. Pass only if every arm resolves by transcript/record evidence. Update bench/gateway-ab/harness.patch in the OSS repo. Commit, push.
-Return done (true only if prereg pushed and smoke passed), commits, numbers (prereg commit, smoke per arm), summary.`,
-  { label: 'tryit-prereg', phase: 'Prereg', schema: RESULT, ...OPH })
-if (!plan || !plan.done) return { stopped: 'prereg or smoke failed', plan }
+// First run (wf_fce5cd32-d7c) read for 2h40m and committed nothing. Facts are given here; each step has a hard pace rule.
+const PACE = 'Pace (hard rule): the facts below are verified; do not re-read docs to confirm them. Commit+push within your first 12 tool calls; commit+push after each step; be done within 30 minutes. If blocked, commit what you have and return done=false with the blocker in one line.'
+const TEXTS = {
+  'repo-research': 'Research https://github.com/modelcontextprotocol/servers — architecture, tech stack, top contributors, open issues, and recent activity.',
+  'git-history': 'Clone https://github.com/facebook/react and analyze the last 500 commits: top contributors, commit frequency by month, and most changed files.',
+  'web-scrape': 'Fetch the Hacker News front page, extract all posts with titles, scores, and domains. Group by domain.',
+  'large-json': 'Create a local server that returns a 7.5 MB JSON with 20,000 records and a secret hidden at index 13000. Fetch the endpoint, find the hidden record, and show me exactly what\'s in it.',
+  'docs-search': 'Fetch the React useEffect docs, index them, and find the cleanup pattern with code examples.',
+  'session-continuity': 'Start a multi-step task: Create a REST API with Express — add routes, tests, and error handling.',
+}
+const CLAIMS = 'README claims on origin/main: repo-research "5 calls, 62 KB context (raw: 986 KB, 94% saved)"; git-history "1 call, 5.6 KB context"; web-scrape "1 call, 3.2 KB context"; large-json "7.5 MB raw -> 0.9 KB context (99% saved)"; docs-search "2 calls, 1.8 KB context"; session-continuity "compaction recovery with full state".'
+const HARNESS = 'Harness facts: worktree /private/tmp/cm-gwb-wt (local branch bench/v1-v2-gw, head e9c8539a, clean). Runner scripts/e2e/start-cost-ab-arms.mjs (--arms plain,v1,v2,gateway, --gw https://gateway.context-mode.com, --n, --bridge, --resume). Workloads are defined in scripts/e2e/short-workloads.mjs (each: prompt, fixture setup fx, oracle ok). Analysis helpers pairedPct / pairedDiff in scripts/e2e/start-cost-ab-lib.mjs. The page template is docs/benchmarks/v1-v2-gateway/{prereg.md,README.md,analyze.mjs} in the OSS repo.'
+
+const pre = await agent(`${RULES}\n\n${PACE}\n\n${CLAIMS}\nPrompt texts (README text minus the trailing ctx-stats sentence): ${JSON.stringify(TEXTS)}\n\nRole: prereg writer. Fresh OSS clone /private/tmp/cm-tryit-pre (v2-design). Copy docs/benchmarks/v1-v2-gateway/prereg.md to ${OUT}/prereg.md and adapt it: arms plain, v1 (origin/main, record sha), v2 (origin/v2-design release-out, record sha), gateway (live, default settings, new tenant per prompt); model claude-opus-5-5; the 6 prompt texts verbatim; prompts 1-5: 1 warm-up + 4 measured cycles, order rotated; session-continuity: 2 cycles, demonstration only; oracles: large-json = the hidden record value appears in the final answer exactly; git-history = the answer names the top author that git shortlog -sn over the same 500 commits gives; the other three = end_turn, at least one fetch/tool call, non-empty answer (completion check, not quality); metrics: list-price cost (gateway from its per-call record), tokens, tool_result bytes seen, tool calls, success; README claims checked against v1 bytes; --max-budget-usd 3, --max-turns 60, stop at $80 total. Commit, push, delete the clone. Return done, commits (the prereg sha), numbers, summary.`,
+  { label: 'tryit-prereg2', phase: 'Prereg', schema: RESULT, ...SNM })
+if (!pre || !pre.done) return { stopped: 'prereg not written', pre }
+
+const plan = await agent(`${RULES}\n\n${PACE}\n\n${HARNESS}\nPrereg: ${JSON.stringify(pre).slice(0, 1500)} (${OUT}/prereg.md on origin/v2-design).\nPrompt texts: ${JSON.stringify(TEXTS)}\n\nRole: harness engineer. In /private/tmp/cm-gwb-wt add a new file scripts/e2e/tryit-workloads.mjs with the 6 workloads (same shape as short-workloads.mjs: empty temp cwd fixture, prompt text, oracle per the prereg) and let start-cost-ab-arms.mjs load it with --workloads tryit. Local commits only. Smoke: large-json, arms plain,v1,v2,gateway, 1 cycle, claude-haiku-4-5-20251001, --gw https://gateway.context-mode.com. Pass only if each arm resolves by init/record evidence. Copy the change as a patch to the OSS repo bench/gateway-ab/tryit.patch (own clone /private/tmp/cm-tryit-h, delete after), commit, push. Return done (true only if smoke passed), commits, numbers (smoke per arm), summary.`,
+  { label: 'tryit-harness', phase: 'Prereg', schema: RESULT, ...OPH })
+if (!plan || !plan.done) return { stopped: 'harness smoke failed', pre, plan }
 
 phase('Run')
 const runs = await parallel(PROMPTS.map((p) => () => agent(`${RULES}\n\nPre-registration: ${JSON.stringify(plan).slice(0, 3000)} (read ${OUT}/prereg.md on origin/v2-design for the exact text).
-Role: runner for prompt ${p} only. In ${WT} run the warm-up and measured cycles for ${p} exactly as the prereg says, claude-opus-5-5, --gw https://gateway.context-mode.com. After EVERY cycle append the run lines to ${OUT}/runs/${p}.jsonl in your own clone /private/tmp/cm-tryit-${p} (v2-design), commit and push (tenant ids withheld). Void only on arm-resolution failure, with reason, re-run once. Stop if the stop rule is hit. Keep raw transcripts in /private/tmp/cm-v2-impl-private/tryit/${p}. Delete the clone at the end. Return done, commits, numbers (per arm: runs, success, mean cost, mean tool_result bytes seen), summary.`,
+${PACE.replace('be done within 30 minutes','be done within 120 minutes')}\nRole: runner for prompt ${p} only (--workloads tryit). In ${WT} run the warm-up and measured cycles for ${p} exactly as the prereg says, claude-opus-5-5, --gw https://gateway.context-mode.com. After EVERY cycle append the run lines to ${OUT}/runs/${p}.jsonl in your own clone /private/tmp/cm-tryit-${p} (v2-design), commit and push (tenant ids withheld). Void only on arm-resolution failure, with reason, re-run once. Stop if the stop rule is hit. Keep raw transcripts in /private/tmp/cm-v2-impl-private/tryit/${p}. Delete the clone at the end. Return done, commits, numbers (per arm: runs, success, mean cost, mean tool_result bytes seen), summary.`,
   { label: `tryit-${p}`, phase: 'Run', schema: RESULT, ...SNM })))
 
 phase('Publish')
