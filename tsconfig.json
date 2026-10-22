@@ -12,5 +12,5 @@
     "resolveJsonModule": true,
     "isolatedModules": true
   },
-  "include": ["src/core", "src/prompt", "src/entries", "src/adapters", "build/**/*.ts"]
+  "include": ["src/core", "src/prompt", "src/entries", "src/cli", "src/setup", "src/adapters", "build/**/*.ts"]
 }
