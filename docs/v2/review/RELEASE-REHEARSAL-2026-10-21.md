@@ -72,3 +72,14 @@ Same steps on v2-design c507e005, with the old `release` and `release-staging` b
 - GitHub `release` updated with `git push --force-with-lease=refs/heads/release:87a17f8f... origin 05e97724:refs/heads/release --no-follow-tags` (rehearsal branch only): 87a17f8f -> 05e97724.
 - Install from GitHub in a temp HOME: SHA256SUMS OK. `hook.mjs --agent kiro` with a `UserPromptSubmit` payload: exit 0, empty stdout, no decode error. `qwen extensions install ...:context-mode --ref release --consent` (Qwen Code 0.26.0): installed, server Connected, uninstall clean.
 - End state: no refs/tags/v2*, no v2 GitHub Release, main stays a92cf6a77ac02971fb5fafe2155e5ee229491884.
+
+## Re-run 4 (gemini hooks.json vs Claude Code)
+Same steps on v2-design 5ca80411 (D-FU-GCH-1: `hooks/hooks.json` has no SessionStart), with the old `release` and `release-staging` branches (05e97724) left in place.
+- plan.mjs: 2.0.0 with the rehearsal branch present.
+- Build: 14 top-level entries, SHA256SUMS all OK. `hooks/hooks.json` holds 0 SessionStart entries.
+- Stage: `release-staging` = 05fbf2ae3faad199a22864b05577ffcb7668cd08, tag v2.0.0 local only.
+- Smoke on release-staging: claude-code PASS (install + `claude plugin validate`), codex PASS, gemini SKIPPED (not installed).
+- Promote to a local bare clone: `release` and tag v2.0.0 moved, `gh release` skipped (remote not origin).
+- GitHub `release` updated with `git push --force-with-lease=refs/heads/release:05e97724... origin 05fbf2ae:refs/heads/release --no-follow-tags` (rehearsal branch only): 05e97724 -> 05fbf2ae.
+- Install from GitHub (`git clone --depth 1 --branch release`): SHA256SUMS OK, `hooks/hooks.json` has 0 SessionStart.
+- End state: no refs/tags/v2*, no v2 GitHub Release (latest is v1.0.169), main stays a92cf6a77ac02971fb5fafe2155e5ee229491884.
