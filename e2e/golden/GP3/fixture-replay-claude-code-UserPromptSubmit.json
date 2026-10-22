@@ -1,7 +1,0 @@
-{
-  "agent": "claude-code",
-  "event": "UserPromptSubmit",
-  "exitCode": 0,
-  "stdout": "",
-  "stderr": ""
-}

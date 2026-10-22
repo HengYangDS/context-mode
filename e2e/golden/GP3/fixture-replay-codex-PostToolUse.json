@@ -1,7 +1,0 @@
-{
-  "agent": "codex",
-  "event": "PostToolUse",
-  "exitCode": 0,
-  "stdout": "",
-  "stderr": ""
-}

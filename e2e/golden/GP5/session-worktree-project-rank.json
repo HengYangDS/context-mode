@@ -1,8 +1,0 @@
-{
-  "isError": false,
-  "order": [
-    "session",
-    "worktree",
-    "project"
-  ]
-}

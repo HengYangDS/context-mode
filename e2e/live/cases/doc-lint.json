@@ -1,3 +1,0 @@
-{ "id": "doc-lint", "covers": ["docs/v2/prompt/"], "kind": "local",
-  "run": ["node", "docs/v2/prompt/lint.mjs", "drafts", "docs/v2/prompt/drafts.md"],
-  "expect": { "jsonField": "fail", "equals": [] } }

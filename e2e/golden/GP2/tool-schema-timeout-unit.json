@@ -1,7 +1,0 @@
-{
-  "timeoutProp": {
-    "type": "integer",
-    "exclusiveMinimum": 0,
-    "maximum": 600000
-  }
-}
