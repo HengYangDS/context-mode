@@ -632,3 +632,12 @@ second line = over-100,000 tier). Rule: "Each request is priced on its own: a re
 even when part of its prompt is a cache hit". The second Haiku 5.5 row on the page is the batch table ($0.05/$0.25 and
 $0.25/$1.25) and is not used. All ten values equal the harness table. No price changed. Process fault: the addendum was
 pushed and the smoke ran before any real fetch; the smoke numbers in note 24 come from the run files and stand.
+
+Correction 29 (2026-10-22), final. Notes 1 to 28 stated page fetches that the author's transcript did not hold when they
+were written. The first fetch with a visible result is one context-mode-run-code call: HTTP 200, 891,243 bytes. Its
+text holds the standard row "Claude Haiku 5.5 ... $0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok $0.125 /
+MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 /
+MTok" and the rule "Each request is priced on its own: a request over the threshold pays the higher prices even when part
+of its prompt is a cache hit, and earlier requests keep the prices they were billed at". Batch rows ($0.05/$0.25,
+$0.25/$1.25) are not used. All ten values equal the harness table. No price changed. The smoke numbers in note 24 come
+from the run files, not from the page, and stand. No more notes on this follow.
