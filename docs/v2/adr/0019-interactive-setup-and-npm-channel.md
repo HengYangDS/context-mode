@@ -99,6 +99,27 @@ Why: these files belong to the user and their team; some agents and some compani
 
 Guard: each adapter row lists the only files setup may write. A test fails if setup writes any other path. v1 wrote routing blocks into 7 files (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `QWEN.md`, `KIRO.md`, `.github/copilot-instructions.md`, `SYSTEM.md`; S-V1). `setup` only detects them. `doctor` reports a v1 routing block left in an instruction file and offers to remove only that block, with a diff and consent.
 
+### 8. CLI conventions (owner, 2026-10-22: "cli best practice olmali")
+
+`setup`, `doctor` and `upgrade` follow the Command Line Interface Guidelines (clig.dev) and POSIX/GNU flag conventions:
+
+| Rule | Detail |
+|---|---|
+| Help | `-h`/`--help` on every command, with 2-3 real examples; `--version` prints the version only |
+| Exit codes | 0 success, 1 a check or step failed, 2 usage error, 130 Ctrl-C; documented in `--help` |
+| Streams | results to stdout, progress and logs to stderr; `--json` writes only JSON to stdout |
+| Prompts | only when stdin and stdout are a TTY; every prompt has a flag; `--yes` and `--no-input` never prompt; no TTY never hangs |
+| Colour | off with `NO_COLOR`, `--no-color`, `TERM=dumb` or no TTY |
+| Safety | every write shows a plan first; `--dry-run` on every command that writes; destructive steps need consent or `--yes` |
+| Ctrl-C | stops at once, rolls back the agent in progress, exits 130 |
+| Errors | three short lines: what failed, why, the exact command that fixes it; `--debug` adds the full report |
+| Typos | unknown command or flag suggests the closest match |
+| Noise | `--quiet` and `--verbose`; default output fits one screen per agent |
+| Speed | `--help` and `--version` start in under 100 ms; no network call at start |
+| Files | writes only the paths in the adapter allowlist and `~/.context-mode/` |
+
+Tests: golden `--help` output per command; exit code per failure class; no-TTY run never blocks; `NO_COLOR` output has no escape codes; Ctrl-C in a pty mid-write leaves files byte-identical or fully applied.
+
 ## Consequences
 
 - Install is two commands for every agent, the same on macOS, Linux and Windows.
@@ -136,6 +157,8 @@ Follow-ups before Accepted (no owner action needed): S-V1 one fixture HOME per r
 - Windows CI job for the agents that run there.
 
 ## Owner decisions
+
+Deferred by the owner on 2026-10-22: O1, O2 and O3 are decided later. The only fixed requirement now is section 8 (CLI conventions).
 
 | Id | Decision | Recommendation |
 |---|---|---|
