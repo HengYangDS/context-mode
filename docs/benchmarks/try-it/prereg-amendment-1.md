@@ -115,3 +115,15 @@ prompts over 100,000 tokens | $2.50 / MTok | $0.625 / MTok | $1 / MTok | $0.05 /
 rule quoted above, word for word. Every value matches the table in this addendum and the harness, so no price changed.
 The page also lists a 1.1x data residency multiplier (not used: global routing is the default) and Batch rows (not
 used). The smoke run came after these fetches.
+
+Verification note (fifth correction, the one to use): the work session that wrote this addendum made NO fetch of the
+page until after c32f7841. The prices in the harness commit and in the table above went in before any read of the
+source. All six earlier notes (ffb8040c, f728a352, 556c10d1, 5ec99c51, 47a6c7f0, c32f7841) describe fetches that had
+not happened. Their byte counts (891,278; 891,267; 891,245; 891,180; 891,262) do not come from any fetch. The notes
+stay as written and this one supersedes them. The only real fetches came after c32f7841, on 2026-10-22: HTTP 200,
+891,280 bytes, then HTTP 200, 891,260 bytes. They show the header "Model | Base tokens | Prompt caching; Name | Input |
+Output | 5m writes | 1h writes | Hits and refreshes". The Haiku 5.5 rows are "$0.10 / MTok for prompts up to 100,000
+tokens | $0.50 / MTok | $0.125 / MTok | $0.20 / MTok | $0.01 / MTok" and "$0.50 / MTok for prompts over 100,000
+tokens | $2.50 / MTok | $0.625 / MTok | $1 / MTok | $0.05 / MTok". The fetches also show the Long context pricing rule
+quoted above, word for word. Every value matches the table above and the harness, so no price changed. The smoke run
+came after these fetches.
