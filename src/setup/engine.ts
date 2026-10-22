@@ -5,7 +5,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { AGENT_HOME_DIR, TOOL_ORDER } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
@@ -369,7 +369,8 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     opts.onAgent?.(id, "start");
     const res = await setupRow(row, ctx, run, true);
     if (res.status === "PASS") {
-      if (res.v1.length) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
+      // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
+      if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
       else if (res.changes.length) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
       else {
         res.checks = await verifyRow(row, ctx.env);

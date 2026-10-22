@@ -212,3 +212,22 @@ exit 0`);
   assert.match(byId.gemini.reason, /not on PATH/);
   assert.equal(readdirSync(s.home).includes(".gemini"), false);
 });
+
+test("[M7] setup/doctor: a report-only v1 finding (shared OS temp file) does not fail an agent that is set up", async (t) => {
+  const { runDoctor } = await import("../../../src/setup/index.ts");
+  const root = mkdtempSync(path.join(tmpdir(), "cm-doctor-tmp-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const home = path.join(root, "home");
+  mkdirSync(home, { recursive: true });
+  const pkgDir = fakePkg(root);
+  const env = { ...process.env, HOME: home, PATH: path.dirname(NODE) };
+  // A context-mode-* file in the OS temp dir is a v1 footprint, report only (UPGRADE_REPORT_ONLY_REASONS).
+  const stray = path.join(tmpdir(), `context-mode-doctor-test-${process.pid}.db`);
+  writeFileSync(stray, "");
+  t.after(() => rmSync(stray, { force: true }));
+  const opts = { home, pkgDir, env, agents: ["vscode"] };
+  assert.equal((await runSetup(opts)).exitCode, 0);
+  const res = await runDoctor(opts);
+  assert.equal(res.exitCode, 0, JSON.stringify(res.agents));
+  assert.ok(res.agents[0].v1.length > 0, "the temp finding is still reported");
+});
