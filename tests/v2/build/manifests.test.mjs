@@ -97,7 +97,11 @@ test("plugin and extension manifests carry name, dev version and the --agent MCP
     hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", version: "0.0.0-dev",
   });
   assert.deepEqual(readJson(dir, "gemini-extension.json"), { mcpServers: entry("gemini"), name: "context-mode", version: "0.0.0-dev" });
-  assert.deepEqual(readJson(dir, "qwen-extension.json"), { mcpServers: entry("qwen"), name: "context-mode", version: "0.0.0-dev" });
+  // D-FU-RM-QWEN-1: Qwen expands ${extensionPath} and ${/} in the manifest and reads config.hooks (a path relative to the extension).
+  const qwenEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "qwen"] } };
+  assert.deepEqual(readJson(dir, "qwen-extension.json"), {
+    hooks: "hooks/qwen.json", mcpServers: qwenEntry, name: "context-mode", version: "0.0.0-dev",
+  });
   assert.deepEqual(readJson(dir, "copilot/plugin.json"), { mcpServers: entry("copilot-cli"), name: "context-mode", version: "0.0.0-dev" });
 });
 
@@ -110,6 +114,11 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   const claude = readJson(dir, "hooks/claude-code.json");
   assert.deepEqual(claude.hooks.PreToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: MATCHERS["claude-code"] }]);
   assert.deepEqual(claude.hooks.SessionStart, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }] }]);
+  // D-FU-RM-QWEN-1: Qwen replaces only ${CLAUDE_PLUGIN_ROOT} in hook commands.
+  const qwenCmd = 'node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent qwen';
+  const qwen = readJson(dir, "hooks/qwen.json");
+  assert.deepEqual(qwen.hooks.PreToolUse, [{ hooks: [{ command: qwenCmd, timeout: 5, type: "command" }], matcher: MATCHERS.qwen }]);
+  assert.deepEqual(qwen.hooks.SessionStart, [{ hooks: [{ command: qwenCmd, timeout: 5, type: "command" }] }]);
   assert.deepEqual(Object.keys(readJson(dir, "hooks/gemini.json").hooks), ["AfterTool", "BeforeAgent", "BeforeTool", "PreCompress", "SessionStart"]);
   assert.deepEqual(readJson(dir, "hooks/gemini.json").hooks.BeforeTool, [{ hooks: [{ command: cmd("gemini"), timeout: 5000, type: "command" }] }]);
   const copilot = readJson(dir, "hooks/copilot-cli.json");
