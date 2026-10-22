@@ -52,7 +52,7 @@ const CLAUDE_EVENTS = { SessionStart: "SessionStart", UserPromptSubmit: "UserPro
 const EVENTS = {
   "claude-code": CLAUDE_EVENTS,
   codex: CLAUDE_EVENTS,
-  gemini: { SessionStart: "SessionStart", UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
+  gemini: { UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
   qwen: CLAUDE_EVENTS,
   "copilot-cli": { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
   vscode: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },

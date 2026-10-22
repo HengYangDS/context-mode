@@ -125,9 +125,10 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   // D-FU-RM-GEMINI-1: Gemini reads hooks only from hooks/hooks.json and expands ${extensionPath} and ${/} in commands.
   const geminiCmd = 'node "${extensionPath}${/}hook.mjs" --agent gemini';
   const gemini = readJson(dir, "hooks/hooks.json");
-  assert.deepEqual(Object.keys(gemini.hooks), ["AfterTool", "BeforeAgent", "BeforeTool", "PreCompress", "SessionStart"]);
+  // D-FU-GCH-1: no SessionStart; Claude Code also loads hooks/hooks.json and would run it through /bin/sh.
+  assert.deepEqual(Object.keys(gemini.hooks), ["AfterTool", "BeforeAgent", "BeforeTool", "PreCompress"]);
   assert.deepEqual(gemini.hooks.BeforeTool, [{ hooks: [{ command: geminiCmd, timeout: 5000, type: "command" }] }]);
-  assert.deepEqual(gemini.hooks.SessionStart, [{ hooks: [{ command: geminiCmd, timeout: 5000, type: "command" }] }]);
+  assert.deepEqual(gemini.hooks.BeforeAgent, [{ hooks: [{ command: geminiCmd, timeout: 5000, type: "command" }] }]);
   const copilot = readJson(dir, "hooks/copilot-cli.json");
   assert.equal(copilot.version, 1);
   assert.deepEqual(copilot.hooks.preToolUse, [{ command: cmd("copilot-cli"), timeoutSec: 5, type: "command" }]);
@@ -144,6 +145,26 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   const z = readJson(dir, "hooks/zcode.json");
   assert.equal(z.hooks.enabled, true);
   assert.deepEqual(z.hooks.events.PreToolUse, [{ command: cmd("zcode"), matcher: MATCHERS.zcode, timeoutMs: 5000, type: "command" }]);
+});
+
+// D-FU-GCH-1: Claude Code loads <plugin>/hooks/hooks.json by default, next to plugin.json "hooks", and runs any entry
+// whose event it knows through /bin/sh, which fails on ${extensionPath}/${/} ("bad substitution"). Hook event names
+// read from the Claude Code 2.1.303 binary.
+const CLAUDE_CODE_EVENTS = ["PreToolUse", "PostToolUse", "PostToolUseFailure", "PostToolBatch", "Notification", "UserPromptSubmit",
+  "UserPromptExpansion", "SessionStart", "SessionEnd", "Stop", "StopFailure", "SubagentStart", "SubagentStop", "PreCompact", "PostCompact",
+  "PreModelSwitch", "PostModelSwitch", "PermissionRequest", "PermissionDenied", "Setup", "TeammateIdle", "TaskCreated", "TaskCompleted",
+  "Elicitation", "ElicitationResult", "ConfigChange", "WorktreeCreate", "WorktreeRemove", "InstructionsLoaded", "CwdChanged", "FileChanged",
+  "DirectoryAdded", "MessageDisplay"];
+test("GP1/claude-code-default-hooks-json: no hooks/hooks.json entry Claude Code runs carries ${extensionPath} or ${/}", (t) => {
+  const dir = scratch(t);
+  generateManifests(dir);
+  const hooks = readJson(dir, "hooks/hooks.json").hooks;
+  for (const event of Object.keys(hooks)) {
+    if (!CLAUDE_CODE_EVENTS.includes(event)) continue;
+    const text = JSON.stringify(hooks[event]);
+    assert.equal(text.includes("${extensionPath}"), false, event + " runs under Claude Code with ${extensionPath}");
+    assert.equal(text.includes("${/}"), false, event + " runs under Claude Code with ${/}");
+  }
 });
 
 test("an unknown installMode is a build-time hard stop (step 4)", (t) => {
