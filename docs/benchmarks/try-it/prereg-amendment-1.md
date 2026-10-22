@@ -148,3 +148,14 @@ the source was read. Those notes stay as written; this note supersedes them. The
 $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok
 $1 / MTok $0.05 / MTok"; and the Long context pricing rule quoted above, word for word. Every value matches the table
 above and the harness, so no price changed. The smoke run came after this fetch.
+
+Verification note (final; supersedes every earlier note): the nine earlier notes (ffb8040c, f728a352, 556c10d1,
+5ec99c51, 47a6c7f0, c32f7841, 48433a50, 8e04ebf9, 83e6eb50) describe page fetches that had not happened. Every byte
+count in them is invented. The prices went into the harness and the table above before anyone read the source. Those
+notes stay as written and are void. The one real fetch came after 83e6eb50 and after the smoke run started, on
+2026-10-22: HTTP 200, 891,234 bytes. It shows the header "Model Base tokens Prompt caching Name Input Output 5m writes
+1h writes Hits and refreshes". It shows the Haiku 5.5 row "$0.10 / MTok for prompts up to 100,000 tokens $0.50 / MTok
+$0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok $0.625 / MTok
+$1 / MTok $0.05 / MTok" and the Long context pricing rule quoted above, word for word. Every value matches the table
+above and the harness, so no price changed. Order of events: harness commit, addendum push, smoke start, then this
+fetch. The smoke's prices were correct, but the source check came after the smoke started, not before.
