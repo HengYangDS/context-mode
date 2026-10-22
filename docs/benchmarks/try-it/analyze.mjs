@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Deterministic analysis for docs/benchmarks/try-it (pre-registration: prereg.md, commit f924eda2).
+// Deterministic analysis for docs/benchmarks/try-it (pre-registration: prereg.md, commit f924eda2; amendment 1:
+// prereg-amendment-1.md, commit c091a4cb). For web-scrape, docs-search and large-json only the run lines with
+// "amendment": 1 count; the first-run lines of these prompts stay in the run files and go to ab.json "superseded".
 // Inputs:  runs/<prompt>.jsonl (one line per session) and tool-result-bytes.json (written once by measure-bytes.mjs
 //          from the private transcripts; it holds each transcript's SHA-256, and no ids or text).
 // Outputs: ab.json (schema context-mode.benchmark-evidence/2) and index.json, in this folder.
@@ -22,6 +24,16 @@ const PRICES = { "claude-opus-5-5": { in: 4, out: 20, cr: 0.2, cw5: 5, cw1h: 8 }
 const PLUGIN = { v1: { git_head: "a92cf6a77ac02971fb5fafe2155e5ee229491884", version: "1.0.169" },
   v2: { git_head: "7f320e1664577c5389f37d0fbd250f867ed69fcc", version: "0.0.0-dev" } };
 const HARNESS_COMMIT = "bb28f201436a4d03b4a59a4e182552d8b5750654";
+const HARNESS_COMMIT_A1 = "c23ecd199f645a00405ea0b0098ac482792a4b98";
+// Prompts re-run under amendment 1, and why their first-run lines are superseded (prereg-amendment-1.md).
+const AMENDED = {
+  "web-scrape": "Gateway arm: the completion check counted only client tool_use blocks, but the gateway ran the fetch at its edge (gateway record edge_calls >= 1), so all gateway sessions failed no-tool-call. The tenant was shared per prompt with memory and skills on, so a later cycle could see an earlier one.",
+  "docs-search": "Gateway arm: the completion check counted only client tool_use blocks, but the gateway ran the fetch at its edge (gateway record edge_calls >= 1), so all gateway sessions failed no-tool-call. The tenant was shared per prompt with memory and skills on, so a later cycle could see an earlier one.",
+  "large-json": "All arms: the record check read the served data from disk, but every session built the data in memory, so every arm failed no-served-data-on-disk. The tenant was shared per prompt with memory and skills on.",
+};
+const AMENDMENT = { file: "docs/benchmarks/try-it/prereg-amendment-1.md", commit: "c091a4cb227170db6875340cce3844ee77a97544",
+  committed: "2026-10-22T13:38:00Z", last_edit_before_first_run: { commit: "da17021383c0e8e3b853a80713d20fc14b7631f2", committed: "2026-10-22T14:49:44Z" },
+  first_run_commit: { commit: "c9ba8cfdb4fa7873dc77354c0c8200229ebc807d", committed: "2026-10-22T14:56:26Z" } };
 // Claims printed in the README "Try It" section at origin/main a92cf6a7 (prereg "README claim check").
 // unit: "calls" = tool_use blocks; "bytes" = tool_result bytes; "pct_saved" = 100 x (1 - v1 / plain) on bytes.
 const CLAIMS = [
@@ -110,7 +122,10 @@ function loadRuns(w, bytes) {
     if (r.model !== "claude-opus-5-5" || r.client_version !== "2.1.303") fail(`${at}: model or client drift`);
     if (r.calls.models.some((m) => m !== "claude-opus-5-5")) fail(`${at}: a call on another model`);
     if (!r.resolution || r.resolution.ok !== true) fail(`${at}: unresolved arm in a counted row`);
-    if (r.harness_commit !== HARNESS_COMMIT) fail(`${at}: harness commit changed`);
+    const am = r.amendment ?? 0;
+    if (am !== 0 && am !== 1) fail(`${at}: unknown amendment ${am}`);
+    if (am === 1 && !AMENDED[w]) fail(`${at}: amendment-1 line for a prompt the amendment did not re-run`);
+    if (r.harness_commit !== (am ? HARNESS_COMMIT_A1 : HARNESS_COMMIT)) fail(`${at}: harness commit changed`);
     if (r.gw_version_before !== r.gw_version_after) fail(`${at}: gateway version changed during the run`);
     if (PLUGIN[r.arm]) {
       const p = r.plugin;
@@ -122,7 +137,7 @@ function loadRuns(w, bytes) {
       if (Math.abs(gatewayUsd(g.tokens) - r.usd) > 1e-6 || Math.abs(g.anthropic_usd - r.usd) > 1e-6) fail(`${at}: usd does not match the gateway record`);
       if (JSON.stringify(r.flags_before) !== JSON.stringify(r.flags_after)) fail(`${at}: tenant flags changed`);
     } else if (Math.abs(clientUsd(r.calls) - r.usd) > 1e-6) fail(`${at}: usd ${r.usd} != recomputed ${clientUsd(r.calls)}`);
-    const b = bytes.filter((s) => s.w === w && s.cycle === r.cycle && s.arm === r.arm && s.role === r.role && s.attempt === r.attempt);
+    const b = bytes.filter((s) => s.w === w && (s.amendment ?? 0) === am && s.cycle === r.cycle && s.arm === r.arm && s.role === r.role && s.attempt === r.attempt);
     if (b.length !== 1) fail(`${at}: ${b.length} byte records`);
     if (typeof b[0].oracle !== "string" || (b[0].oracle === "ok") !== r.success) fail(`${at}: oracle reason and success differ`);
     r._b = b[0];
@@ -135,10 +150,11 @@ function armRecord(r) {
     turns: r.turns, result_subtype: r.result_subtype, timed_out: r.timed_out, rate_limited: r.rate_limited, budget_hit: r.budget_hit,
     tool_result_bytes: r._b.tool_result_bytes, tool_result_blocks: r._b.tool_result_blocks,
     tool_calls: sumCalls(r._b.tool_calls), tool_calls_by_name: r._b.tool_calls, tools_runner: r.tools,
-    compact_boundary: r._b.compact_boundary, transcript_sha256: r._b.transcript_sha256, order_position: r.position, calls: r.calls };
+    compact_boundary: r._b.compact_boundary, ...(r._b.result_events ? { result_events: r._b.result_events } : {}), transcript_sha256: r._b.transcript_sha256, order_position: r.position, calls: r.calls };
   if (r.arm === "v1" || r.arm === "v2") {
     o.plugin_tool_calls = Object.entries(r._b.tool_calls).filter(([k]) => k.startsWith("mcp__")).reduce((s, [, v]) => s + v, 0);
     o.plugin_tools_listed = r.resolution.plugin_tools.length;
+    if (r.plugin.build_sha256sums) o.plugin_build_sha256sums = r.plugin.build_sha256sums;
   }
   if (r.arm === "gateway") {
     const g = r.gateway_record;
@@ -175,6 +191,7 @@ function armSummary(pairs, a) {
   if (a === "gateway") {
     s.no_client_tool_call = `${pairs.filter((p) => p[a].tool_calls === 0).length}/${pairs.length}`;
     s.edge_calls_when_no_client_tool_call = pairs.filter((p) => p[a].tool_calls === 0).map((p) => p[a].gateway_record.edge_calls);
+    s.edge_calls = pairs.map((p) => p[a].gateway_record.edge_calls);
   }
   return s;
 }
@@ -217,17 +234,34 @@ export function build() {
   const bytes = loadBytes();
   const inputs = [{ file: "tool-result-bytes.json", sha256: bytes.sha256, sessions: bytes.sessions.length }];
   const prompts = [], byId = {};
-  let sessions = 0, spend = 0, voids = 0, warm = 0;
+  let sessions = 0, spend = 0, voids = 0, warm = 0, spendSuperseded = 0;
+  const superseded = [];
   for (const w of [...PROMPTS, DEMO]) {
-    const { rows, sha256: h } = loadRuns(w, bytes.sessions);
-    inputs.push({ file: `runs/${w}.jsonl`, sha256: h, sessions: rows.length });
-    sessions += rows.length; spend += rows.reduce((s, r) => s + r.usd, 0);
-    voids += rows.filter((r) => r.role === "void").length; warm += rows.filter((r) => r.role === "warmup").length;
+    const { rows: all, sha256: h } = loadRuns(w, bytes.sessions);
+    inputs.push({ file: `runs/${w}.jsonl`, sha256: h, sessions: all.length });
+    sessions += all.length; spend += all.reduce((s, r) => s + r.usd, 0);
+    voids += all.filter((r) => r.role === "void").length; warm += all.filter((r) => r.role === "warmup").length;
     const demo = w === DEMO;
+    const rows = AMENDED[w] ? all.filter((r) => r.amendment === 1) : all;
+    if (AMENDED[w]) {
+      const old = all.filter((r) => (r.amendment ?? 0) === 0);
+      if (rows.length === 0) fail(`${w}: no amendment-1 lines`);
+      spendSuperseded += old.reduce((s, r) => s + r.usd, 0);
+      const op = pairsOf(w, old, N_PLANNED), oc = (a) => op.map((p) => p[a].usd);
+      superseded.push({ id: w, label: LABELS[w], reason: AMENDED[w], replaced_by: "amendment 1 run lines of the same prompt",
+        run_lines: old.length, harness_commit: HARNESS_COMMIT, gateway_tenant_scope: "prompt",
+        analysis: { n: op.length, arms: Object.fromEntries(ARMS.map((a) => [a, armSummary(op, a)])),
+          v1_vs_plain: paired(oc("plain"), oc("v1")), v2_vs_plain: paired(oc("plain"), oc("v2")),
+          gateway_vs_plain: paired(oc("plain"), oc("gateway")), v2_vs_v1_secondary: paired(oc("v1"), oc("v2")) },
+        pairs: op });
+    }
     const pairs = pairsOf(w, rows, demo ? N_DEMO : N_PLANNED);
     const col = (a) => pairs.map((p) => p[a].usd);
     const arms = Object.fromEntries(ARMS.map((a) => [a, armSummary(pairs, a)]));
     const entry = { id: w, label: LABELS[w], demonstration_only: demo, pairs_planned: demo ? N_DEMO : N_PLANNED,
+      run_set: AMENDED[w] ? "amendment 1" : "first run", harness_commit: AMENDED[w] ? HARNESS_COMMIT_A1 : HARNESS_COMMIT,
+      gateway_tenant_scope: AMENDED[w] ? "session" : "prompt",
+      gateway_tool_calls_rule: AMENDED[w] ? "completion check counts client tool_use blocks plus gateway edge_calls" : "completion check counts client tool_use blocks only",
       void_sessions: rows.filter((r) => r.role === "void").length, warmup_sessions: rows.filter((r) => r.role === "warmup").length,
       analysis: demo ? { n: pairs.length, arms, note: "Demonstration only (prereg): no interval, no verdict, no claim." } : {
         n: pairs.length, arms,
@@ -245,7 +279,7 @@ export function build() {
   const claims = CLAIMS.map((c) => checkClaim(c, byId));
   // Descriptive sum over the measured pairs of prompts 1 to 5 (not in the prereg analysis; no interval: different prompts).
   const counted = prompts.filter((p) => !p.demonstration_only);
-  const pooled = { note: "Sum over the measured pairs of the five counted prompts. Descriptive only: no interval, the rows are different prompts.",
+  const pooled = { note: "Sum over the measured pairs of the five counted prompts (amendment-1 pairs for web-scrape, docs-search and large-json; first-run pairs for the other two). Descriptive only: no interval, the rows are different prompts.",
     pairs: counted.reduce((s, p) => s + p.pairs.length, 0) };
   const plainTotal = counted.reduce((s, p) => s + p.pairs.reduce((a, q) => a + q.plain.usd, 0), 0);
   pooled.plain_usd = r5(plainTotal);
@@ -265,13 +299,14 @@ export function build() {
     model: "claude-opus-5-5",
     harness: "start-cost-ab-arms --workloads tryit (gateway repo worktree, local branch, never pushed) + bench/gateway-ab/tryit.patch",
     harness_commit: HARNESS_COMMIT,
+    harness_commit_amendment_1: HARNESS_COMMIT_A1,
     prereg: { file: "docs/benchmarks/try-it/prereg.md", commit: "f924eda2ec61692f08aa3fe8dc9bcdf1512dc0e6",
-      committed: "2026-10-22T10:51:33Z", first_run_commit: "2026-10-22T11:13:39Z" },
+      committed: "2026-10-22T10:51:33Z", first_run_commit: "2026-10-22T11:13:39Z", amendment_1: AMENDMENT },
     arms: {
       plain: "Claude Code alone (direct). Empty strict MCP map, no plugin.",
       v1: `OSS plugin v1: origin/main ${PLUGIN.v1.git_head}, version ${PLUGIN.v1.version}, npm install --omit=dev.`,
       v2: `OSS plugin v2: v2-design ${PLUGIN.v2.git_head} built to release-out (manifest version ${PLUGIN.v2.version}).`,
-      gateway: "Claude Code talks to Anthropic through the live Context Mode gateway, default tenant flags, one new disposable tenant per prompt.",
+      gateway: "Claude Code talks to Anthropic through the live Context Mode gateway, default tenant flags. First run: one new disposable tenant per prompt. Amendment 1: one new disposable tenant per session.",
     },
     plugin_revisions: { v1: { ...PLUGIN.v1, dirty: false }, v2: { ...PLUGIN.v2, dirty: false } },
     warmup_cycles: 1,
@@ -282,15 +317,17 @@ export function build() {
     success_rules: {
       "large-json": "the planted record value is in the final answer, read against the served data on disk; fails closed (no-served-data-on-disk) when no served file exists",
       "git-history": "the final answer names the top git shortlog author over the same 500 commits",
-      other: "completion check: end_turn, at least one client tool call, non-empty answer. Not a quality check.",
+      "large-json (amendment 1)": "every scalar leaf of the record at index 13000, JSON-parsed from the last tool_result that served or generated it, appears whole in the final answer; fails closed (no-record-in-tool-result) when no such tool_result exists",
+      other: "completion check: end_turn, at least one tool call, non-empty answer. First run: client tool calls only. Amendment 1: client tool calls plus gateway edge_calls. Not a quality check.",
     },
-    spend_usd_list_price: r5(spend), stop_rule_usd: STOP_USD,
+    spend_usd_list_price: r5(spend), spend_usd_superseded: r5(spendSuperseded), stop_rule_usd: STOP_USD,
     sessions, warmup_sessions: warm, void_sessions: voids,
     inputs,
     withheld: ["prompt and answer text", "session ids", "tenant ids", "gateway host", "local paths", "raw transcripts", "credentials"],
     pooled,
     readme_claims: { source: "README.md 'Try It' at origin/main a92cf6a77ac02971fb5fafe2155e5ee229491884", rule: "HOLDS when the measured median is within 25% of the claimed number, else DIFFERS. A link the run did not exercise is INCONCLUSIVE.", checks: claims },
     prompts,
+    superseded,
   };
 
   const index = {
@@ -305,7 +342,9 @@ export function build() {
         success: Object.fromEntries(ARMS.map((a) => [a, p.analysis.arms[a].success])) }),
       readme_claims: claims.map((c) => ({ id: c.id, claim: c.text, verdict: c.verdict })) },
       { file: "tool-result-bytes.json", sha256: bytes.sha256, writer: "measure-bytes.mjs (needs the private transcripts)" }],
-    preregistrations: [{ file: "prereg.md", commit: ab.prereg.commit, committed: ab.prereg.committed }],
+    preregistrations: [{ file: "prereg.md", commit: ab.prereg.commit, committed: ab.prereg.committed },
+      { file: "prereg-amendment-1.md", commit: AMENDMENT.commit, committed: AMENDMENT.committed }],
+    superseded: superseded.map((x) => ({ id: x.id, run_lines: x.run_lines, reason: x.reason })),
     runs: [...PROMPTS, DEMO].map((w) => `runs/${w}.jsonl`),
   };
   return { ab, index };

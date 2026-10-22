@@ -84,26 +84,26 @@
      "label": "Web scraping",
      "n": 4,
      "v1": {
-      "pct": 21.4,
+      "pct": 30.7,
       "pct_ci95": [
-       -23.3,
-       66.1
+       -15.4,
+       76.8
       ],
       "verdict": "same"
      },
      "v2": {
-      "pct": 28.3,
+      "pct": 37.2,
       "pct_ci95": [
-       10.7,
-       45.8
+       11,
+       63.4
       ],
       "verdict": "more"
      },
      "gateway": {
-      "pct": -50.9,
+      "pct": -48.9,
       "pct_ci95": [
-       -72.2,
-       -29.6
+       -80.5,
+       -17.3
       ],
       "verdict": "less"
      },
@@ -111,7 +111,7 @@
       "plain": "4/4",
       "v1": "4/4",
       "v2": "4/4",
-      "gateway": "0/4"
+      "gateway": "4/4"
      }
     },
     {
@@ -119,33 +119,33 @@
      "label": "Large JSON API",
      "n": 4,
      "v1": {
-      "pct": 105.3,
+      "pct": 92.9,
       "pct_ci95": [
-       86.1,
-       124.4
+       27.6,
+       158.1
       ],
       "verdict": "more"
      },
      "v2": {
-      "pct": 16.9,
+      "pct": 61.8,
       "pct_ci95": [
-       -18.2,
-       52
+       -8.6,
+       132.2
       ],
       "verdict": "same"
      },
      "gateway": {
-      "pct": -35.3,
+      "pct": -41.4,
       "pct_ci95": [
-       -52.4,
-       -18.2
+       -83.2,
+       0.5
       ],
-      "verdict": "less"
+      "verdict": "same"
      },
      "success": {
-      "plain": "0/4",
-      "v1": "0/4",
-      "v2": "0/4",
+      "plain": "4/4",
+      "v1": "1/4",
+      "v2": "2/4",
       "gateway": "0/4"
      }
     },
@@ -154,26 +154,26 @@
      "label": "Documentation search",
      "n": 4,
      "v1": {
-      "pct": 25.5,
+      "pct": 19.9,
       "pct_ci95": [
-       6.3,
-       44.7
+       4.6,
+       35.3
       ],
       "verdict": "more"
      },
      "v2": {
-      "pct": 54.3,
+      "pct": 39.5,
       "pct_ci95": [
-       18.5,
-       90.2
+       -18.1,
+       97.2
       ],
-      "verdict": "more"
+      "verdict": "same"
      },
      "gateway": {
-      "pct": -64.6,
+      "pct": -61.2,
       "pct_ci95": [
-       -88,
-       -41.1
+       -69.6,
+       -52.8
       ],
       "verdict": "less"
      },
@@ -181,7 +181,7 @@
       "plain": "4/4",
       "v1": "4/4",
       "v2": "4/4",
-      "gateway": "0/4"
+      "gateway": "4/4"
      }
     },
     {
@@ -225,12 +225,12 @@
     {
      "id": "web-scrape",
      "claim": "1 call",
-     "verdict": "HOLDS"
+     "verdict": "DIFFERS"
     },
     {
      "id": "web-scrape",
      "claim": "3.2 KB context",
-     "verdict": "DIFFERS"
+     "verdict": "HOLDS"
     },
     {
      "id": "large-json",
@@ -266,7 +266,7 @@
   },
   {
    "file": "tool-result-bytes.json",
-   "sha256": "d5fa31c65c211dcf1318b38b1dd33f3a56217a384a11d97385b145b3a9a1c3f2",
+   "sha256": "d6becd733712e2d12a1f66cc347f43099157846db9612cc339e238ca07bab344",
    "writer": "measure-bytes.mjs (needs the private transcripts)"
   }
  ],
@@ -275,6 +275,28 @@
    "file": "prereg.md",
    "commit": "f924eda2ec61692f08aa3fe8dc9bcdf1512dc0e6",
    "committed": "2026-10-22T10:51:33Z"
+  },
+  {
+   "file": "prereg-amendment-1.md",
+   "commit": "c091a4cb227170db6875340cce3844ee77a97544",
+   "committed": "2026-10-22T13:38:00Z"
+  }
+ ],
+ "superseded": [
+  {
+   "id": "web-scrape",
+   "run_lines": 20,
+   "reason": "Gateway arm: the completion check counted only client tool_use blocks, but the gateway ran the fetch at its edge (gateway record edge_calls >= 1), so all gateway sessions failed no-tool-call. The tenant was shared per prompt with memory and skills on, so a later cycle could see an earlier one."
+  },
+  {
+   "id": "large-json",
+   "run_lines": 20,
+   "reason": "All arms: the record check read the served data from disk, but every session built the data in memory, so every arm failed no-served-data-on-disk. The tenant was shared per prompt with memory and skills on."
+  },
+  {
+   "id": "docs-search",
+   "run_lines": 20,
+   "reason": "Gateway arm: the completion check counted only client tool_use blocks, but the gateway ran the fetch at its edge (gateway record edge_calls >= 1), so all gateway sessions failed no-tool-call. The tenant was shared per prompt with memory and skills on, so a later cycle could see an earlier one."
   }
  ],
  "runs": [

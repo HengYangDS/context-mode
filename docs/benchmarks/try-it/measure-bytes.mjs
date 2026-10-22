@@ -3,6 +3,8 @@
 // Usage: node measure-bytes.mjs <private-root>
 //   <private-root>/<prompt>/[priv/]runs.jsonl      private run ledger (session id per run)
 //   <private-root>/<prompt>/[priv/]transcripts/<prompt>-<role>-<cycle>-<attempt>-<arm>.jsonl
+//   Run lines with "amendment": 1 (prereg-amendment-1.md) read <private-root>/<prompt>-a1/ in the same layout, and
+//   their byte records carry "amendment": 1.
 // Per session it records: the byte sum over every tool_result block the model was sent (UTF-8 bytes of the text;
 // a non-text block counts as the bytes of its JSON), the number of tool_result blocks, tool calls by kind,
 // compact_boundary events, and the oracle reason from the run ledger. Every transcript must match its run row by session id, turns and client cost
@@ -30,10 +32,15 @@ const out = { schema: "context-mode.tryit-tool-result-bytes/1",
   method: "Sum over every tool_result block in the session transcript (stream-json user events): UTF-8 bytes of each text part; a non-text part counts as the bytes of its JSON. Tool calls: tool_use blocks in assistant events. compact_boundary: system events of that subtype.",
   sessions: [] };
 for (const w of PROMPTS) {
-  const base = existsSync(join(root, w, "priv", "runs.jsonl")) ? join(root, w, "priv") : join(root, w);
+  const baseOf = (d) => existsSync(join(root, d, "priv", "runs.jsonl")) ? join(root, d, "priv") : join(root, d);
+  const privOf = (b) => readFileSync(join(b, "runs.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.cycle_done);
   const pub = readFileSync(join(HERE, "runs", w + ".jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-  const priv = readFileSync(join(base, "runs.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)).filter((r) => r.cycle_done);
+  const src = {};
   for (const r of pub) {
+    const am = r.amendment ?? 0;
+    if (am !== 0 && am !== 1) fail(`${w}: unknown amendment ${am}`);
+    if (!src[am]) { const b = baseOf(am ? w + "-a1" : w); src[am] = { base: b, priv: privOf(b) }; }
+    const { base, priv } = src[am];
     const p = priv.filter((x) => x.cycle === r.cycle && x.arm === r.arm && x.role === r.role && x.attempt === r.attempt);
     if (p.length !== 1) fail(`${w} ${r.role} ${r.cycle} ${r.arm}: ${p.length} private rows`);
     if (p[0].usd !== r.usd || p[0].turns !== r.turns || p[0].success !== r.success) fail(`${w} ${r.cycle} ${r.arm}: public and private rows differ`);
@@ -41,11 +48,15 @@ for (const w of PROMPTS) {
     const f = join(base, "transcripts", `${w}-${r.role}-${r.cycle}-${r.attempt}-${r.arm}.jsonl`);
     const raw = readFileSync(f);
     const ev = raw.toString("utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l));
-    const init = ev.find((e) => e.type === "system" && e.subtype === "init");
+    const inits = ev.filter((e) => e.type === "system" && e.subtype === "init");
     const res = ev.filter((e) => e.type === "result");
-    if (!init || res.length !== 1) fail(`${f}: no init or not one result event`);
+    // More than one init/result pair is allowed only inside one session (a background task that ends after the answer
+    // wakes the same session again). The run ledger holds the last result event; this record keeps the count.
+    if (inits.length < 1 || res.length < 1 || inits.length !== res.length) fail(`${f}: init and result events do not pair`);
+    if (new Set([...inits, ...res].map((e) => e.session_id)).size !== 1) fail(`${f}: more than one session id`);
+    const init = inits[0], last = res[res.length - 1];
     if (p[0].session && init.session_id !== p[0].session) fail(`${f}: session id differs from the run ledger`);
-    if (res[0].num_turns !== r.turns) fail(`${f}: turns ${res[0].num_turns} != ${r.turns}`);
+    if (last.num_turns !== r.turns) fail(`${f}: turns ${last.num_turns} != ${r.turns}`);
     let bytes = 0, blocks = 0, compact = 0; const calls = {};
     for (const e of ev) {
       if (e.type === "system" && e.subtype === "compact_boundary") compact++;
@@ -54,8 +65,9 @@ for (const w of PROMPTS) {
       if (e.type === "user") for (const c of content) if (c.type === "tool_result") { bytes += blockBytes(c); blocks++; }
       if (e.type === "assistant") for (const c of content) if (c.type === "tool_use") calls[c.name] = (calls[c.name] || 0) + 1;
     }
-    out.sessions.push({ w, cycle: r.cycle, arm: r.arm, role: r.role, attempt: r.attempt, oracle: p[0].oracle,
+    out.sessions.push({ w, ...(am ? { amendment: am } : {}), cycle: r.cycle, arm: r.arm, role: r.role, attempt: r.attempt, oracle: p[0].oracle,
       tool_result_bytes: bytes, tool_result_blocks: blocks, tool_calls: calls, compact_boundary: compact,
+      ...(res.length > 1 ? { result_events: res.length, turns_all_results: res.reduce((t, e) => t + e.num_turns, 0) } : {}),
       transcript_sha256: createHash("sha256").update(raw).digest("hex") });
   }
 }
