@@ -72,17 +72,18 @@
 
 ## Rollout
 
-1. Spikes done 2026-10-22 (ADR-0019 "Results", synthesis [S-SYN](spikes/setup/S-SYN.md)): S-PATH, S-EXT PASS; S-UI PASS on macOS only; S-NPM, S-HOOK, S-V1 FAIL. Before ADR-0019 is Accepted: owner closes O2 (hook budget rule) and O3 (v1 hook compat); S-V1 gets one fixture test per row; S-UI pty runs on Linux and Windows; S-PATH runs nvm, fnm, Volta; S-EXT gets a golden Gemini payload. S-NPM closes at step 3, with the first real `next` publish (needs O1 first).
+1. Spikes done 2026-10-22 (ADR-0019 "Results", synthesis [S-SYN](spikes/setup/S-SYN.md)): S-PATH, S-EXT PASS; S-UI PASS on macOS only; S-NPM, S-HOOK, S-V1 FAIL. ADR-0019 is Accepted (PO on delegation 2026-10-22); O2 and O3 are closed by D3 and D4; S-V1 gets one fixture test per row; S-UI pty runs on Linux and Windows; S-PATH runs nvm, fnm, Volta; S-EXT gets a golden Gemini payload. S-NPM closes at step 3, with the first real `next` publish (needs O1 first).
 2. Build `setup`, `doctor` CLI, shared check registry; tests per ADR-0019.
-3. Owner sets up the npm trusted publisher (O1). `release.yml` job `publish-npm` publishes `context-mode@2.0.0` with dist-tag `next` and provenance; the provenance check closes S-NPM. Owner test on own machines.
-4. Owner moves `latest` (one approval), only after O3 is built. README and one install page switch to the two commands.
+3. Owner sets up the npm trusted publisher (O1, the only open owner step). `release.yml` job `publish-npm` (environment `npm-publish`, OIDC, `--provenance`) publishes `context-mode@2.0.0` with dist-tag `next`; the provenance check closes S-NPM. Owner tests on own machines. The git `release` branch stays only for git-based installers.
+4. Owner moves `latest` by hand (one approval), only after D4 (v1 hook and `mcp` forms accepted, doctor flag, setup rewrite) is built and tested. README and one install page switch to the two commands.
 5. Per-agent docs shrink to troubleshooting.
 
-## Open questions for the owner
+## Open questions
 
-Closed by spikes: the prompt UI is bundled `@clack/prompts` (S-UI; ADR-0019 section 4).
+All closed on 2026-10-22 by the product owner (PO) on delegation; the owner reviews in the morning. Full text: ADR-0019 "Owner decisions".
 
-1. **O1, npm trusted publisher** (S-NPM). Recommendation: do the owner steps in ADR-0019 O1 on npmjs.com and GitHub (environment `npm-publish`, owner as required reviewer), then let `release.yml` publish `2.0.0` to `next`.
-2. **O2, hook budget rule** (S-HOOK: bare node start alone is 31.7 ms p95 of the 40 ms). Recommendation: judge hook time minus bare node start now; keep `HOOK_P95_MS` at 40 until re-runs on a quiet host and each Node major; cut `hook.mjs` work in parallel.
-3. **O3, v1 hook commands after `npm i -g context-mode@2`** (S-V1). Recommendation: v2 accepts `hook <platform> <event>` as a compat form, and setup still rewrites to the absolute form.
-4. Issue filing when `gh` is not logged in: prefilled browser URL, or save the report and print the path only. Recommendation: prefilled URL when the report fits, else save and print the path (ADR-0019 section 5).
+1. **O1, npm trusted publisher** (S-NPM): still an owner step on npmjs.com and GitHub. Not closed by the PO.
+2. **O2, hook budget rule**: closed by D3. Hook overhead (hook wall time minus bare `node -e ''` wall time, same host, same run) p95 <= 15 ms is gated; wall p95 is reported only.
+3. **O3, v1 hook commands after `npm i -g context-mode@2`**: closed by D4. v2 accepts `hook <platform> <event>` and `mcp`; doctor flags "v1 form, run context-mode setup"; setup rewrites to `node "<abs>/hook.mjs" --agent <id>`.
+4. **Issue filing**: closed by D6. Show the redacted report, ask once, `gh issue create` if logged in, else a prefilled URL; never send without a keypress.
+5. **Package, channel, prompt UI, CLI conventions**: D1, D2, D5, D7 in ADR-0019.

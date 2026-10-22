@@ -45,13 +45,12 @@ Every outward step needs its own approval.
 | Copilot CLI, VS Code, Kiro, ZCode | test first, then document |
 | npm users | `npm uninstall -g context-mode`, then the agent's git install. On first run, `ctx_doctor` lists the v1 leftovers and `ctx_upgrade` removes them |
 
-4. **d) npm deprecate.** The owner runs it with `--otp`:
-
-   ```
-   npm deprecate context-mode@"<2.0.0" "v1 is frozen. v2 installs from git: https://github.com/mksglu/context-mode#install"
-   ```
-
-   Only people who install or reinstall see this warning. Global users do not. v1 checks npm `latest` every hour, and nothing new will be published there, so v1 users get no "outdated" warning. **The README and the release note are the main channel.**
+4. **d) npm: no deprecate (amended 2026-10-22, ADR-0019 D2; decided by PO on delegation, owner reviews in the morning).** The `npm deprecate` step is removed. v2 is published on npm instead, by `release.yml` job `publish-npm` (ADR-0013). Dist-tag plan:
+   - `2.0.0` is published with dist-tag `next`. CI never sets `latest`.
+   - `latest` stays on v1. Users who run `npx -y context-mode mcp` keep getting v1 until the owner moves `latest` by hand (one approval), only after the v1 compatibility forms (ADR-0019 D4) are built and tested.
+   - Test with `npm i -g context-mode@next`. After `latest` moves, `npm i -g context-mode` gives v2.
+   - v1 stays installable as `context-mode@1`. Nothing is deprecated, so v1 users are not warned or blocked (rule: v1 users must not give up when v2 ships).
+   The git `release` branch stays for git-based installers (Claude Code marketplace). The README and the release note give the two-command install: `npm i -g context-mode && context-mode setup`.
 
 ## v1 cleanup (no data migration)
 
@@ -94,6 +93,10 @@ Facts:
 
 - Q14: `main` is protected by GitHub branch protection.
 - ADR-0017 R3: upgrade order is install v2 → `/ctx-upgrade` → `npm uninstall -g` last.
+
+## Amendment 2026-10-22 (ADR-0019)
+
+Step d (npm deprecate) is removed; v2 is published on npm with dist-tag `next` (decided by PO on delegation, owner reviews in the morning). The "no `package.json` on `release`" rule and the "no npm for v2" rows above are superseded by ADR-0019 sections 1 and 2. The "npm users" row in step c is replaced by `npm i -g context-mode@next` then `context-mode setup`.
 
 ## Changes
 

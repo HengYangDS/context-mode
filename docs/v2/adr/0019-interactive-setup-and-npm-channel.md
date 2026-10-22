@@ -1,6 +1,6 @@
 # ADR-0019: One interactive `context-mode setup`, npm as the user channel
 
-- Status: Proposed (2026-10-22). Spike results are in "Results" (2026-10-22): 3 PASS, 3 FAIL. Accepted when the owner closes "Owner decisions" and the follow-ups in "Results" pass.
+- Status: Accepted (PO on delegation 2026-10-22; O1 owner step open). Spike results are in "Results" (2026-10-22): 3 PASS, 3 FAIL; the follow-ups in "Results" stay open as tests.
 - Owner request, 2026-10-22: install steps are too complex; setup must be interactive (in the style of the Vercel `skills` CLI), live inside doctor, verify and validate every step, leave nothing to the user, and report every failure as an issue.
 - Supersedes: ADR-0011 step d (npm deprecate) and the "no `package.json` on `release`" rule (the `release` branch now carries the publishable `package.json`, S-NPM); ADR-0002 GS7 (out-tree `package.json` shape); the per-agent install docs as the main install path.
 - Amends: ADR-0010 (doctor gets a CLI form that can fix), ADR-0013 (release also publishes to npm), ADR-0014 (setup failures use the same debug report).
@@ -158,10 +158,22 @@ Follow-ups before Accepted (no owner action needed): S-V1 one fixture HOME per r
 
 ## Owner decisions
 
-Deferred by the owner on 2026-10-22: O1, O2 and O3 are decided later. The only fixed requirement now is section 8 (CLI conventions).
+On 2026-10-22 the owner delegated the npm decisions to the assistant acting as product owner (PO). Each row below is decided by PO on delegation, owner reviews in the morning. O1 is the only step that stays with the owner, because only the package owner can do it on npmjs.com.
 
-| Id | Decision | Recommendation |
+| Id | Decision (decided by PO on delegation, owner reviews in the morning) |
+|---|---|
+| D1 Package | Name `context-mode`, version `2.0.0`, `bin: {"context-mode": "cli.mjs"}` (no `./`: npm 11 strips it), `type: "module"`, `engines: {"node": ">=24.15.0"}`, no `dependencies`, no install scripts, `files` = the release tree. `package.json` and `cli.mjs` are listed in `SHA256SUMS`. The npm tarball file list and hashes must equal the release `SHA256SUMS`. |
+| D2 Channel | npm is the user channel. The git `release` branch stays only for git-based installers. Publish with dist-tag `next` and `--provenance` through npm trusted publishing (OIDC) from `release.yml`, environment `npm-publish`. `latest` stays on v1 until the owner moves it by hand. |
+| D3 Hook budget (was O2) | Rule: hook overhead = hook wall time minus bare `node -e ''` wall time, on the same host and in the same run; overhead p95 <= 15 ms. Wall p95 is reported, not gated. `HOOK_P95_MS` stays as the reported wall target. |
+| D4 v1 compatibility (was O3) | The v2 CLI accepts the v1 forms `context-mode hook <platform> <event>` and `context-mode mcp` (alias of `server`) and maps them to v2. `doctor` reports them as "v1 form, run context-mode setup". `setup` rewrites them to the absolute form `node "<abs>/hook.mjs" --agent <id>`. |
+| D5 Prompt UI | `@clack/prompts` bundled at build time (devDependency only). TTY check first; no TTY = flag path. |
+| D6 Issue reports | On FAIL show the redacted report and ask once. `gh issue create` if `gh` is logged in, else print a prefilled URL. Never send without a keypress. |
+| D7 CLI | Follows section 8 (clig.dev): `--help` with examples, exit codes 0/1/2/130, results on stdout, progress on stderr, `--json`, `--yes`, `--no-input`, `--dry-run`, `NO_COLOR`, Ctrl-C rollback. |
+
+| Id | Owner step | Detail |
 |---|---|---|
-| O1 | npm trusted publisher for `context-mode` (S-NPM). Only the package owner can do this on npmjs.com. | Do the S-NPM owner steps: Trusted Publisher = `mksglu/context-mode`, workflow `release.yml`, environment `npm-publish`; publishing access "require 2FA, disallow tokens"; revoke old tokens; GitHub environment `npm-publish` with the owner as required reviewer. First publish within 2 days of setup, as `2.0.0` with tag `next`; then check `npm view context-mode@2.0.0 dist.attestations`. That publish closes S-NPM. |
-| O2 | Hook budget rule (S-HOOK FAIL): bare node start is 31.7 ms p95, so 40 ms wall leaves about 8 ms for the hook. Options: (a) judge hook time minus bare node start, measured in the same run; (b) raise `HOOK_P95_MS` after re-runs; (c) cut `hook.mjs` work (155 KB bundle, git lookup). | (a) now, so doctor D5 and setup verify do not blame the hook for a slow node start; keep `HOOK_P95_MS` at 40 until the re-run on a quiet host and each supported Node major; do (c) in parallel. |
-| O3 | v1 hook commands after `npm i -g context-mode@2` (S-V1): every v1 `context-mode hook <platform> <event>` then runs the v2 CLI. Options: v2 accepts that form, or setup rewrites all v1 hook commands in the same run. Must be closed before `latest` moves. | Both: v2 CLI accepts `hook <platform> <event>` as a compat form (like the `mcp` alias), so a half-migrated user keeps working hooks; setup still rewrites to the absolute form and doctor flags the old form. |
+| O1 | npm trusted publisher for `context-mode` (S-NPM) | Open. On npmjs.com: Trusted Publisher = `mksglu/context-mode`, workflow `release.yml`, environment `npm-publish`; publishing access "require 2FA, disallow tokens"; revoke old tokens. On GitHub: environment `npm-publish` with the owner as required reviewer. First publish is `2.0.0` with tag `next`; then check `npm view context-mode@2.0.0 dist.attestations`. That publish closes S-NPM. |
+
+Closed: O2 by D3, O3 by D4.
+
+Consequences of D3 for S-HOOK: the measured overhead (47.8 ms minus 31.7 ms = 16.1 ms on one noisy host, Post hook) is above 15 ms. The re-run on a quiet host and on each supported Node major decides; the cut of `hook.mjs` work (155 KB bundle, git lookup) continues in parallel. Doctor D5 and the setup verify step judge the overhead, not the wall time.

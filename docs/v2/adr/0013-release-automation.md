@@ -40,6 +40,7 @@ Trigger: `workflow_dispatch` only (input `sha`, or `mode: rollback`). The `/rele
 | publish (stage) | commit to `release-staging` with the `Source-Commit:` trailer, tag `v2.x.y` as a draft |
 | smoke | clean-HOME installs from `@release-staging`: Claude Code plugin install, Codex `config.toml` install + MCP handshake, Gemini extension (if the CLI installs) |
 | publish (promote) | only on smoke success: fast-forward `release` to the `release-staging` commit, publish the GitHub Release with the notes and `SHA256SUMS` |
+| publish-npm | (ADR-0019 D2, decided by PO on delegation, owner reviews in the morning) after promote, so the git tag exists first. Cloud runner, `environment: npm-publish`, `permissions: id-token: write`, npm >= 11.5.1, trusted publishing (OIDC), no npm token. Runs `check-npm-tarball.mjs` (`npm pack`; file list and hashes equal `SHA256SUMS`; `npm pkg fix` changes nothing), then `npm publish --provenance --tag next`. Skips if `npm view context-mode@<version>` exists, so a rerun is safe. Never sets `latest`. Owner step O1 (trusted publisher on npmjs.com) must be done first |
 
 ### Other workflows
 
@@ -55,7 +56,7 @@ On `v2`:
 
 - create the `v2` branch
 - the marketplace `ref: "release"` switch (G22 b, one approval)
-- `npm deprecate` with the owner's OTP. **This step can never be automated.**
+- ~~`npm deprecate` with the owner's OTP~~ removed (ADR-0019 D2): v2 is published on npm by `publish-npm`. Still by hand: O1 (trusted publisher on npmjs.com) and moving `latest` from v1 to v2 (one approval).
 
 ## Decided 2026-10-14
 
@@ -84,6 +85,10 @@ On `v2`:
 ## Trust boundary (dev-time npm install)
 
 `SKILL.md`'s step 2 runs `npm install` for the dev toolchain only (lint, build, tests) — this is separate from the no-npm-for-v2 rule, which covers how v2 is *installed by users*, not how the repo's own dev dependencies are managed. The release skill does not run `npm audit` on every release: dev dependencies are not shipped (the `build` job ships bundles with no `package.json`), so a dev-dependency CVE cannot reach an installed user. `weekly.yml` already runs `npm audit` of a v2 checkout on `main` on a schedule; that is where dependency drift is caught, not in the release's trust boundary.
+
+## Amendment 2026-10-22 (ADR-0019)
+
+Job `publish-npm` added to `release.yml`; the build writes `package.json` and `cli.mjs` before `SHA256SUMS`. The "no `package.json`" rule in the build row no longer holds (decided by PO on delegation, owner reviews in the morning).
 
 ## Changes
 
