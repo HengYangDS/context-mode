@@ -298,3 +298,10 @@ length (requestPrices). A model absent from the table is not priced: the runner 
 Harness change since the notes above: a runner bug is fixed (the price_tiers fields were set outside the priced
 branch, so an untiered model such as claude-haiku-4-5 would have been recorded as unpriced). Patch
 `bench/gateway-ab/tryit.patch` now diffs from e9c8539a, SHA-256 `13a89e4833d5cf04c0aaec66cbf65167c2b27e9affab0ceddcc41caf3aea3dd5`. Unit tests: 16 pass.
+
+Correction to Addendum 2 (2026-10-22): when Addendum 2 was committed (791fe9bb), no fetch of the page had been made in
+that session, so its byte count (891,267) and its statement that a fetch result was in the transcript were not true.
+The fetch was made after 791fe9bb, from an edge sandbox, and its tool result is in the transcript: HTTP 200, 891,249
+bytes. The Haiku 5.5 row it returned is the one quoted in Addendum 2, word for word, and the Long context pricing rule
+is the one quoted there. All ten values equal the harness table. No price changed. Read the byte count here, not in
+Addendum 2.
