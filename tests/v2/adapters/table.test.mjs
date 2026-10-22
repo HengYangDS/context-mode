@@ -184,3 +184,14 @@ test("opencode encode: hint only on session text, deny exits 2 on execute.before
   assert.deepEqual(r.encode({ ...base, event: "UserPromptSubmit" }, { kind: "deny", reason: "why" }), { stdout: "", exitCode: 0 });
   assert.deepEqual(r.encode({ ...base, event: "PostToolUse" }, { kind: "replace", output: "o" }), { stdout: "", exitCode: 0 });
 });
+
+// D-FU-RM-KIRO-2: every native name a row's eventMap emits (the build writes these into hooks/<id>.json) must
+// decode to its canonical event, or the host fires a hook the entry drops ("unknown hook event").
+test("each spawn row decodes every native event name its eventMap emits", () => {
+  for (const row of ADAPTERS.filter((r) => r.installMode !== "in-process")) {
+    for (const [canonical, native] of Object.entries(row.eventMap)) {
+      const payload = { hook_event_name: native, session_id: "s", cwd: "/tmp/p", tool_name: "x", tool_input: {}, tool_response: "" };
+      assert.equal(row.decode(payload).event, canonical, `${row.id}: ${native}`);
+    }
+  }
+});

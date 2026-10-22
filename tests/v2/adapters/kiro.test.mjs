@@ -77,8 +77,19 @@ test("decode missing session_id/cwd gives empty strings", () => {
   assert.deepEqual(decode({ hook_event_name: "SessionStart" }), { event: "SessionStart", agent: "kiro", sessionId: "", cwd: "" });
 });
 
+// D-FU-RM-KIRO-2: the build writes trigger UserPromptSubmit (D-FU-RM-KIRO-1) and the Kiro docs' prompt hook
+// payload has hook_event_name "UserPromptSubmit", so decode must accept it.
+test("decode UserPromptSubmit (the trigger the build writes) reads the prompt from env USER_PROMPT only", () => {
+  withPrompt("run tests", () => {
+    const ev = decode({ ...base, hook_event_name: "UserPromptSubmit", prompt: "stdin field is ignored" });
+    assert.deepEqual(ev, { event: "UserPromptSubmit", agent: "kiro", sessionId: "k-1", cwd: "/tmp/proj", prompt: "run tests" });
+  });
+  withPrompt(undefined, () => {
+    assert.equal("prompt" in decode({ ...base, hook_event_name: "UserPromptSubmit" }), false);
+  });
+});
+
 test("decode throws on unknown event names and non-object payloads", () => {
-  assert.throws(() => decode({ ...base, hook_event_name: "UserPromptSubmit" }));
   assert.throws(() => decode({ ...base, hook_event_name: "PreCompact" }));
   assert.throws(() => decode({ ...base, hook_event_name: "Stop" }));
   assert.throws(() => decode(undefined));

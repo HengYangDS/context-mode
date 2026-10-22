@@ -60,6 +60,14 @@ test("kiro UserPromptSubmit: stdout is empty (adapter rule A28)", () => {
   assert.equal(r.stdout, "");
 });
 
+test("kiro UserPromptSubmit trigger from hooks/kiro.json is decoded, not dropped (D-FU-RM-KIRO-2)", () => {
+  const p = { session_id: "k2", cwd: repo, hook_event_name: "UserPromptSubmit" };
+  const r = run(["--agent", "kiro"], JSON.stringify(p));
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, "");
+  assert.doesNotMatch(r.stderr, /decode failed|unknown hook event/);
+});
+
 test("detached journal write lands before the process ends (D-M3-H2-8)", () => {
   const p = { session_id: "e2", cwd: repo, hook_event_name: "UserPromptSubmit", prompt: "hello entry" };
   const r = run(["--agent", "claude-code"], JSON.stringify(p));
