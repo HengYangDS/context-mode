@@ -30,8 +30,10 @@ function commands(value, out = []) {
   return out;
 }
 const servers = () => MANIFESTS.flatMap((m) => Object.values(readJson(m).mcpServers));
+const EXTENSION_ROOT = "${extensionPath}${/}"; // qwen-extension.json server path (D-FU-RM-QWEN-1)
 const strip = (raw) => {
   const p = raw.split('"').join("");
+  if (p.startsWith(EXTENSION_ROOT)) return p.slice(EXTENSION_ROOT.length);
   return p.startsWith(PLUGIN_ROOT) ? p.slice(PLUGIN_ROOT.length) : p;
 };
 
@@ -42,7 +44,7 @@ test("[M6] GP1/npm-pack-includes-runtime-files: every file a manifest or bundle 
   for (const m of MANIFESTS) {
     named.add(m);
     const hooks = readJson(m).hooks;
-    if (typeof hooks === "string") named.add(hooks.slice(2));
+    if (typeof hooks === "string") named.add(hooks.startsWith("./") ? hooks.slice(2) : hooks); // qwen names "hooks/qwen.json" (D-FU-RM-QWEN-1)
   }
   for (const s of servers()) named.add(strip(s.args[0]));
   for (const h of hookFiles()) {

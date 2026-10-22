@@ -40,8 +40,8 @@
   "kiro": [
     "PostToolUse",
     "PreToolUse",
-    "PromptSubmit",
-    "SessionStart"
+    "SessionStart",
+    "UserPromptSubmit"
   ],
   "zcode": [
     "PostToolUse",
