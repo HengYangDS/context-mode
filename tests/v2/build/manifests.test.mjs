@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from "node:f
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { buildMatcher, generateManifests } from "../../../build/manifests.ts";
+import { assertOutPackageJson, buildMatcher, generateManifests } from "../../../build/manifests.ts";
 import { ADAPTERS, getAdapter } from "../../../src/adapters/table.ts";
 
 const CLAUDE_MATCHER_NAMES = "Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit";
@@ -29,6 +29,7 @@ const EXPECTED_FILES = [
   "hooks/qwen.json",
   "hooks/vscode.json",
   "hooks/zcode.json",
+  "package.json",
   "qwen-extension.json",
 ];
 
@@ -149,4 +150,32 @@ test("an unknown installMode is a build-time hard stop (step 4)", (t) => {
   const dir = scratch(t);
   const bad = { ...getAdapter("qwen"), installMode: "floppy" };
   assert.throws(() => generateManifests(dir, undefined, [...ADAPTERS, bad]), { message: "manifest: unknown installMode floppy" });
+});
+
+// D-FU-RM-PI-1 (ADR-0002 GS7 amended): Pi reads package.json "pi".extensions from the package dir. The out tree holds
+// one package.json with only name, version, private, type and pi; no dependencies, no scripts.
+test("package.json is the Pi-only shape: name, version, private, type, pi (extensions, skills)", (t) => {
+  const dir = scratch(t);
+  generateManifests(dir, "2.0.0");
+  assert.deepEqual(readJson(dir, "package.json"), {
+    name: "context-mode",
+    pi: { extensions: ["./pi/index.js"], skills: ["./skills"] },
+    private: true,
+    type: "module",
+    version: "2.0.0",
+  });
+  assert.doesNotThrow(() => assertOutPackageJson(readJson(dir, "package.json")));
+});
+
+test("assertOutPackageJson throws on dependencies, scripts or any other key", () => {
+  const ok = { name: "context-mode", version: "2.0.0", private: true, type: "module", pi: { extensions: ["./pi/index.js"], skills: ["./skills"] } };
+  assert.doesNotThrow(() => assertOutPackageJson(ok));
+  assert.throws(() => assertOutPackageJson({ ...ok, dependencies: { "better-sqlite3": "1.0.0" } }), /dependencies/);
+  assert.throws(() => assertOutPackageJson({ ...ok, scripts: { postinstall: "node x.js" } }), /scripts/);
+  assert.throws(() => assertOutPackageJson({ ...ok, devDependencies: {} }), /devDependencies/);
+  assert.throws(() => assertOutPackageJson({ ...ok, private: false }), /private/);
+  assert.throws(() => assertOutPackageJson({ ...ok, type: "commonjs" }), /type/);
+  assert.throws(() => assertOutPackageJson({ ...ok, pi: { extensions: ["./pi/index.js"], skills: ["./skills"], prompts: [] } }), /pi/);
+  const { pi: _pi, ...noPi } = ok;
+  assert.throws(() => assertOutPackageJson(noPi), /pi/);
 });

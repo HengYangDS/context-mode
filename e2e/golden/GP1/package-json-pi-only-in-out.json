@@ -1,0 +1,23 @@
+{
+  "hasNodeModules": false,
+  "keys": [
+    "name",
+    "pi",
+    "private",
+    "type",
+    "version"
+  ],
+  "packageJson": {
+    "name": "context-mode",
+    "pi": {
+      "extensions": [
+        "./pi/index.js"
+      ],
+      "skills": [
+        "./skills"
+      ]
+    },
+    "private": true,
+    "type": "module"
+  }
+}

@@ -201,13 +201,22 @@ test("[M0] GP1/harness-smoke", async () => {
   await client.close();
 });
 
-test("[M0] GP1/no-package-json-in-out", () => {
+// D-FU-RM-PI-1 (ADR-0002 GS7 amended): the out tree holds one package.json, the Pi-only shape (name, version,
+// private, type, pi), with no dependencies and no scripts, and no node_modules. The version is dropped from the
+// golden (it is the build's --version) but must be present.
+test("[M0] GP1/package-json-pi-only-in-out", () => {
   assert.ok(existsSync(RELEASE_OUT), `release-out not found: ${RELEASE_OUT} (run build/build.mjs first)`);
+  const pkgPath = path.join(RELEASE_OUT, "package.json");
+  assert.ok(existsSync(pkgPath), "release-out/package.json missing (Pi reads its \"pi\" key)");
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+  assert.equal(typeof pkg.version, "string");
+  const { version: _version, ...rest } = pkg;
   const result = {
-    hasPackageJson: existsSync(path.join(RELEASE_OUT, "package.json")),
     hasNodeModules: existsSync(path.join(RELEASE_OUT, "node_modules")),
+    keys: Object.keys(pkg).sort(),
+    packageJson: rest,
   };
-  assert.deepStrictEqual(normalize(result), loadGolden("no-package-json-in-out"));
+  assert.deepStrictEqual(normalize(result), loadGolden("package-json-pi-only-in-out"));
 });
 
 // #890 — built bundles must carry no `with { type: "json" }` / `assert { type: "json" }`
