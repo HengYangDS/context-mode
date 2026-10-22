@@ -43,17 +43,6 @@
           }
         ]
       }
-    ],
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "command": "node \"${extensionPath}${/}hook.mjs\" --agent gemini",
-            "timeout": 5000,
-            "type": "command"
-          }
-        ]
-      }
     ]
   }
 }

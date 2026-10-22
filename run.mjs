@@ -941,7 +941,10 @@ var ADAPTERS = Object.freeze([
     toolNamePrefix: TOOL_NAME_PREFIX3,
     nativeTools: { shell: [] },
     execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
+    // D-FU-GCH-1: no SessionStart. Claude Code also loads hooks/hooks.json (Gemini's file) and would run a SessionStart
+    // entry through /bin/sh, which fails on ${extensionPath}. Gemini's SessionStart only sent the resume hint (compact never
+    // arrives there), and GP6 forbids that hint on BeforeAgent, so Gemini goes without it.
+    eventMap: { UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,

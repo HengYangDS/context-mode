@@ -315,7 +315,7 @@ var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "c507e00563abb1f8ff5270647a73c5f8b2cdb015" : void 0;
+var BUNDLE_SHA = true ? "5ca804119183ec9624d9c13ebb624d126ada9fd3" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
@@ -1278,7 +1278,10 @@ var ADAPTERS = Object.freeze([
     toolNamePrefix: TOOL_NAME_PREFIX3,
     nativeTools: { shell: [] },
     execReadOnlyHint: false,
-    eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
+    // D-FU-GCH-1: no SessionStart. Claude Code also loads hooks/hooks.json (Gemini's file) and would run a SessionStart
+    // entry through /bin/sh, which fails on ${extensionPath}. Gemini's SessionStart only sent the resume hint (compact never
+    // arrives there), and GP6 forbids that hint on BeforeAgent, so Gemini goes without it.
+    eventMap: { UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
