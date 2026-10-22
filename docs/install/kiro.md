@@ -99,7 +99,7 @@ Tested on macOS with a temporary HOME, against the release branch, commit 043853
 |---|---|---|---|
 | install command (sh) | not installed | 2026-10-22 | Pass: mcp.json and hook file written with the real path, other servers kept |
 | written hook command, run from another folder (SessionStart) | not installed | 2026-10-22 | Pass: exit 0; SessionStart printed context |
-| written hook command, UserPromptSubmit payload | not installed | 2026-10-22 | Fail on release 87a17f8: "unknown hook event UserPromptSubmit"; fixed in the build after it |
+| written hook command, UserPromptSubmit payload | not installed | 2026-10-22 | Fail on release 87a17f8: "unknown hook event UserPromptSubmit". Pass on release 05e9772: exit 0, empty stdout |
 | `git -C ~/.context-mode-app pull` | n/a | 2026-10-21 | Pass: "Already up to date" |
 | uninstall command (sh) | not installed | 2026-10-22 | Pass: entry and hook file removed, other servers kept |
 
