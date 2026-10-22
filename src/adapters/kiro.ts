@@ -6,9 +6,12 @@ import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, Tool
 export const TOOL_NAME_PREFIX = "mcp_context-mode_"; // impl/10 §1.3, A1 (Kiro @mcp matcher ids mcp_<server>_<tool>)
 
 // Native event name -> canonical; legacy names are aliases (impl/10 §8 event-name row, §1.4).
+// UserPromptSubmit is the trigger the build writes (D-FU-RM-KIRO-1) and the hook_event_name in the Kiro docs'
+// prompt hook payload (D-FU-RM-KIRO-2); PromptSubmit stays for hook files written by older builds.
 const KIRO_EVENTS: Readonly<Record<string, CanonicalEventName>> = {
   SessionStart: "SessionStart",
   agentSpawn: "SessionStart",
+  UserPromptSubmit: "UserPromptSubmit",
   PromptSubmit: "UserPromptSubmit",
   userPromptSubmit: "UserPromptSubmit",
   PreToolUse: "PreToolUse",

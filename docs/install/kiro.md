@@ -98,13 +98,14 @@ Tested on macOS with a temporary HOME, against the release branch, commit 043853
 | Command | Kiro version | Date | Result |
 |---|---|---|---|
 | install command (sh) | not installed | 2026-10-22 | Pass: mcp.json and hook file written with the real path, other servers kept |
-| written hook command, run from another folder (SessionStart, PromptSubmit) | not installed | 2026-10-22 | Pass: exit 0; SessionStart printed context |
+| written hook command, run from another folder (SessionStart) | not installed | 2026-10-22 | Pass: exit 0; SessionStart printed context |
+| written hook command, UserPromptSubmit payload | not installed | 2026-10-22 | Fail on release 87a17f8: "unknown hook event UserPromptSubmit"; fixed in the build after it |
 | `git -C ~/.context-mode-app pull` | n/a | 2026-10-21 | Pass: "Already up to date" |
 | uninstall command (sh) | not installed | 2026-10-22 | Pass: entry and hook file removed, other servers kept |
 
 Checked against kiro.dev on 2026-10-22: the hooks page shows the keys `version` "v1", `name`, `trigger`, `matcher` (`@mcp`), `action.type` "command" and `action.command`. The field table also lists `hooks[].timeout` (seconds) and `hooks[].enabled`, and says `trigger` is PascalCase. Kiro CLI V3 loads global hooks from `~/.kiro/hooks/` and reads user MCP servers from `~/.kiro/settings/mcp.json` under `mcpServers`.
 
-Open point, the prompt hook: the docs name the trigger "Prompt Submit" but give no ID, and the "Agent Stop" ID is `Stop`, so the ID does not always follow the display name. The docs' sample payload for that hook has `"hook_event_name": "UserPromptSubmit"`. The release `hooks/kiro.json` uses the trigger `PromptSubmit`, and the release `hook.mjs` accepts `PromptSubmit` but drops `UserPromptSubmit` (exit 0, "unknown hook event", no effect). So the prompt hook may not work until the build accepts `UserPromptSubmit`. The other three hooks are not affected. The Kiro CLI cannot block a prompt, so this does not stop your prompts.
+The prompt hook: the docs name the trigger "Prompt Submit" and give no ID, but the docs' sample payload for that hook has `"hook_event_name": "UserPromptSubmit"`. The release `hooks/kiro.json` uses the trigger `UserPromptSubmit`, and `hook.mjs --agent kiro` accepts both `UserPromptSubmit` and the older `PromptSubmit` (fixed 2026-10-22, D-FU-RM-KIRO-2). Release builds before that fix drop `UserPromptSubmit` with "unknown hook event"; run the Update step to get the fix. The Kiro CLI cannot block a prompt, so this hook never stops your prompts.
 
 Not run: Kiro itself. Kiro has no npm package we could put in a temporary folder, so no run showed Kiro load the server or fire the hooks, and `/ctx-doctor` did not run. Windows commands.
 

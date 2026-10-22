@@ -80,7 +80,9 @@ test("[M2] GP1/no-clientinfo-agent-from-flag", async (t) => {
 // M3 install cases (14a-issue-cases.md GP1 rows; impl/10 §1.5; impl/13 §3; DECISIONS-r9 R4). They read only the
 // generated release-out/hooks/*.json (build/manifests.ts output) — black box, no src/ import (GS4).
 const HOOKS_OUT = path.join(RELEASE_OUT, "hooks");
-const readHooks = (id) => JSON.parse(readFileSync(path.join(HOOKS_OUT, `${id}.json`), "utf8"));
+// D-FU-RM-GEMINI-1: Gemini reads only hooks/hooks.json; every other host ships hooks/<id>.json.
+const hookFileOf = (id) => (id === "gemini" ? "hooks" : id) + ".json";
+const readHooks = (id) => JSON.parse(readFileSync(path.join(HOOKS_OUT, hookFileOf(id)), "utf8"));
 const SPAWN_HOOK_AGENTS = ["claude-code", "codex", "gemini", "qwen", "copilot-cli", "vscode", "kiro", "zcode"];
 // impl/10 §1.5 "Timeout key" column: key and unit per host shape.
 const TIMEOUT_KEY = {

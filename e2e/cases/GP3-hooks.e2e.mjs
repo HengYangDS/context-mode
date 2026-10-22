@@ -56,7 +56,9 @@ function discoverFixtures() {
 // M3 hook-config cases (14a-issue-cases.md GP3 rows; impl/10 §1.5; DECISIONS-r9 R4, T-CX). Black box: they read
 // only release-out/hooks/*.json and recorded fixtures (GS4).
 const HOOKS_OUT = path.join(REPO_ROOT, "release-out", "hooks");
-const readHooks = (id) => JSON.parse(readFileSync(path.join(HOOKS_OUT, `${id}.json`), "utf8"));
+// D-FU-RM-GEMINI-1: Gemini reads only hooks/hooks.json; every other host ships hooks/<id>.json.
+const hookFileOf = (id) => (id === "gemini" ? "hooks" : id) + ".json";
+const readHooks = (id) => JSON.parse(readFileSync(path.join(HOOKS_OUT, hookFileOf(id)), "utf8"));
 const HOST_TIMEOUT_MAX_S = 10; // #1226: every hook timeout is 10 s or less
 const MS_PER_S = 1000;
 // impl/10 §1.5 "Timeout key" column; value divisor gives seconds.

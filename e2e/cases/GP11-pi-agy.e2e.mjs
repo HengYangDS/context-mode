@@ -133,9 +133,11 @@ const PRE_TOOL_EVENT = {
 
 test("[M7] GP11/agy-hooks-schema-valid: each generated hook file passes its own host schema (#1206)", () => {
   const files = readdirSync(path.join(OUT, "hooks")).filter((f) => f.endsWith(".json")).sort();
-  assert.deepEqual(files.map((f) => f.slice(0, -5)), Object.keys(SCHEMA).sort());
+  // D-FU-RM-GEMINI-1: Gemini reads only hooks/hooks.json; every other host ships hooks/<id>.json.
+  const idOf = (f) => (f === "hooks.json" ? "gemini" : f.slice(0, -5));
+  assert.deepEqual(files.map(idOf).sort(), Object.keys(SCHEMA).sort());
   for (const f of files) {
-    const id = f.slice(0, -5);
+    const id = idOf(f);
     const doc = JSON.parse(readFileSync(path.join(OUT, "hooks", f), "utf8"));
     assert.doesNotThrow(() => SCHEMA[id](doc), id);
     // Walk the parsed strings: the Claude command quotes the plugin root ("${CLAUDE_PLUGIN_ROOT}/hook.mjs"), so the

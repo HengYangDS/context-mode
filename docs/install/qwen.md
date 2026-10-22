@@ -1,50 +1,31 @@
 # Install context-mode v2 on Qwen Code
 
-This guide adds the MCP server with `qwen mcp add`. This gives the context-mode tools, but no hooks.
-
-The extension install (`qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release`) is the better method. It does not work yet: the release build has a relative server path in `qwen-extension.json` and no hooks entry, so the server shows as Disconnected. This guide will move to it when the build is fixed.
+This guide uses the Qwen Code extension install. It adds the MCP server and the four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse) from the release branch. You do not need `~/.context-mode-app`.
 
 ## Install
 
-Get the files first. See [Get the files](./README.md#get-the-files).
-
-macOS / Linux:
+The same commands work in PowerShell (not run on Windows yet).
 
 ```sh
 npm install -g @qwen-code/qwen-code
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
-qwen mcp add -s user context-mode node "$HOME/.context-mode-app/server.mjs" --agent qwen
+qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release --consent
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-npm install -g @qwen-code/qwen-code
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
-qwen mcp add -s user context-mode node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent qwen
-```
-
+`--consent` accepts the extension risk prompt, so the command does not stop to ask.
 
 ## Verify
 
 ```sh
 qwen mcp list
+qwen extensions list
 ```
 
-`context-mode` must show as Connected. Then run `/ctx-doctor` in Qwen Code.
+`context-mode` must show as Connected, and `qwen extensions list` must show `context-mode (2.0.0)` with Ref `release`. Then run `/ctx-doctor` in Qwen Code, and `/hooks` to see the four context-mode hooks.
 
 ## Update
 
-macOS / Linux:
-
 ```sh
-git -C ~/.context-mode-app pull
-```
-
-Windows (PowerShell):
-
-```powershell
-git -C "$env:USERPROFILE\.context-mode-app" pull
+qwen extensions update context-mode
 ```
 
 Restart Qwen Code.
@@ -73,20 +54,16 @@ Then add the v1 entry for Qwen Code as the [Rollback table](../../README.md#upgr
 
 ## Uninstall
 
-macOS / Linux:
+```sh
+qwen extensions uninstall context-mode
+```
+
+If you used the older `qwen mcp add` method, also run:
 
 ```sh
 qwen mcp remove -s user context-mode
 rm -rf ~/.context-mode-app
 ```
-
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-qwen mcp remove -s user context-mode
-Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
-```
-
 
 ## Report a problem
 
@@ -94,13 +71,14 @@ Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/c
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+Tested on macOS with a temporary HOME, against the release branch, commit 87a17f8.
 
 | Command | Qwen Code version | Date | Result |
 |---|---|---|---|
-| `qwen mcp add -s user context-mode node "$HOME/.context-mode-app/server.mjs" --agent qwen` | 0.25.3 | 2026-10-21 | Pass |
-| `qwen mcp list` | 0.25.3 | 2026-10-21 | Pass: Connected |
-| `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release` | 0.25.3 | 2026-10-21 | Fail: installs, but server Disconnected and no hooks |
-| `qwen mcp remove -s user context-mode` | 0.25.3 | 2026-10-21 | Pass |
+| `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release --consent` | 0.26.0 | 2026-10-22 | Pass: installed and enabled, server path `<home>/.qwen/extensions/context-mode/server.mjs` |
+| `qwen mcp list` | 0.26.0 | 2026-10-22 | Pass: Connected |
+| hook registration (`qwen -p` with `--debug`, no login) | 0.26.0 | 2026-10-22 | Pass: "Hook registry initialized with 4 hook entries"; SessionStart ran `hook.mjs` with `${CLAUDE_PLUGIN_ROOT}` set to the extension folder, exit 0 |
+| `qwen extensions update context-mode` | 0.26.0 | 2026-10-22 | Pass: "already up to date" |
+| `qwen extensions uninstall context-mode` | 0.26.0 | 2026-10-22 | Pass: extension folder removed, `qwen mcp list` empty |
 
-Not run: hooks (this method has none). A live Qwen session (needs a login). Windows commands.
+Without `--consent`, the URL with no `:context-mode` suffix opens a plugin picker, so keep the suffix. Not run: a logged-in Qwen session, so `/ctx-doctor`, `/hooks` and the other three hooks did not run. Windows commands.
