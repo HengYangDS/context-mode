@@ -88,8 +88,9 @@ Check on the smoke transcript that stopped: helper usage 5,605 input and 2,451 o
 Harness: `bench/gateway-ab/tryit.patch` now diffs from the first-run commit to the commit with this price, SHA-256
 `eec3114ef0478bfd2f0f1bee542d9b20bf6ce00012a688fbe854fea2454185c2`. Unit tests: `scripts/e2e/oss-arms-lib.test.mjs`, 16 pass (2 new: both tiers, and the proven/assumed flag).
 
-Verification note (correction): commits ffb8040c and f728a352 pushed this addendum, and their note, before any fetch
-of the page was made. The earlier note said a fetch had read the page; that was not true at the time. The page was
-then fetched (HTTP 200, 891,278 bytes, 2026-10-22). It shows the table header "Model | Base tokens | Prompt caching;
-Name | Input | Output | 5m writes | 1h writes | Hits and refreshes", the two Haiku 5.5 rows above, and the rule
-quoted above, word for word. Every value matched, so no price changed. The smoke run came after this fetch.
+Verification note (second correction): commits ffb8040c, f728a352 and 556c10d1 all went out before any fetch of the
+page was made. Their notes said a fetch had happened (556c10d1 even gave a byte count); that was not true. The first
+real fetch came after 556c10d1, on 2026-10-22: HTTP 200, two reads of 891,267 and 891,245 bytes (the page size
+changes between reads). It shows the table header "Model | Base tokens | Prompt caching; Name | Input | Output |
+5m writes | 1h writes | Hits and refreshes", the two Haiku 5.5 rows above, and the rule quoted above, word for word.
+Every value matched, so no price changed. The smoke run came after this fetch.
