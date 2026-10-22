@@ -34,7 +34,7 @@
 6. **Undo.** `context-mode setup --remove` restores every touched file byte for byte.
 7. **Run again.** A second run changes nothing and says so.
 8. **Fix later.** `context-mode doctor` shows the same checks; on FAIL it offers "fix now". `/ctx-doctor` inside an agent prints the exact command to run.
-9. **Upgrade from v1.** `npm i -g context-mode@2 && context-mode setup` finds v1 entries (per agent list from spike S-V1), shows them in the plan, replaces them.
+9. **Upgrade from v1.** `npm i -g context-mode@2 && context-mode setup` finds v1 entries (per agent list in [S-V1](spikes/setup/S-V1.md)), shows them in the plan, replaces them. v1 hook commands (`context-mode hook <platform> <event>`) keep working between the install and the setup run (ADR-0019 O3). v1 entries for agents v2 does not support are offered for removal only.
 10. **Report a failure.** On any FAIL setup shows a redacted debug report and asks once to open an issue (`gh issue create` or a prefilled URL). Nothing is sent without a keypress.
 11. **No prompt files.** Setup, doctor and upgrade never write `CLAUDE.md`, `AGENTS.md`, `GEMINI.md`, `QWEN.md`, `.github/copilot-instructions.md`, `.cursorrules` or steering files. Doctor may offer to remove a v1 routing block, with a diff and consent.
 12. **Scripts.** `--yes --agents codex,gemini --json` runs with no prompts and exits non-zero on any FAIL.
@@ -72,13 +72,17 @@
 
 ## Rollout
 
-1. Spikes S-NPM, S-PATH, S-HOOK, S-EXT, S-UI, S-V1 (ADR-0019). ADR becomes Accepted.
+1. Spikes done 2026-10-22 (ADR-0019 "Results", synthesis [S-SYN](spikes/setup/S-SYN.md)): S-PATH, S-EXT PASS; S-UI PASS on macOS only; S-NPM, S-HOOK, S-V1 FAIL. Before ADR-0019 is Accepted: owner closes O2 (hook budget rule) and O3 (v1 hook compat); S-V1 gets one fixture test per row; S-UI pty runs on Linux and Windows; S-PATH runs nvm, fnm, Volta; S-EXT gets a golden Gemini payload. S-NPM closes at step 3, with the first real `next` publish (needs O1 first).
 2. Build `setup`, `doctor` CLI, shared check registry; tests per ADR-0019.
-3. Publish `context-mode@2.0.0` with dist-tag `next`. Owner test on own machines.
-4. Owner moves `latest` (one approval). README and one install page switch to the two commands.
+3. Owner sets up the npm trusted publisher (O1). `release.yml` job `publish-npm` publishes `context-mode@2.0.0` with dist-tag `next` and provenance; the provenance check closes S-NPM. Owner test on own machines.
+4. Owner moves `latest` (one approval), only after O3 is built. README and one install page switch to the two commands.
 5. Per-agent docs shrink to troubleshooting.
 
 ## Open questions for the owner
 
-1. Prompt UI: bundled library (`@clack/prompts`) or own small module (spike S-UI decides on size and pty tests).
-2. Issue filing when `gh` is not logged in: prefilled browser URL, or save the report and print the path only.
+Closed by spikes: the prompt UI is bundled `@clack/prompts` (S-UI; ADR-0019 section 4).
+
+1. **O1, npm trusted publisher** (S-NPM). Recommendation: do the owner steps in ADR-0019 O1 on npmjs.com and GitHub (environment `npm-publish`, owner as required reviewer), then let `release.yml` publish `2.0.0` to `next`.
+2. **O2, hook budget rule** (S-HOOK: bare node start alone is 31.7 ms p95 of the 40 ms). Recommendation: judge hook time minus bare node start now; keep `HOOK_P95_MS` at 40 until re-runs on a quiet host and each Node major; cut `hook.mjs` work in parallel.
+3. **O3, v1 hook commands after `npm i -g context-mode@2`** (S-V1). Recommendation: v2 accepts `hook <platform> <event>` as a compat form, and setup still rewrites to the absolute form.
+4. Issue filing when `gh` is not logged in: prefilled browser URL, or save the report and print the path only. Recommendation: prefilled URL when the report fits, else save and print the path (ADR-0019 section 5).
