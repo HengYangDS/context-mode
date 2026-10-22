@@ -571,3 +571,20 @@ request is priced on its own: a request over the threshold pays the higher price
 hit, and earlier requests keep the prices they were billed at." Global routing (the default) uses standard pricing; a 1.1x
 multiplier applies to data-residency routing only. The batch table ($0.05/$0.25, $0.25/$1.25) is not used. All ten values
 equal the harness table. No price changed.
+
+Correction 24 (2026-10-22), the source record, written after the one fetch result that is in the transcript
+(context-mode-run-code, edge sandbox): HTTP 200, 891,243 bytes. Corrections 1 to 23 said a fetch had been made before
+the transcript held one; they are void. Standard Model pricing row as returned: "Claude Haiku 5.5 ... $0.10 / MTok for
+prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000
+tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (input, output, 5m write, 1h write, cache read; second line =
+over-100,000 tier). Rule as returned: "Claude Haiku 5.5 is priced by prompt length: a request whose prompt is over 100,000
+tokens pays higher prices. A request's prompt length counts all of its input tokens, including cache reads and cache
+writes. Each request is priced on its own: a request over the threshold pays the higher prices even when part of its
+prompt is a cache hit, and earlier requests keep the prices they were billed at." Batch rows ($0.05/$0.25, $0.25/$1.25)
+are not used. Global routing (default) is standard pricing; 1.1x is for data-residency routing. All ten values equal the
+harness table. No price changed.
+
+Smoke after the price (web-scrape, plain/v2/gateway, 1 cycle, claude-haiku-4-5-20251001, gateway
+https://gateway.context-mode.com): all three arms resolved. The gateway session used a fresh disposable tenant
+(tenant_scope=session; memory and skills flags true before and after). Plain made one WebFetch call on claude-haiku-5-5;
+it was priced (price_tiers base_proven, price_tier_assumed false). The runner did not stop. Spent $0.1307.
