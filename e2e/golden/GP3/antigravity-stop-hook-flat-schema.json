@@ -15,8 +15,7 @@
     "AfterTool",
     "BeforeAgent",
     "BeforeTool",
-    "PreCompress",
-    "SessionStart"
+    "PreCompress"
   ],
   "qwen": [
     "PostToolUse",
