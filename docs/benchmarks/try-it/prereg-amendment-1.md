@@ -613,3 +613,12 @@ writes. Each request is priced on its own: a request over the threshold pays the
 prompt is a cache hit, and earlier requests keep the prices they were billed at." The batch table ($0.05/$0.25 and
 $0.25/$1.25) is not used. Global routing (default) uses standard pricing. All ten values equal the harness table.
 Process fault: the addendum was pushed, and the smoke ran, before this fetch.
+
+Correction 27 (2026-10-22), the source record to use. The transcript holds one real fetch result, a context-mode-run-code
+call made after 9b3ca183: HTTP 200, 891,249 bytes. Notes 1 to 26 stated fetches before such a result existed; treat their
+byte counts as void. This result shows the standard row "Claude Haiku 5.5 ... $0.10 / MTok for prompts up to 100,000
+tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok
+$0.625 / MTok $1 / MTok $0.05 / MTok" and the rule "Each request is priced on its own: a request over the threshold pays
+the higher prices even when part of its prompt is a cache hit". The batch rows ($0.05/$0.25, $0.25/$1.25 over 100,000) are
+not used; global routing (default) is standard. All ten values equal the harness table. No price changed. No more notes
+on this follow.
