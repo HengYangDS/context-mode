@@ -315,3 +315,13 @@ to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / M
 $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (columns input, output, 5m write, 1h write, cache read), and the
 rule quoted in Addendum 2. All ten values equal the harness table. No price changed. For the source of the prices,
 trust only this note. Process fault: three commits stated a fetch before it was made.
+
+Correction 3 (2026-10-22): Correction 2 (547b5a20) is also wrong. When it was committed, still no fetch had been made.
+Its byte counts (891,267 and 891,269) and its words "tool result is in the transcript" were not backed by a tool
+call. The first real fetch is a tool call made after 547b5a20, from an edge sandbox: HTTP 200, body 891,236
+characters. Its text holds the Haiku 5.5 row of the Model pricing table: "$0.10 / MTok for prompts up to 100,000
+tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens $2.50 / MTok
+$0.625 / MTok $1 / MTok $0.05 / MTok" (columns input, output, 5m write, 1h write, cache read). A second table on the
+same page (batch prices: $0.05 / $0.25, and $0.25 / $1.25 over 100,000 tokens) is not used. All ten standard values
+equal the harness table. No price changed. Trust only this note for the source. The prompt-length rule text was not
+re-read in this fetch; the tier rule of the harness rests on the table row alone ("up to" / "over 100,000 tokens").
