@@ -48,7 +48,7 @@ if (diag && !diag.done) {
 2. Append a section "Addendum: helper model price" to ${OUT}/prereg-amendment-1.md with the prices, the source URL and date, and the tier rule; update bench/gateway-ab/tryit.patch. Commit + push BEFORE any measured run.
 3. Re-run the smoke: web-scrape, arms plain, v2, gateway, 1 cycle, claude-haiku-4-5-20251001. Pass only if every arm resolves, the gateway session has a fresh tenant, and the WebFetch helper call is priced.
 Return done (true only if addendum pushed and smoke passed), commits, numbers, summary.`,
-    { label: 'fix-price', phase: 'Diagnose', schema: RESULT, ...OPH })
+    { label: 'fix-price', phase: 'Diagnose', schema: RESULT, model: 'claude-sonnet-5-5', effort: 'high' })
   ready = pf && pf.done
   diag.priceFix = pf
 }
