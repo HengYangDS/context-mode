@@ -49,3 +49,13 @@ test("install-docs: the real docs pass", () => {
   assert.ok(files.length >= 11);
   assert.deepEqual(files.flatMap((f) => checkLines(f, readFileSync(path.join(DIR, f), "utf8"))), []);
 });
+
+test("install-docs: npm install of context-mode needs a version tag", () => {
+  const bad = checkLines("n.md", ["```sh", "npm i -g context-mode", "npm install -g context-mode && context-mode setup", "```"].join("\n")).join("\n");
+  assert.ok(bad.includes("n.md:2 npm install") && bad.includes("n.md:3 npm install"), bad);
+  assert.deepEqual(checkLines("n.md", ["```sh", "npm i -g context-mode@next && context-mode setup", "npm uninstall -g context-mode", "```"].join("\n")), []);
+});
+
+test("install-docs: the root README fences pass", () => {
+  assert.deepEqual(checkLines("README.md", readFileSync(path.join(DIR, "..", "..", "README.md"), "utf8")), []);
+});

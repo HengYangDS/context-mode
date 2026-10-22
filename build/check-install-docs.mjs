@@ -8,6 +8,7 @@
 // only an agent variable ({env:HOME}, ${extensionPath}, ${CLAUDE_PLUGIN_ROOT}) passes.
 // Shell fences also fail on forms that do not expand as copied: a quoted "~/..." in sh (the shell keeps the ~),
 // $env:USERPROFILE in sh, and ~ or %USERPROFILE% in powershell (Windows PowerShell 5.1 passes them to git/node as is).
+// A fenced `npm i -g context-mode` without a version tag fails (@next = v2 preview, @1 = v1): latest is v1 until the owner moves it (ADR-0019 D2). The default run also checks README.md.
 // Any fenced line with "change this", "your path" or "edit this" fails: the reader must not edit a block.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
 import { readdirSync, readFileSync } from "node:fs";
@@ -44,6 +45,8 @@ export function checkLines(name, text) {
     const at = `${name}:${i + 1}`;
     if (/<[A-Za-z.][^<>\n]*>/.test(line) || /\.\.\.>/.test(line)) bad.push(`${at} placeholder: ${line.trim()}`);
     if (/npx\s+(-y\s+)?context-mode/.test(line)) bad.push(`${at} npx context-mode: ${line.trim()}`);
+    // v2 preview is on dist-tag next; a bare install gets v1 until the owner moves latest (ADR-0019 D2).
+    if (/\bnpm\s+(i|install|add)\b[^\n&;|]*\bcontext-mode(?![\w./@-])/.test(line)) bad.push(`${at} npm install of context-mode needs a version tag (@next for v2, @1 for v1): ${line.trim()}`);
     if (USER_PATH.test(line)) bad.push(`${at} user path: ${line.trim()}`);
     if (EDIT_HINT.test(line)) bad.push(`${at} edit step: ${line.trim()}`);
     if (SH_LANG.test(lang)) {
@@ -70,6 +73,11 @@ export function checkLines(name, text) {
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = readdirSync(DIR).filter((f) => f.endsWith(".md")).sort();
   const bad = files.flatMap((f) => checkLines(f, readFileSync(path.join(DIR, f), "utf8")));
+  if (!process.argv[2]) { // default run also checks the root README fences (v2 preview install, ADR-0019)
+    const readme = path.join(DIR, "..", "..", "README.md");
+    bad.push(...checkLines("README.md", readFileSync(readme, "utf8")));
+    files.push("README.md");
+  }
   for (const b of bad) console.log("  " + b);
   console.log(`${bad.length ? "FAIL" : "PASS"} install-docs ${files.length} files`);
   process.exit(bad.length ? 1 : 0);

@@ -63,7 +63,7 @@ npm uninstall -g context-mode
 Do the Uninstall steps below. Then install v1 again:
 
 ```sh
-npm install -g context-mode
+npm install -g context-mode@1
 ```
 
 Then add the v1 entry for VS Code as the [Rollback table](../../README.md#upgrading-from-v1) says.

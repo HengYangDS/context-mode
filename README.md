@@ -21,6 +21,16 @@ Context Mode stops the big output before it lands, keeps it on disk, and gives b
 
 See [docs/how-it-works.md](docs/how-it-works.md) for the full picture.
 
+## v2 preview
+
+Install the v2 preview from npm, then run the guided setup:
+
+```sh
+npm i -g context-mode@next && context-mode setup
+```
+
+`@next` is the v2 preview. A plain `npm i -g context-mode` still installs v1 until v2 is released.
+
 ## Install
 
 Pick your agent and follow its guide. A row shows a command only after a live install test on that agent passes.
