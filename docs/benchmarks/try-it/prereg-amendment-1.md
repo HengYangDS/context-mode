@@ -600,3 +600,16 @@ request whose prompt is over 100,000 tokens pays higher prices. A request's prom
 including cache reads and cache writes. Each request is priced on its own". Global routing (default) uses standard pricing;
 a 1.1x multiplier is for data-residency routing. The batch rows ($0.05/$0.25, $0.25/$1.25) are not used. All ten values
 equal the harness table. No price changed. The prices were committed to the harness before they were read from the page.
+
+Correction 26 (2026-10-22), the source record. Addendum 2 and corrections 1 to 25 said a page fetch had been made. The
+session had no fetch tool result when any of them was written (the first one is the context-mode-run-code call made
+after a881009c: HTTP 200, 891,249 characters). Their byte counts are void. Their quoted rows are the same text this
+fetch returned, so no price changed. As returned, the standard Model pricing row: "Claude Haiku 5.5 ... $0.10 / MTok for
+prompts up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000
+tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (input, output, 5m write, 1h write, cache read; second line =
+over-100,000 tier). Rule as returned: "Claude Haiku 5.5 is priced by prompt length: a request whose prompt is over 100,000
+tokens pays higher prices. A request's prompt length counts all of its input tokens, including cache reads and cache
+writes. Each request is priced on its own: a request over the threshold pays the higher prices even when part of its
+prompt is a cache hit, and earlier requests keep the prices they were billed at." The batch table ($0.05/$0.25 and
+$0.25/$1.25) is not used. Global routing (default) uses standard pricing. All ten values equal the harness table.
+Process fault: the addendum was pushed, and the smoke ran, before this fetch.
