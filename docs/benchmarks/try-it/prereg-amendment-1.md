@@ -280,3 +280,21 @@ up to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 
 tokens $2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok", and the Long context pricing rule quoted above, word for
 word. All ten values match the table above and the harness, so no price changed. Process fault: the prices went into
 the harness, and the smoke ran, before the source was read.
+
+Addendum 2 (2026-10-22, written after a fetch whose tool result is in this session's transcript: HTTP 200, 891,267
+bytes, from https://platform.claude.com/docs/en/about-claude/pricing). The notes above stay as written; read only this
+one for the source. The page's Model pricing table, Claude Haiku 5.5 row, word for word: "$0.10 / MTok for prompts up
+to 100,000 tokens $0.50 / MTok $0.125 / MTok $0.20 / MTok $0.01 / MTok $0.50 / MTok for prompts over 100,000 tokens
+$2.50 / MTok $0.625 / MTok $1 / MTok $0.05 / MTok" (columns: input, output, 5m write, 1h write, cache read). The
+Long context pricing rule: "Claude Haiku 5.5 is priced by prompt length: a request whose prompt is over 100,000
+tokens pays higher prices. A request's prompt length counts all of its input tokens, including cache reads and cache
+writes. Each request is priced on its own". All ten values equal the harness table; no price changed.
+
+Tier rule in the harness: a per-model total from the result event with prompt (input + cache reads + cache writes) at or
+under 100,000 tokens proves the base tier (base_proven). Over it, the per-request split is not in the event: base
+price is used and the run is flagged price_tier_assumed. A request-level record would be priced by its own prompt
+length (requestPrices). A model absent from the table is not priced: the runner stops (fail closed).
+
+Harness change since the notes above: a runner bug is fixed (the price_tiers fields were set outside the priced
+branch, so an untiered model such as claude-haiku-4-5 would have been recorded as unpriced). Patch
+`bench/gateway-ab/tryit.patch` now diffs from e9c8539a, SHA-256 `13a89e4833d5cf04c0aaec66cbf65167c2b27e9affab0ceddcc41caf3aea3dd5`. Unit tests: 16 pass.

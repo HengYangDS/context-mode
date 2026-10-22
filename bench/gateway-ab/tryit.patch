@@ -260,7 +260,7 @@ index f88eccff..63edba82 100644
 +  assert.equal(none.price_tiers, undefined);
 +});
 diff --git a/scripts/e2e/start-cost-ab-arms.mjs b/scripts/e2e/start-cost-ab-arms.mjs
-index f2488020..970e9fd9 100644
+index f2488020..7d38d6c1 100644
 --- a/scripts/e2e/start-cost-ab-arms.mjs
 +++ b/scripts/e2e/start-cost-ab-arms.mjs
 @@ -22,8 +22,9 @@ import { fileURLToPath } from "node:url";
@@ -343,12 +343,16 @@ index f2488020..970e9fd9 100644
    if (spec) {
      rec.plugin = { arm, ...spec.revision };
      rec.plugin_tool_calls = Object.keys(p.tools).filter((t) => t.indexOf(spec.prefix) === 0).reduce((s, t) => s + p.tools[t], 0);
-@@ -178,20 +182,27 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+@@ -177,21 +181,29 @@ async function runOne({ w, arm, cycle, role, attempt, order, position }) {
+   rec.resolution = { ok: res.ok, why: res.why, ...res.evidence };
    const cost = p.result ? usdFromResult(p.result) : null;
    rec.usd_client = p.result ? Number(p.result.total_cost_usd) : null;
-   if (cost && cost.usd !== null) { rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage"; }
-+  if (cost && cost.price_tiers) { rec.price_tiers = cost.price_tiers; rec.price_tier_assumed = cost.price_tier_assumed; }
-   else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
+-  if (cost && cost.usd !== null) { rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage"; }
+-  else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
++  if (cost && cost.usd !== null) {
++    rec.usd = cost.usd; rec.usd_low = cost.usd_low; rec.calls = cost.calls; rec.calls_from = "result_event_model_usage";
++    if (cost.price_tiers) { rec.price_tiers = cost.price_tiers; rec.price_tier_assumed = cost.price_tier_assumed; }
++  } else { rec.usd = null; rec.error = p.result ? (cost ? cost.why : "no_cost") : "no result event (exit " + out.code + (out.timedOut ? ", timed out" : "") + ")"; }
    if (arm === "gateway") {
      rec.flags_before = flagsBefore;
 -    rec.tenant = TENANTS[w];
@@ -374,7 +378,7 @@ index f2488020..970e9fd9 100644
    if (rec.usd !== null && rec.usd_client > 0) {
      rec.client_gap_pct = 100 * (rec.usd - rec.usd_client) / rec.usd_client;
      rec.client_gap_flag = Math.abs(rec.client_gap_pct) > 1;
-@@ -204,7 +215,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
+@@ -204,7 +216,8 @@ function save(r) { runs.push(r); appendFileSync(LEDGER, JSON.stringify(r) + "\n"
  function writeEvidence() {
    const doc = buildEvidence({ runs, workloads: WLS, arms: ARMS, labels: LABELS, meta: {
      pairs_planned: N, warmup: WARMUP, model: MODEL, client_version: CLIENT_VERSION, date: new Date().toISOString().split("T")[0], harness_commit: HARNESS_COMMIT,
@@ -384,7 +388,7 @@ index f2488020..970e9fd9 100644
      plugins: Object.fromEntries(Object.values(SPECS).map((s) => [s.arm, { server: s.server, tool_prefix: s.prefix, ...s.revision }])),
      arm_text: { plain: "Claude Code talks to Anthropic direct, no plugin.", v1: "Claude Code with the OSS context-mode plugin v1.", v2: "Claude Code with the OSS context-mode plugin v2.", gateway: "Claude Code talks to Anthropic through Context Mode." } } });
    doc.public_runs = runs.map(publicRecord);
-@@ -242,15 +254,6 @@ async function runCycle(w, role, cycle, order) {
+@@ -242,15 +255,6 @@ async function runCycle(w, role, cycle, order) {
  }
  
  // ── the grid ────────────────────────────────────────────────────────────────────────────────────────────────
