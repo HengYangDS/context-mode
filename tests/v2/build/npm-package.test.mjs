@@ -50,7 +50,7 @@ test("[M7] build/npm-sums-cover-entry: SHA256SUMS lists package.json and cli.mjs
 
 test("[M7] build/npm-pack-equals-sums: npm pack file list and sha256 equal SHA256SUMS (plus SHA256SUMS itself)", () => {
   const dest = path.join(scratch, "pack");
-  const p = spawnSync(NPM, ["pack", "--json", "--pack-destination", (spawnSync("mkdir", ["-p", dest]), dest)], { cwd: out, encoding: "utf8" });
+  const p = spawnSync(NPM, ["pack", "--json", "--pack-destination", (spawnSync("mkdir", ["-p", dest]), dest)], { cwd: out, encoding: "utf8", shell: process.platform === "win32" });
   assert.equal(p.status, 0, p.stderr);
   const [info] = JSON.parse(p.stdout);
   assert.equal(info.name, "context-mode");

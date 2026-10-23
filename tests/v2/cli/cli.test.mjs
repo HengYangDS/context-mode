@@ -173,7 +173,7 @@ test("[M7] cli/exit-ok: setup --yes --agents codex applies, verifies, exit 0; re
   assert.match(r.stdout, /codex\s+PASS/);
   const toml = readFileSync(f, "utf8");
   assert.match(toml, /model = "o3"/, "user keys kept");
-  assert.match(toml, new RegExp(path.join(s.pkg, "server.mjs").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.ok(toml.includes(path.join(s.pkg, "server.mjs").replaceAll("\\", "\\\\")), "server path (TOML-escaped)");
 });
 
 test("[M7] cli/exit-fail: a failing verify step is exit 1, the agent is rolled back byte for byte", (t) => {
@@ -275,7 +275,7 @@ test("[M7] cli/doctor: read-only; v1 form reported with the exact command; PASS 
 
 // ---------- upgrade ----------
 
-test("[M7] cli/upgrade: npm i -g context-mode@<tag>, then the new package runs setup --repair", (t) => {
+test("[M7] cli/upgrade: npm i -g context-mode@<tag>, then the new package runs setup --repair", { skip: process.platform === "win32" && "fake npm is an sh script" }, (t) => {
   const s = sandbox(t);
   const f = codexHome(s);
   const root = path.join(s.root, "npmroot");

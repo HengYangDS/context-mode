@@ -80,10 +80,10 @@ test("registry: one check row per adapter row, built from src/adapters/table.ts"
 test("registry: server and hook commands are absolute node + absolute file, never the bin name", () => {
   const reg = buildRegistry({ home: "/h", pkgDir: "/abs/pkg", env: {} });
   for (const r of reg.filter((x) => x.hookCommand)) {
-    assert.deepEqual(r.hookCommand, [NODE, "/abs/pkg/hook.mjs", "--agent", r.id]);
+    assert.deepEqual(r.hookCommand, [NODE, path.join("/abs/pkg", "hook.mjs"), "--agent", r.id]);
   }
   const codex = reg.find((r) => r.id === "codex");
-  assert.deepEqual(codex.serverCommand, [NODE, "/abs/pkg/server.mjs", "--agent", "codex"]);
+  assert.deepEqual(codex.serverCommand, [NODE, path.join("/abs/pkg", "server.mjs"), "--agent", "codex"]);
 });
 
 test("instruction files: the allowlist guard refuses every routing-instruction file", () => {
@@ -92,7 +92,7 @@ test("instruction files: the allowlist guard refuses every routing-instruction f
     assert.throws(() => assertWritable(reg.find((r) => r.id === "codex"), path.join("/h/.codex", name)), /not allowed/);
   }
   assert.throws(() => assertWritable(reg.find((r) => r.id === "codex"), "/h/.bashrc"), /not allowed/);
-  assert.doesNotThrow(() => assertWritable(reg.find((r) => r.id === "codex"), "/h/.codex/config.toml"));
+  assert.doesNotThrow(() => assertWritable(reg.find((r) => r.id === "codex"), path.join("/h", ".codex", "config.toml")));
 });
 
 test("setup: replaces v1 entries, keeps user keys, verifies, backs up, releases the lock", async (t) => {
@@ -193,7 +193,7 @@ test("setup --dry-run returns the plan and writes nothing", async (t) => {
   assert.equal(existsSync(path.join(s.home, ".context-mode")), false);
 });
 
-test("setup: CLI agents use the agent's own command; missing binary is SKIPPED with the reason", async (t) => {
+test("setup: CLI agents use the agent's own command; missing binary is SKIPPED with the reason", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
   const s = sandbox(t);
   const log = path.join(s.root, "claude.log");
   const state = path.join(s.root, "claude.state");

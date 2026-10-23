@@ -15,7 +15,7 @@ import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
 const HOOK_SAMPLES = 9;
-const HOOK_ROUNDS = 3; // noise only adds time: a real overhead over budget fails every round
+const HOOK_ROUNDS = 5; // noise only adds time: a real overhead over budget fails every round
 const P95 = 0.95;
 const VERIFY_TIMEOUT_MS = 10_000;
 const MANIFEST = "manifest.json";

@@ -124,7 +124,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     const out: CheckRow = {
       id, installMode: row.installMode, serverCommand: serverCmd(ctx, id), config, cli: cliFor(ctx, id),
       listCommand: LIST[id], hookFiles,
-      allowedWrites: [...(config ? [config.file] : []), ...hookFiles.map((h) => h.file)],
+      allowedWrites: [...(config ? [config.file] : []), ...hookFiles.map((h) => h.file)].map((f) => path.resolve(f)),
       goldenPayload: golden(row, ctx.home),
     };
     if (row.installMode !== "in-process") out.hookCommand = [process.execPath, path.join(ctx.pkgDir, HOOK_BUNDLE), AGENT_FLAG, id];
