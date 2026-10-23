@@ -40,7 +40,7 @@ if (has("list")) {
   if (own) console.log("context-mode");
 } else if (has("uninstall") || has("remove")) {
   rmSync(state, { force: true });
-} else if (has("install") || (agent === "copilot" && has("add"))) {
+} else if (has("install") || has("link") || (agent === "copilot" && has("add"))) {
   mkdirSync(path.dirname(state), { recursive: true });
   writeFileSync(state, args.join(" "));
 }
