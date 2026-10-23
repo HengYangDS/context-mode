@@ -76,13 +76,13 @@ export function winCmdLine(file: string, args: string[]): string {
 }
 
 /** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe. */
-function runBin(bin: string, args: string[], env: SetupContext["env"]): ReturnType<typeof spawnSync> {
+function runBin(bin: string, args: string[], env: SetupContext["env"], input?: string): ReturnType<typeof spawnSync> {
   const file = which(bin, env) ?? bin;
   if (process.platform === "win32" && /\.(cmd|bat)$/i.test(file)) {
     return spawnSync(env.ComSpec || "cmd.exe", ["/d", "/s", "/c", winCmdLine(file, args)],
-      { env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: true, windowsHide: true });
+      { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: true, windowsHide: true });
   }
-  return spawnSync(file, args, { env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
+  return spawnSync(file, args, { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
 }
 
 function readOr(file: string): string | undefined { return existsSync(file) ? readFileSync(file, "utf8") : undefined; }
@@ -378,7 +378,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       atomicWrite(e.file, e.after);
     }
     for (const args of plan.cli) {
-      const r = runBin(row.cli!.bin, args, ctx.env);
+      const r = runBin(row.cli!.bin, args, ctx.env, row.cli!.input ?? "");
       if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
     }
     if (plan.cli.length) for (const args of row.cli!.remove) run.record({ agent: row.id, undo: { bin: row.cli!.bin, args } });

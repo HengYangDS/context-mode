@@ -256,3 +256,30 @@ test("winCmdLine: quotes each argument for cmd.exe /d /s /c", () => {
   assert.equal(winCmdLine("C:\\a b\\claude.cmd", ["plugin", "add", "C:\\x y", ""]), '""C:\\a b\\claude.cmd" plugin add "C:\\x y" """');
   assert.equal(winCmdLine("c.cmd", ['say "hi"']), '"c.cmd "say ""hi""""');
 });
+
+// D-INST-1: `gemini extensions install <dir>` asks "trust this folder?" and waits for a key even with --consent, so a
+// non-interactive setup hung. ADR-0019 section 3 step 4 names `extensions link` (gemini: --consent; qwen: `y` on stdin).
+test("registry: gemini and qwen link the package dir; qwen answers its prompt on stdin (D-INST-1)", () => {
+  const rows = Object.fromEntries(buildRegistry({ home: "/h", pkgDir: "/p/context-mode", env: {} }).map((r) => [r.id, r]));
+  assert.deepEqual(rows.gemini.cli.install, [["extensions", "link", "/p/context-mode", "--consent"]]);
+  assert.deepEqual(rows.qwen.cli.install, [["extensions", "link", "/p/context-mode"]]);
+  assert.equal(rows.qwen.cli.input, "y\n");
+  assert.equal(rows.gemini.cli.input, undefined);
+});
+
+test("setup: a CLI agent that needs an answer on stdin gets it (D-INST-1)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  const log = path.join(s.root, "qwen.log");
+  const state = path.join(s.root, "qwen.state");
+  fakeBin(s.root, "qwen", `echo "$@" >> "${log}"
+case "$1 $2" in
+  "extensions list") if [ -f "${state}" ]; then echo "context-mode (2.0.0)"; fi ;;
+  "extensions link") read a; echo "answer=$a" >> "${log}"; if [ "$a" = y ]; then touch "${state}"; else exit 1; fi ;;
+esac
+exit 0`);
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["qwen"], runId: "r" });
+  assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+  const text = readFileSync(log, "utf8");
+  assert.ok(text.includes("extensions link "), text);
+  assert.ok(text.includes("answer=y"), text);
+});

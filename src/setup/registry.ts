@@ -29,7 +29,7 @@ export interface ConfigTarget { file: string; format: HostConfigFormat; key: rea
  *  drop = the installed package ships its own hooks, so a v1 copy would run twice. */
 export interface HookFile { file: string; mode: "rewrite" | "drop"; }
 
-export interface CliPlan { bin: string; install: string[][]; remove: string[][]; }
+export interface CliPlan { bin: string; install: string[][]; remove: string[][]; input?: string; }
 
 export interface CheckRow {
   id: AgentId;
@@ -87,8 +87,10 @@ function cliFor(ctx: SetupContext, id: AgentId): CliPlan | undefined {
   switch (id) {
     case "claude-code":
       return { bin: "claude", install: [["plugin", "marketplace", "add", ctx.pkgDir], ["plugin", "install", PLUGIN_ID]], remove: [["plugin", "uninstall", PLUGIN_ID]] };
-    case "gemini": return { bin: "gemini", install: [["extensions", "install", ctx.pkgDir, "--consent"]], remove: [["extensions", "uninstall", SERVER_KEY]] };
-    case "qwen": return { bin: "qwen", install: [["extensions", "install", ctx.pkgDir, "--consent"]], remove: [["extensions", "uninstall", SERVER_KEY]] };
+    // D-INST-1: `extensions install <dir>` waits on a trust prompt even with --consent; `link` does not (ADR-0019 section 3).
+    // Qwen has no consent flag, so its risk prompt gets `y` on stdin.
+    case "gemini": return { bin: "gemini", install: [["extensions", "link", ctx.pkgDir, "--consent"]], remove: [["extensions", "uninstall", SERVER_KEY]] };
+    case "qwen": return { bin: "qwen", install: [["extensions", "link", ctx.pkgDir]], remove: [["extensions", "uninstall", SERVER_KEY]], input: "y\n" };
     case "copilot-cli": return { bin: "copilot", install: [["mcp", "add", SERVER_KEY, "--", ...s]], remove: [["mcp", "remove", SERVER_KEY]] };
     case "pi": return { bin: "pi", install: [["install", ctx.pkgDir]], remove: [["remove", ctx.pkgDir]] };
     default: return undefined;
