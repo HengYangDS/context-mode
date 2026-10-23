@@ -4,9 +4,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const IO = join(import.meta.dirname, "..", "..", "..", "src", "core", "hooks", "io.ts");
-const PROBE = `const { readStdin } = await import(${JSON.stringify(IO)});
+const PROBE = `const { readStdin } = await import(${JSON.stringify(pathToFileURL(IO).href)});
 const before = new Set(process.moduleLoadList);
 const s = await readStdin();
 const added = process.moduleLoadList.filter((m) => !before.has(m));
