@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-22",
+  "date": "2026-10-23",
   "versions": {
     "v1": "1.0.169",
     "v2": "1.0.169",
@@ -7,10 +7,10 @@
   },
   "shas": {
     "v1": "90af14e34bf35120c3310f7a75f54fa99d2cabba",
-    "v2": "de9184b097f65b37f2242d668e4c742379255e29"
+    "v2": "f8f7850e4bc8afcb662807d65dc741ed70660f36"
   },
   "v1_source": "v1 numbers measured today by running v1 own scripts (npx tsx tests/ecosystem-benchmark.ts and npx tsx tests/live-benchmark.ts) on a clean checkout of origin/main. run.mjs reads this file; it does not install v1.",
-  "run_ms": 2012,
+  "run_ms": 1896,
   "totals": {
     "part1": {
       "raw_bytes": 322419,
@@ -21,8 +21,8 @@
     "part2": {
       "raw_bytes": 76105,
       "v1_context_bytes": 11099,
-      "v2_tool_context_bytes": 4416,
-      "v2_hook_context_bytes": 7566
+      "v2_tool_context_bytes": 44456,
+      "v2_hook_context_bytes": 7576
     }
   },
   "rows": [
@@ -37,8 +37,8 @@
       "v2_tool_context_bytes": 277,
       "v2_hook_context_bytes": 216,
       "v2_hook_replaced": true,
-      "v2_ms": 57,
-      "v2_hook_ms": 47,
+      "v2_ms": 55,
+      "v2_hook_ms": 49,
       "code_blocks": null,
       "error": null
     },
@@ -53,8 +53,8 @@
       "v2_tool_context_bytes": 265,
       "v2_hook_context_bytes": 218,
       "v2_hook_replaced": true,
-      "v2_ms": 50,
-      "v2_hook_ms": 47,
+      "v2_ms": 49,
+      "v2_hook_ms": 45,
       "code_blocks": null,
       "error": null
     },
@@ -69,8 +69,8 @@
       "v2_tool_context_bytes": 202,
       "v2_hook_context_bytes": 221,
       "v2_hook_replaced": true,
-      "v2_ms": 49,
-      "v2_hook_ms": 49,
+      "v2_ms": 43,
+      "v2_hook_ms": 44,
       "code_blocks": null,
       "error": null
     },
@@ -85,8 +85,8 @@
       "v2_tool_context_bytes": 315,
       "v2_hook_context_bytes": 215,
       "v2_hook_replaced": true,
-      "v2_ms": 78,
-      "v2_hook_ms": 56,
+      "v2_ms": 42,
+      "v2_hook_ms": 58,
       "code_blocks": null,
       "error": null
     },
@@ -101,8 +101,8 @@
       "v2_tool_context_bytes": 365,
       "v2_hook_context_bytes": 400,
       "v2_hook_replaced": false,
-      "v2_ms": 46,
-      "v2_hook_ms": 42,
+      "v2_ms": 44,
+      "v2_hook_ms": 45,
       "code_blocks": null,
       "error": null
     },
@@ -117,8 +117,8 @@
       "v2_tool_context_bytes": 735,
       "v2_hook_context_bytes": 188,
       "v2_hook_replaced": true,
-      "v2_ms": 47,
-      "v2_hook_ms": 46,
+      "v2_ms": 44,
+      "v2_hook_ms": 47,
       "code_blocks": null,
       "error": null
     },
@@ -133,8 +133,8 @@
       "v2_tool_context_bytes": 1156,
       "v2_hook_context_bytes": 183,
       "v2_hook_replaced": true,
-      "v2_ms": 47,
-      "v2_hook_ms": 81,
+      "v2_ms": 42,
+      "v2_hook_ms": 83,
       "code_blocks": null,
       "error": null
     },
@@ -149,8 +149,8 @@
       "v2_tool_context_bytes": 353,
       "v2_hook_context_bytes": 197,
       "v2_hook_replaced": true,
-      "v2_ms": 52,
-      "v2_hook_ms": 49,
+      "v2_ms": 43,
+      "v2_hook_ms": 43,
       "code_blocks": null,
       "error": null
     },
@@ -165,8 +165,8 @@
       "v2_tool_context_bytes": 363,
       "v2_hook_context_bytes": 200,
       "v2_hook_replaced": true,
-      "v2_ms": 47,
-      "v2_hook_ms": 48,
+      "v2_ms": 42,
+      "v2_hook_ms": 42,
       "code_blocks": null,
       "error": null
     },
@@ -181,8 +181,8 @@
       "v2_tool_context_bytes": 421,
       "v2_hook_context_bytes": 204,
       "v2_hook_replaced": true,
-      "v2_ms": 50,
-      "v2_hook_ms": 50,
+      "v2_ms": 42,
+      "v2_hook_ms": 45,
       "code_blocks": null,
       "error": null
     },
@@ -197,8 +197,8 @@
       "v2_tool_context_bytes": 758,
       "v2_hook_context_bytes": 195,
       "v2_hook_replaced": true,
-      "v2_ms": 49,
-      "v2_hook_ms": 52,
+      "v2_ms": 44,
+      "v2_hook_ms": 47,
       "code_blocks": null,
       "error": null
     },
@@ -213,8 +213,8 @@
       "v2_tool_context_bytes": 171,
       "v2_hook_context_bytes": 191,
       "v2_hook_replaced": true,
-      "v2_ms": 49,
-      "v2_hook_ms": 93,
+      "v2_ms": 44,
+      "v2_hook_ms": 52,
       "code_blocks": null,
       "error": null
     },
@@ -229,8 +229,8 @@
       "v2_tool_context_bytes": 123,
       "v2_hook_context_bytes": 193,
       "v2_hook_replaced": true,
-      "v2_ms": 48,
-      "v2_hook_ms": 47,
+      "v2_ms": 43,
+      "v2_hook_ms": 54,
       "code_blocks": null,
       "error": null
     },
@@ -245,8 +245,8 @@
       "v2_tool_context_bytes": 238,
       "v2_hook_context_bytes": 198,
       "v2_hook_replaced": true,
-      "v2_ms": 37,
-      "v2_hook_ms": 58,
+      "v2_ms": 39,
+      "v2_hook_ms": 60,
       "code_blocks": null,
       "error": null
     },
@@ -262,23 +262,23 @@
       "raw_bytes": 3988,
       "v1_context_bytes": 2246,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 651,
+      "v2_tool_context_bytes": 3114,
       "v2_hook_context_bytes": 3988,
       "v2_hook_replaced": false,
-      "v2_ms": 11,
-      "v2_hook_ms": 45,
+      "v2_ms": 13,
+      "v2_hook_ms": 40,
       "queries_with_hits": {
-        "v2": 2,
+        "v2": 1,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 5,
-        "returned_whole_v2": 0,
+        "returned_whole_v2": 1,
         "v1_code_chunks": 4,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 22 chunk(s) from Context7: Supabase.",
+      "v2_index_reply": "Indexed 1 source(s), 5 chunk(s) from Context7: Supabase.",
       "error": null
     },
     {
@@ -293,23 +293,23 @@
       "raw_bytes": 6075,
       "v1_context_bytes": 1494,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 2190,
+      "v2_tool_context_bytes": 6033,
       "v2_hook_context_bytes": 216,
       "v2_hook_replaced": true,
-      "v2_ms": 6,
-      "v2_hook_ms": 47,
+      "v2_ms": 9,
+      "v2_hook_ms": 46,
       "queries_with_hits": {
-        "v2": 1,
+        "v2": 2,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 5,
-        "returned_whole_v2": 0,
+        "returned_whole_v2": 1,
         "v1_code_chunks": 4,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 44 chunk(s) from Context7: React.",
+      "v2_index_reply": "Indexed 1 source(s), 16 chunk(s) from Context7: React.",
       "error": null
     },
     {
@@ -324,11 +324,11 @@
       "raw_bytes": 6658,
       "v1_context_bytes": 3311,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 684,
+      "v2_tool_context_bytes": 4177,
       "v2_hook_context_bytes": 218,
       "v2_hook_replaced": true,
-      "v2_ms": 5,
-      "v2_hook_ms": 48,
+      "v2_ms": 10,
+      "v2_hook_ms": 46,
       "queries_with_hits": {
         "v2": 1,
         "v1": null,
@@ -340,7 +340,7 @@
         "v1_code_chunks": 5,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 56 chunk(s) from Context7: Next.js.",
+      "v2_index_reply": "Indexed 1 source(s), 5 chunk(s) from Context7: Next.js.",
       "error": null
     },
     {
@@ -354,11 +354,11 @@
       "raw_bytes": 4102,
       "v1_context_bytes": 620,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 750,
+      "v2_tool_context_bytes": 3822,
       "v2_hook_context_bytes": 221,
       "v2_hook_replaced": true,
-      "v2_ms": 4,
-      "v2_hook_ms": 49,
+      "v2_ms": 8,
+      "v2_hook_ms": 45,
       "queries_with_hits": {
         "v2": 1,
         "v1": null,
@@ -370,7 +370,7 @@
         "v1_code_chunks": 5,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 25 chunk(s) from Context7: Tailwind.",
+      "v2_index_reply": "Indexed 1 source(s), 5 chunk(s) from Context7: Tailwind.",
       "error": null
     },
     {
@@ -385,23 +385,23 @@
       "raw_bytes": 16683,
       "v1_context_bytes": 0,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 47,
-      "v2_hook_context_bytes": 202,
+      "v2_tool_context_bytes": 11542,
+      "v2_hook_context_bytes": 212,
       "v2_hook_replaced": true,
-      "v2_ms": 5,
-      "v2_hook_ms": 48,
+      "v2_ms": 18,
+      "v2_hook_ms": 49,
       "queries_with_hits": {
-        "v2": 0,
+        "v2": 3,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 8,
-        "returned_whole_v2": 0,
+        "returned_whole_v2": 2,
         "v1_code_chunks": 8,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 59 chunk(s) from Skill: context-mode.",
+      "v2_index_reply": "Indexed 1 source(s), 25 chunk(s) from Skill: context-mode.",
       "error": null
     },
     {
@@ -416,23 +416,23 @@
       "raw_bytes": 36090,
       "v1_context_bytes": 2412,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 47,
+      "v2_tool_context_bytes": 14415,
       "v2_hook_context_bytes": 212,
       "v2_hook_replaced": true,
-      "v2_ms": 7,
-      "v2_hook_ms": 51,
+      "v2_ms": 16,
+      "v2_hook_ms": 52,
       "queries_with_hits": {
-        "v2": 0,
+        "v2": 3,
         "v1": null,
         "of": 3
       },
       "code_blocks": {
         "in_source": 37,
-        "returned_whole_v2": 0,
+        "returned_whole_v2": 5,
         "v1_code_chunks": 33,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 256 chunk(s) from Skill Refs: context-mode.",
+      "v2_index_reply": "Indexed 1 source(s), 52 chunk(s) from Skill Refs: context-mode.",
       "error": null
     },
     {
@@ -447,13 +447,13 @@
       "raw_bytes": 2509,
       "v1_context_bytes": 1016,
       "v2_tool": "ctx_index+ctx_search",
-      "v2_tool_context_bytes": 47,
+      "v2_tool_context_bytes": 1353,
       "v2_hook_context_bytes": 2509,
       "v2_hook_replaced": false,
-      "v2_ms": 6,
-      "v2_hook_ms": 54,
+      "v2_ms": 11,
+      "v2_hook_ms": 39,
       "queries_with_hits": {
-        "v2": 0,
+        "v2": 3,
         "v1": null,
         "of": 3
       },
@@ -463,7 +463,7 @@
         "v1_code_chunks": 0,
         "v1_exact_code_preserved": true
       },
-      "v2_index_reply": "Indexed 1 source(s), 119 chunk(s) from MCP: tools/list.",
+      "v2_index_reply": "Indexed 1 source(s), 40 chunk(s) from MCP: tools/list.",
       "error": null
     }
   ]

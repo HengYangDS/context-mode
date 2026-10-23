@@ -13,8 +13,8 @@ v2 = branch v2-design `de9184b0`, built bundle (`release-out/server.mjs`, `relea
 |--------|----|---------|---------|
 | Scenarios | 21 | 21 | 21 |
 | Raw data | 389.2 KB | 389.2 KB | 389.2 KB |
-| Context (bytes the model sees) | 16.2 KB | 9.9 KB | 10.3 KB |
-| Savings | 96% | 97% | 97% |
+| Context (bytes the model sees) | 16.2 KB | 49.0 KB | 10.3 KB |
+| Savings | 96% | 87% | 97% |
 
 Columns:
 
@@ -56,21 +56,22 @@ Queries are byte-exact from v1 `tests/live-benchmark.ts`. "Queries with hits" = 
 
 | Scenario | Source | Raw Size | v1 Search Result | v2 Search Result | v1 Savings | v2 Savings | v2 Queries with hits | v1 Code Chunks | v2 Code Blocks whole | v2 Time |
 |----------|--------|----------|-----------------|-----------------|-----------|-----------|-------------------|----------------|-------------------|---------|
-| Supabase Edge Functions (5 examples) | Context7: Supabase | 3.9 KB | 2,246 B | 651 B | 44% | 84% | 2 / 3 | 4 | 0 / 5 | 11ms |
-| React useEffect docs | Context7: React | 5.9 KB | 1,494 B | 2,190 B | 75% | 64% | 1 / 3 | 4 | 0 / 5 | 6ms |
-| Next.js App Router docs | Context7: Next.js | 6.5 KB | 3,311 B | 684 B | 50% | 90% | 1 / 3 | 5 | 0 / 9 | 5ms |
-| Tailwind CSS docs | Context7: Tailwind | 4.0 KB | 620 B | 750 B | 85% | 82% | 1 / 2 | 5 | 0 / 6 | 4ms |
-| Skill: context-mode (main prompt) | Skill: context-mode | 16.3 KB | 0 B | 47 B | 100% | 100% | 0 / 3 | 8 | 0 / 8 | 5ms |
-| Skill references (4 files combined) | Skill Refs: context-mode | 35.2 KB | 2,412 B | 47 B | 93% | 100% | 0 / 3 | 33 | 0 / 37 | 7ms |
-| MCP tools/list (40 tools) | MCP: tools/list | 2.5 KB | 1,016 B | 47 B | 60% | 98% | 0 / 3 | 0 | 0 / 0 | 6ms |
+| Supabase Edge Functions (5 examples) | Context7: Supabase | 3.9 KB | 2,246 B | 3,114 B | 44% | 22% | 1 / 3 | 4 | 1 / 5 | 13ms |
+| React useEffect docs | Context7: React | 5.9 KB | 1,494 B | 6,033 B | 75% | 1% | 2 / 3 | 4 | 1 / 5 | 9ms |
+| Next.js App Router docs | Context7: Next.js | 6.5 KB | 3,311 B | 4,177 B | 50% | 37% | 1 / 3 | 5 | 0 / 9 | 10ms |
+| Tailwind CSS docs | Context7: Tailwind | 4.0 KB | 620 B | 3,822 B | 85% | 7% | 1 / 2 | 5 | 0 / 6 | 8ms |
+| Skill: context-mode (main prompt) | Skill: context-mode | 16.3 KB | 0 B | 11,542 B | 100% | 31% | 3 / 3 | 8 | 2 / 8 | 18ms |
+| Skill references (4 files combined) | Skill Refs: context-mode | 35.2 KB | 2,412 B | 14,415 B | 93% | 60% | 3 / 3 | 33 | 5 / 37 | 16ms |
+| MCP tools/list (40 tools) | MCP: tools/list | 2.5 KB | 1,016 B | 1,353 B | 60% | 46% | 3 / 3 | 0 | 0 / 0 | 11ms |
 
-**Subtotal: 74.3 KB raw → v1 10.8 KB (85%), v2 4.3 KB (94%)**
+**Subtotal: 74.3 KB raw → v1 10.8 KB (85%), v2 43.4 KB (42%)**
 
-Read this part with care. v2 returns fewer bytes here mostly because it finds less:
+Read this part with care. Search layers 1-4 (DEVIATIONS D-SEARCH-1..4) changed this part on purpose:
 
-- v2 chunks are small (BM25 snippets of at most 800 B), so no fenced code block comes back whole (0 in every row). v1 returned whole chunks with code.
-- Three rows (Skill main prompt, Skill references, MCP tools/list) get **no hits** in v2: the 47 B reply is `No hits in scope "worktree" across 1 source(s).` v1 also got 0 B on the Skill main prompt row.
-- Smaller here is not better. Part 2 is a retrieval test; the bytes column alone does not show quality.
+- Every row now gets hits; before, three rows (Skill main prompt, Skill references, MCP tools/list) got none. v2 now returns more bytes because it finds more, so the v2 savings fell (94% to 42%).
+- "Queries with hits" counts the queries of one `ctx_search` call that show at least one hit. A chunk that an earlier query of the same call already returned is not shown again (impl/05 §6 step 6). On a small source the first query can return every chunk, so later queries show none. Each query run on its own gets hits in all 7 rows (bench/search/heldout.mjs, `bench7`).
+- Chunks keep code blocks whole (layer 1). A reply still clips each hit to 800 B (`SNIPPET_MAX_BYTES`, DECISIONS-r9 M21) and escapes `< > &` (#341), so a code block longer than the clip, or one with `<`, `>` or `&`, cannot show whole in the reply. That is why "Code blocks whole" is still low. Changing the clip or the escape needs an owner decision.
+- Smaller here is not better. Part 2 is a retrieval test; the bytes column alone does not show quality. Held-out recall@5 and MRR are in docs/v2/spikes/search/DIAGNOSIS.md.
 
 ## Part 3: v2 hook path (PostToolUse replace)
 
