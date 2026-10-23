@@ -542,3 +542,18 @@ test("[search-L4] ftsQuery: when no word matches, typo correction from the index
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("ftsQuery and rankTexts treat a NUL character as a word break, never an FTS5 error (D-SEARCH-6)", async () => {
+  const { db, root, project } = await freshDb("9a".repeat(8));
+  try {
+    ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "alpha beta gamma", bytes: 16 }]);
+    assert.deepEqual(ftsQuery(db, "\u0000", "session", project, "s1", 10, 0), []);
+    assert.equal(ftsQuery(db, "alpha\u0000beta", "session", project, "s1", 10, 0).length, 1);
+    assert.equal(ftsQuery(db, "gamma\u0000", "session", project, "s1", 10, 0).length, 1);
+    assert.equal(ftsQuery(db, "alp\u0000hax", "session", project, "s1", 10, 0).length, 0);
+    assert.deepEqual(rankTexts(["alpha beta", "zeta"], "alpha\u0000beta").map((s) => s > 0), [true, false]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
