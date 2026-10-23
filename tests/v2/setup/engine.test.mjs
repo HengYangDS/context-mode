@@ -283,3 +283,17 @@ exit 0`);
   assert.ok(text.includes("extensions link "), text);
   assert.ok(text.includes("answer=y"), text);
 });
+
+// D-INST-2: Gemini 0.65.0 prints `extensions list` to stderr. The list check read stdout only, so a linked extension
+// looked missing and setup rolled Gemini back.
+test("setup: the list check reads the agent's stderr too (D-INST-2)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  const state = path.join(s.root, "gemini.state");
+  fakeBin(s.root, "gemini", `case "$1 $2" in
+  "extensions list") if [ -f "${state}" ]; then echo "context-mode (2.0.0)" >&2; else echo "No extensions installed." >&2; fi ;;
+  "extensions link") touch "${state}" ;;
+esac
+exit 0`);
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"], runId: "r" });
+  assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+});

@@ -162,7 +162,8 @@ function listCheck(row: CheckRow, env: SetupContext["env"]): Check | undefined {
   const l = row.listCommand;
   if (!l || !which(l.bin, env)) return undefined;
   const r = runBin(l.bin, l.args, env);
-  const ok = r.status === 0 && `${r.stdout}`.includes("context-mode");
+  // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
+  const ok = r.status === 0 && `${r.stdout}${r.stderr}`.includes("context-mode");
   return { name: "list", ok, detail: ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
 }
 
