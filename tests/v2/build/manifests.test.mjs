@@ -18,6 +18,7 @@ const MATCHERS = {
 };
 
 const EXPECTED_FILES = [
+  ".claude-plugin/marketplace.json",
   ".claude-plugin/plugin.json",
   "copilot/plugin.json",
   "gemini-extension.json",
@@ -96,6 +97,10 @@ test("plugin and extension manifests carry name, dev version and the --agent MCP
   const claudeEntry = { "context-mode": { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/server.mjs", "--agent", "claude-code"] } };
   assert.deepEqual(readJson(dir, ".claude-plugin/plugin.json"), {
     hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", version: "0.0.0-dev",
+  });
+  // D-INST-3: `claude plugin marketplace add <package dir>` (what setup runs) needs this file in the npm package.
+  assert.deepEqual(readJson(dir, ".claude-plugin/marketplace.json"), {
+    name: "context-mode", plugins: [{ description: "Context Mode for Claude Code", name: "context-mode", source: "./", version: "0.0.0-dev" }],
   });
   // D-FU-RM-GEMINI-1: Gemini expands ${extensionPath} and ${/} in the manifest and reads hooks only from <ext>/hooks/hooks.json.
   const geminiEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "gemini"] } };

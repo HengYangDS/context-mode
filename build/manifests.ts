@@ -216,6 +216,11 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
   for (const row of rows) {
     const manifest = manifestFor(row, version);
     if (manifest !== null) files.push(manifest);
+    if (row.installMode === "marketplace") { // D-INST-3: setup runs `claude plugin marketplace add <package dir>`
+      files.push([".claude-plugin/marketplace.json", {
+        name: SERVER_KEY, plugins: [{ name: SERVER_KEY, source: "./", description: "Context Mode for Claude Code", version }],
+      }]);
+    }
     const shape = HOOK_SHAPES[row.id];
     if (shape !== null) files.push([hookFile(row), shape(row)]);
   }
