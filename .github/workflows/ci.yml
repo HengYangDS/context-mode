@@ -50,10 +50,10 @@ jobs:
       - run: node e2e/checks/windows-grandchild-kill.mjs
         name: T-F5 Windows grandchild kill (0 alive after KILL_GRACE_MS)
         if: runner.os == 'Windows'
-      # ADR-0019 D3: the one hook overhead gate (lowest of 5 batch p95 values), ubuntu only (DEVIATIONS D-CI-PERF-1).
+      # ADR-0019 D3: the one hook overhead gate (warm-up, lowest of 5 batch p95 values, 15 ms), all three OSes
+      # (DEVIATIONS D-CI-PERF-1, D-CI-PERF-5). It also prints the cold first call of a fresh bundle copy as info.
       - run: node e2e/checks/setup-hook-overhead.mjs
-        name: D3 hook overhead p95 <= 15 ms (perf check)
-        if: runner.os == 'Linux'
+        name: D3 hook overhead p95 <= 15 ms (perf check; cold first call is info)
       - run: node docs/v2/prompt/lint.mjs --out release-out
         name: prompt lint, bundle mode (impl/13 §7; gate layer prompt-lint from M2, D-M0-1)
       - run: node e2e/cases/run.mjs --milestone "$GATE_MILESTONE"
