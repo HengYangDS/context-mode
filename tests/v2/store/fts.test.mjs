@@ -550,7 +550,7 @@ test("ftsQuery and rankTexts treat a NUL character as a word break, never an FTS
     assert.deepEqual(ftsQuery(db, "\u0000", "session", project, "s1", 10, 0), []);
     assert.equal(ftsQuery(db, "alpha\u0000beta", "session", project, "s1", 10, 0).length, 1);
     assert.equal(ftsQuery(db, "gamma\u0000", "session", project, "s1", 10, 0).length, 1);
-    assert.equal(ftsQuery(db, "alp\u0000hax", "session", project, "s1", 10, 0).length, 0);
+    assert.equal(ftsQuery(db, "zzqx\u0000qqzx", "session", project, "s1", 10, 0).length, 0);
     assert.deepEqual(rankTexts(["alpha beta", "zeta"], "alpha\u0000beta").map((s) => s > 0), [true, false]);
   } finally {
     closeDb(db);

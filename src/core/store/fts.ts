@@ -137,7 +137,8 @@ function toMatch(q: string): string {
   const words: string[] = [];
   let cur = "";
   for (const ch of q) {
-    if (ch.trim() === "") {
+    // D-SEARCH-6: NUL ends an FTS5 string ("unterminated string"), so it splits words like whitespace.
+    if (ch.trim() === "" || ch === "\u0000") {
       if (cur !== "") words.push(cur);
       cur = "";
     } else {
@@ -180,7 +181,7 @@ interface PageRow { rid: number; source_id: number; ord: number; body: string; l
 // D-SEARCH-4: the trigram match: every query word (stopwords out) of 3+ characters as one quoted
 // substring, plus the whole query when it has more than one word; joined by OR.
 function trigramMatch(q: string): string {
-  const words = q.split(/\s+/).filter((w) => w !== "");
+  const words = q.split(/[\s\u0000]+/).filter((w) => w !== "");
   const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
   const parts = new Set((kept.length > 0 ? kept : words).filter((w) => [...w].length >= 3));
   const whole = words.join(" ");
