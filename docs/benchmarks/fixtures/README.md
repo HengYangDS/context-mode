@@ -30,9 +30,9 @@ The v1 code strings are byte-exact (`bench/fixtures/scenarios.json`). v2 adds on
 
 | Scenario | Source | Raw Size | v1 Context | v2 Tool | v2 Hook | v1 Savings | v2 Tool Savings | v2 Hook Savings | v2 Time |
 |----------|--------|----------|-----------|---------|---------|-----------|----------------|----------------|---------|
-| React useEffect docs | Context7 | 5.9 KB | 261 B | 277 B | 216 B | 96% | 95% | 96% | 57ms |
-| Next.js App Router docs | Context7 | 6.5 KB | 249 B | 265 B | 218 B | 96% | 96% | 97% | 50ms |
-| Tailwind CSS docs | Context7 | 4.0 KB | 186 B | 202 B | 221 B | 95% | 95% | 95% | 49ms |
+| React useEffect docs | Context7 | 5.9 KB | 1,494 B | 6,407 B | 75% | -5% | 2 / 3 | 4 | 3 / 5 | 8ms |
+| Next.js App Router docs | Context7 | 6.5 KB | 3,311 B | 6,848 B | 50% | -3% | 1 / 3 | 5 | 9 / 9 | 10ms |
+| Tailwind CSS docs | Context7 | 4.0 KB | 620 B | 4,273 B | 85% | -4% | 1 / 2 | 5 | 6 / 6 | 7ms |
 | Page snapshot (HN) | Playwright | 56.2 KB | 299 B | 315 B | 215 B | 99% | 99% | 100% | 78ms |
 | Network requests | Playwright | 0.4 KB | 349 B | 365 B | 400 B | 13% | 9% | 0% | 46ms |
 | PR list (Next.js) | GitHub | 6.4 KB | 719 B | 735 B | 188 B | 89% | 89% | 97% | 47ms |
@@ -56,21 +56,22 @@ Queries are byte-exact from v1 `tests/live-benchmark.ts`. "Queries with hits" = 
 
 | Scenario | Source | Raw Size | v1 Search Result | v2 Search Result | v1 Savings | v2 Savings | v2 Queries with hits | v1 Code Chunks | v2 Code Blocks whole | v2 Time |
 |----------|--------|----------|-----------------|-----------------|-----------|-----------|-------------------|----------------|-------------------|---------|
-| Supabase Edge Functions (5 examples) | Context7: Supabase | 3.9 KB | 2,246 B | 3,114 B | 44% | 22% | 1 / 3 | 4 | 1 / 5 | 13ms |
+| Supabase Edge Functions (5 examples) | Context7: Supabase | 3.9 KB | 2,246 B | 4,218 B | 44% | -6% | 1 / 3 | 4 | 5 / 5 | 13ms |
 | React useEffect docs | Context7: React | 5.9 KB | 1,494 B | 6,033 B | 75% | 1% | 2 / 3 | 4 | 1 / 5 | 9ms |
 | Next.js App Router docs | Context7: Next.js | 6.5 KB | 3,311 B | 4,177 B | 50% | 37% | 1 / 3 | 5 | 0 / 9 | 10ms |
 | Tailwind CSS docs | Context7: Tailwind | 4.0 KB | 620 B | 3,822 B | 85% | 7% | 1 / 2 | 5 | 0 / 6 | 8ms |
-| Skill: context-mode (main prompt) | Skill: context-mode | 16.3 KB | 0 B | 11,542 B | 100% | 31% | 3 / 3 | 8 | 2 / 8 | 18ms |
-| Skill references (4 files combined) | Skill Refs: context-mode | 35.2 KB | 2,412 B | 14,415 B | 93% | 60% | 3 / 3 | 33 | 5 / 37 | 16ms |
-| MCP tools/list (40 tools) | MCP: tools/list | 2.5 KB | 1,016 B | 1,353 B | 60% | 46% | 3 / 3 | 0 | 0 / 0 | 11ms |
+| Skill: context-mode (main prompt) | Skill: context-mode | 16.3 KB | 0 B | 11,570 B | 100% | 31% | 3 / 3 | 8 | 3 / 8 | 17ms |
+| Skill references (4 files combined) | Skill Refs: context-mode | 35.2 KB | 2,412 B | 15,919 B | 93% | 56% | 3 / 3 | 33 | 10 / 37 | 15ms |
+| MCP tools/list (40 tools) | MCP: tools/list | 2.5 KB | 1,016 B | 1,353 B | 60% | 46% | 3 / 3 | 0 | 0 / 0 | 10ms |
 
-**Subtotal: 74.3 KB raw → v1 10.8 KB (85%), v2 43.4 KB (42%)**
+**Subtotal: 74.3 KB raw → v1 10.8 KB (85%), v2 49.4 KB (34%)** (before D-SEARCH-7: v2 43.4 KB, 42%)
 
 Read this part with care. Search layers 1-4 (DEVIATIONS D-SEARCH-1..4) changed this part on purpose:
 
 - Every row now gets hits; before, three rows (Skill main prompt, Skill references, MCP tools/list) got none. v2 now returns more bytes because it finds more, so the v2 savings fell (94% to 42%).
 - "Queries with hits" counts the queries of one `ctx_search` call that show at least one hit. A chunk that an earlier query of the same call already returned is not shown again (impl/05 §6 step 6). On a small source the first query can return every chunk, so later queries show none. Each query run on its own gets hits in all 7 rows (bench/search/heldout.mjs, `bench7`).
-- Chunks keep code blocks whole (layer 1). A reply still clips each hit to 800 B (`SNIPPET_MAX_BYTES`, DECISIONS-r9 M21) and escapes `< > &` (#341), so a code block longer than the clip, or one with `<`, `>` or `&`, cannot show whole in the reply. That is why "Code blocks whole" is still low. Changing the clip or the escape needs an owner decision.
+- Chunks keep code blocks whole (layer 1). Since D-SEARCH-7 (owner decision 2026-10-23) a reply shows the stored text as it is (no `&lt; &gt; &amp;`), and a fenced block that the best match sits in or next to comes back whole up to 2048 B (`SNIPPET_CODE_MAX_BYTES`, [src/core/store/snippet.ts](../../../src/core/store/snippet.ts)). Code blocks whole in this table: 9 / 70 before, 36 / 70 after; v1 code chunks 59 / 70.
+- Cost: v2 Part 2 bytes rose from 44,456 B to 50,588 B (+14%), because whole code blocks are longer than 800 B clips. v1 returns 11,099 B here, so v2 still returns more bytes than v1 on Part 2.
 - Smaller here is not better. Part 2 is a retrieval test; the bytes column alone does not show quality. Held-out recall@5 and MRR are in docs/v2/spikes/search/DIAGNOSIS.md.
 
 ## Part 3: v2 hook path (PostToolUse replace)
@@ -109,8 +110,8 @@ Part 2 hook rows feed the same text as Part 2 tool rows, so the 21 hook rows cou
 | Part | Raw | v1 | v2 tool | v2 hook |
 |------|-----|----|---------|---------|
 | Part 1 (14) | 314.9 KB | 5,517 B | 5,742 B | 3,019 B |
-| Part 2 (7) | 74.3 KB | 11,099 B | 4,416 B | 7,566 B |
-| All (21) | 389.2 KB | 16,616 B | 10,158 B | 10,585 B |
+| Part 2 (7) | 74.3 KB | 11,099 B | 50,588 B | 7,566 B |
+| All (21) | 389.2 KB | 16,616 B | 56,330 B | 10,585 B |
 
 ## What this measures and what it does not
 

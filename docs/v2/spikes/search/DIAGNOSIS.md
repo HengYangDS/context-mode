@@ -249,3 +249,50 @@ queries written after the fix, labels checked as substrings of the source text b
   SQL text, NUL), scoped and unscoped: one bug, a NUL character gave "Internal error". Fixed (D-SEARCH-6).
 - Escaping of `< > &` (D-SEARCH-5) costs 20 whole fences in replies; this is the largest single gap
   to the v1 MCP figure of 21 / 70.
+
+## 8. Verbatim, fence-aware snippets (D-SEARCH-7, 2026-10-23, node 26, macOS)
+
+Owner decision 2026-10-23: replies show code as stored. Code: `src/core/store/snippet.ts`, `highlight` in
+`src/core/store/fts.ts`. Row: DEVIATIONS D-SEARCH-7.
+
+How the snippet is chosen:
+
+- The snippet is one slice of the stored chunk text. No `&lt; &gt; &amp;`, no markers.
+- The chunk splits into blocks: fenced code blocks and paragraphs. Each block gets a BM25-style score
+  (k1 1.2, b 0.75, idf over the blocks of the chunk). The best block is the window. Whole neighbour
+  blocks join, higher score first, while they fit.
+- Budget: 800 B for prose (`SNIPPET_MAX_BYTES`), 2048 B when the window holds a fence
+  (`SNIPPET_CODE_MAX_BYTES`; 8 such hits fit one 16 KB reply). A fence over 2048 B returns its best whole
+  lines with the fence lines and `[lines a-b of N]`. Only one line longer than the budget is cut.
+- Query words such as `func_data.message` or `getServerSideProps` count as the whole symbol (weight 2,
+  doubled inside code) and as their parts. When no query word is in the chunk (a typo hit), words of
+  5+ characters match by prefix.
+- Search-path prepared statements are cached per connection.
+
+| Metric | v1 (MCP) | v2 before (`57276168`) | v2 after |
+|---|---|---|---|
+| Bench 7: fences whole in replies (`heldout.mjs`) | 21 / 70 | 9 / 70 | **42 / 70** |
+| Bench 7: fences whole (`crosscheck.mjs`) | n/a | 9 / 69 | **58 / 69** |
+| Bench 7: scenarios with no hits | 0 / 7 | 0 / 7 | 0 / 7 |
+| Held-out recall@5 | 0.84 | 0.86 | **0.98** |
+| Held-out MRR@10 | 0.76 | 0.720 | **0.827** |
+| Held-out zero-hit queries | 0 / 50 | 0 / 50 | 0 / 50 |
+| Code queries recall@5 | n/a | 4 / 7 | **7 / 7** |
+| New set recall@5 / MRR@10 (10 queries) | 0.80 / 0.75 | 0.90 / 0.836 | 0.90 / 0.836 |
+| p50 / p95 ms, +1 MB, 4 alternating run pairs | 3.0 / 7.7 | 4.6-5.6 / 11.6-14.3 | 4.3-4.6 / 11.2-11.8 |
+| Fixtures Part 2: v2 reply bytes | 11,099 | 44,456 | 50,588 (+14%) |
+| Fixtures Part 2: code blocks whole (one call, all queries) | 59 / 70 code chunks | 9 / 70 | 36 / 70 |
+
+By kind, after: identifier 8/8, natural 13/14, code 7/7, typo 8/8, morph 6/6, phrase 5/5, flag 2/2.
+
+Notes:
+
+- Ranking did not change. Recall rose because the scorer reads the reply: the expected text is now in
+  the snippet (for example q12 `getServerSideProps`: the code below the heading is now in the reply).
+  So these gains are about what the model sees, not about which chunk ranks first.
+- Loss: replies are larger. Part 2 bytes rose 14% and are still 4.6x the v1 bytes on Part 2.
+- Still missing: q47 (natural, no hit in top 10), x08 on the new set (rank 9).
+- The machine load was about 10 during the latency runs; compare the paired runs, not the absolute ms.
+- Raw results: `docs/v2/spikes/search/results/before-snippet.json`, `after-snippet.json`;
+  `bench/fixtures/results.json`. Guard floors in `e2e/cases/GP-SEARCH-heldout.e2e.mjs`: recall@5 0.96,
+  MRR@10 0.807.
