@@ -50,6 +50,10 @@ jobs:
       - run: node e2e/checks/windows-grandchild-kill.mjs
         name: T-F5 Windows grandchild kill (0 alive after KILL_GRACE_MS)
         if: runner.os == 'Windows'
+      # ADR-0019 D3: the one hook overhead gate (median of 3 batch p95 values), ubuntu only (DEVIATIONS D-CI-PERF-1).
+      - run: node e2e/checks/setup-hook-overhead.mjs
+        name: D3 hook overhead p95 <= 15 ms (perf check)
+        if: runner.os == 'Linux'
       - run: node docs/v2/prompt/lint.mjs --out release-out
         name: prompt lint, bundle mode (impl/13 §7; gate layer prompt-lint from M2, D-M0-1)
       - run: node e2e/cases/run.mjs --milestone "$GATE_MILESTONE"
@@ -101,5 +105,3 @@ jobs:
         name: src/prompt/_generated.ts
       - run: node --test e2e/cases/GP-SETUP-npm-install.e2e.mjs
         name: GP-SETUP npm pack, global install, setup twice, remove byte for byte
-        env:
-          CM_HOOK_OVERHEAD_BUDGET_MS: "40" # shared-runner jitter; the product default stays 15 ms

@@ -93,6 +93,9 @@ test("[M6] GP-SETUP/npm-pack-install-setup-twice-remove: the packed npm bin sets
     [pathKey]: [fakeBin, binDir, process.env[pathKey] ?? ""].join(path.delimiter),
   };
   delete env.CLAUDE_PROJECT_DIR;
+  // D3 timing is gated once, by e2e/checks/setup-hook-overhead.mjs (DEVIATIONS D-CI-PERF-1). This functional case
+  // lifts the product's timing knob so shared-runner jitter cannot fail setup or doctor; every other check still runs.
+  env.CM_HOOK_OVERHEAD_BUDGET_MS = "60000";
   const packed = JSON.parse(sh("npm", ["pack", "--json", "--pack-destination", packDir], { cwd: outDir, env, shell: WIN }))[0];
 
   // D1: the tarball file list equals the release tree, and package.json is a SHA256SUMS row.
@@ -151,7 +154,11 @@ test("[M6] GP-SETUP/npm-pack-install-setup-twice-remove: the packed npm bin sets
   }
   const hooked = r1.agents.filter((a) => a.checks.some((c) => c.name === "hook"));
   assert.ok(hooked.length >= 5, "hook step ran for the hook agents");
-  for (const a of hooked) assert.ok(a.checks.find((c) => c.name === "hook").overheadP95Ms <= Math.max(15, Number(process.env.CM_HOOK_OVERHEAD_BUDGET_MS) || 0), `${a.id}: D3 overhead`);
+  for (const a of hooked) {
+    const h = a.checks.find((c) => c.name === "hook");
+    for (const k of ["overheadP95Ms", "wallP95Ms", "bareP95Ms"]) assert.ok(Number.isFinite(h[k]) && h[k] >= 0, `${a.id}: hook ${k} recorded`);
+    t.diagnostic(`${a.id} hook overhead p95 ${h.overheadP95Ms} ms (wall ${h.wallP95Ms}, bare ${h.bareP95Ms}); gated by e2e/checks/setup-hook-overhead.mjs`);
+  }
   // D4: the v1 hook command became the absolute form; no v1 command remains.
   const codexHooks = readFileSync(path.join(home, ".codex", "hooks.json"), "utf8");
   assert.ok(!codexHooks.includes("context-mode hook"), "codex v1 hook form rewritten");

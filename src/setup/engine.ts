@@ -208,6 +208,8 @@ function hookRound(row: CheckRow, env: SetupContext["env"]): Check {
     const r = spawnSync(cmd[0], cmd.slice(1), { env, input, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
     wall.push(performance.now() - t);
     if (r.status !== 0) return { name: "hook", ok: false, detail: `hook exited ${r.status}: ${`${r.stderr}`.trim()}` };
+    const out = `${r.stdout}`.trim(); // the golden payload is a harmless shell call: no answer, or one JSON object
+    if (out) { let j: unknown; try { j = JSON.parse(out); } catch { /* below */ } if (!isObj(j)) return { name: "hook", ok: false, detail: `hook answer is not a JSON object: ${out.slice(0, 200)}` }; }
     t = performance.now();
     spawnSync(cmd[0], ["-e", ""], { env, timeout: VERIFY_TIMEOUT_MS });
     bare.push(performance.now() - t);
