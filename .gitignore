@@ -4,6 +4,11 @@ node_modules/
 !/build/build.mjs
 !/build/check-readme.mjs
 !/build/check-secrets.mjs
+!/build/check-install-docs.mjs
+!/build/check-removed.mjs
+!/build/hash.mjs
+!/build/manifests.ts
+!/build/readme-agents.mjs
 # v2 build output and the prompt file build.mjs generates and deletes (impl/13 §2.2)
 release-out/
 src/prompt/_generated.ts
