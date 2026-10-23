@@ -13,7 +13,7 @@ This is the map. Start here, then follow the links.
 
 | Doc | What it is |
 |---|---|
-| [`PRD-v2.md`](../../PRD-v2.md) | The product plan. |
+| [`PRD-v2.md`](PRD-v2.md) | The product plan. |
 | [`TECH-SPEC.md`](TECH-SPEC.md) | The build spec: test strategy, prompt delivery, tool names per agent, open spikes, decisions. |
 | `adr/0001`–`0019` | One decision each. Table below. |
 | [`docs/v2/impl/`](impl/README.md) | Per-module implementation files for `src/`: exact paths, signatures, pseudocode, constants. Binding under ADR-0018. |

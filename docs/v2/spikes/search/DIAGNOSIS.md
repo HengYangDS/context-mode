@@ -1,6 +1,6 @@
 # Search quality diagnosis (v2 `ctx_index` + `ctx_search`)
 
-Status: in progress. Sections fill in as each step lands.
+Status: layers 1 to 4 and verbatim snippets are in the code (D-SEARCH-1 to D-SEARCH-7, `impl/DEVIATIONS.md`). Sections 6 to 8 hold the final numbers. Open: q47 (natural query, no hit in the top 10) and the p95 target of 10 ms (see section 6).
 
 Trigger: fixture benchmark Part 2 (`bench/fixtures/results.json`) has "No hits" on 3 of 7
 scenarios and 0 fenced code blocks returned whole. Owner request (2026-10-23): add search

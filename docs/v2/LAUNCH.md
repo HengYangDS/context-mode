@@ -132,6 +132,12 @@ Logs, search results, and docs get stored and indexed instead of filling
 the context window. Your agent searches back for the exact text it needs,
 on any of 10 supported agents, with one code path and no fallback chains.
 
+## Release state (2026-10-23)
+
+- Rehearsed three times on `release-staging` and `release` (`docs/v2/review/RELEASE-REHEARSAL-2026-10-21.md`). No tag, no GitHub Release, no npm publish has happened.
+- `release.yml` has the job `publish-npm` (ADR-0019 D2). It needs the owner steps in `NPM-OWNER-STEPS.md` first.
+- npm dist-tag plan: v2 goes out as `next`; `latest` stays on v1 until the owner moves it.
+
 ## Before the first real release
 
 Two owner steps. Neither touches a rehearsal branch by hand.

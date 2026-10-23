@@ -342,7 +342,7 @@ Every milestone names its own E2E gate (ADR-0017): no milestone's work counts as
 
 ## 18a. Implementation specification
 
-The module structure, dependency rules, constants, and per-module file map for implementers live in [`docs/v2/impl/README.md`](docs/v2/impl/README.md), under [ADR-0018](docs/v2/adr/0018-implementation-architecture.md). Start there before writing code for any milestone above.
+The module structure, dependency rules, constants, and per-module file map for implementers live in [`docs/v2/impl/README.md`](impl/README.md), under [ADR-0018](adr/0018-implementation-architecture.md). Start there before writing code for any milestone above.
 
 ## 19. Changes
 
