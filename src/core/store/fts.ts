@@ -121,6 +121,31 @@ function toMatchAny(q: string): string {
   return [...terms].join(" OR ");
 }
 
+// D-SEARCH-2: common English words that carry no search signal (v1 src/store.ts STOPWORDS, general part).
+// A query made only of stopwords keeps all its words.
+const STOPWORDS: ReadonlySet<string> = new Set([
+  "a", "an", "the", "and", "or", "of", "to", "in", "on", "at", "by", "is", "be", "it", "as", "do", "i",
+  "for", "are", "but", "not", "you", "all", "can", "had", "her", "was", "one", "our", "out", "has", "his",
+  "how", "its", "may", "who", "did", "get", "got", "let", "she", "too", "will", "with", "this", "that",
+  "from", "they", "been", "have", "some", "them", "than", "each", "into", "your", "could", "would",
+  "about", "which", "their", "there", "other", "should", "also", "very", "when", "what", "then", "these",
+  "those", "being", "does", "both", "while", "where", "here", "were", "much", "any", "my", "me", "we",
+]);
+
+// D-SEARCH-2: the quoted prefix terms of a search query, stopwords dropped (all kept if all are stopwords).
+function searchTerms(q: string): string[] {
+  const all = [...new Set(toMatch(q).split(" ").filter((t) => t !== ""))];
+  const kept = all.filter((t) => !STOPWORDS.has(t.slice(1, -2).toLowerCase()));
+  return kept.length > 0 ? kept : all;
+}
+
+const COUNT_MATCH = `
+SELECT count(*) AS n FROM chunks JOIN sources s ON s.id = chunks.source_id
+WHERE chunks MATCH :match
+  AND (:scope <> 'session' OR chunks.session_id = :session_id)
+  AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
+  AND (:source IS NULL OR s.label = :source)`;
+
 interface QueryRow { source_id: number; label: string; ord: number; body: string; score: number; }
 
 // impl/02 §9.2 + impl/05 steps 5, 7, 8 (D-M1-T8-2, D-M1-T8-4). Zero hits -> [], never throws for
@@ -135,8 +160,16 @@ export function ftsQuery(
   offset: number,
   source?: string,
 ): Hit[] {
-  const match = toMatch(q);
-  if (match === "") return [];
+  const terms = searchTerms(q);
+  if (terms.length === 0) return [];
+  // D-SEARCH-2: AND first; when AND has fewer than `limit` hits in scope, every page uses OR (BM25 ranks
+  // chunks with more terms first). The choice does not depend on `offset`, so pages stay consistent.
+  const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
+  let match = terms.join(" ");
+  if (terms.length > 1) {
+    const n = Number((db.raw.prepare(COUNT_MATCH).get({ match, ...filter }) as { n: number }).n);
+    if (n < limit) match = terms.join(" OR ");
+  }
   const rows = db.raw.prepare(QUERY).all({
     match,
     scope,

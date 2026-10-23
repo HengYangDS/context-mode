@@ -417,3 +417,43 @@ test("[M2] GP5/snippet-code-point-safe", () => {
   const amp = highlight("a".repeat(C.SNIPPET_MAX_BYTES - 3) + "&😀", "a", C.SNIPPET_MAX_BYTES);
   assert.ok(amp.endsWith("a"));
 });
+
+// ---- Search layer 2 (D-SEARCH-2): AND first, OR fallback when AND has fewer than `limit` hits, stopwords dropped ----
+test("[search-L2] ftsQuery: one query word missing from the index still finds the chunk (OR fallback)", async () => {
+  const { db, root, project } = await freshDb("a".repeat(16));
+  try {
+    const id = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "deploy the edge function", bytes: 24 }]);
+    const hits = ftsQuery(db, "deploy edge function guide", "session", project, "s1", 10, 0);
+    assert.equal(hits.length, 1);
+    assert.equal(hits[0].sourceId, id);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("[search-L2] ftsQuery: a stopword alone never makes a chunk match", async () => {
+  const { db, root, project } = await freshDb("b".repeat(16));
+  try {
+    ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "stop.txt" }), [{ ord: 0, text: "the the the cat", bytes: 15 }]);
+    const id = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "go.txt" }), [{ ord: 0, text: "deploy now", bytes: 10 }]);
+    const hits = ftsQuery(db, "the deploy missingword", "session", project, "s1", 10, 0);
+    assert.deepEqual(hits.map((h) => h.sourceId), [id]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("[search-L2] ftsQuery: AND results are kept when there are at least `limit` of them", async () => {
+  const { db, root, project } = await freshDb("c".repeat(16));
+  try {
+    const both = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "both.txt" }), [{ ord: 0, text: "alpha beta", bytes: 10 }]);
+    ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "one.txt" }), [{ ord: 0, text: "alpha alpha alpha", bytes: 17 }]);
+    assert.deepEqual(ftsQuery(db, "alpha beta", "session", project, "s1", 1, 0).map((h) => h.sourceId), [both]);
+    assert.equal(ftsQuery(db, "alpha beta", "session", project, "s1", 10, 0).length, 2);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
