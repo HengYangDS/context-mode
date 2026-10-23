@@ -1,11 +1,11 @@
 export const meta = {
   name: 'v2-compact-m2',
-  description: 'Publish pack for benchmarks; compaction: re-score T-CMP, push-not-pull (anchored block + turn-boundary BM25 recall), live T-CMP; M2: trigger sweep + self-sufficient replace text; merge on evidence; gate, CI, A/B, report',
+  description: 'Two tracks in parallel: (A) post-compaction recall when facts live only in the DB, (B) saving M2 >= 90. Each: diagnose + frozen eval, 3 candidate algorithms on exp branches in parallel, numeric pick, merge, adversarial re-measure; then docs, gate, CI',
   phases: [
-    { title: 'Publish', detail: 'benchmark publish pack' },
-    { title: 'Compact', detail: 're-score, implement push recall, live T-CMP, merge' },
-    { title: 'M2', detail: 'trigger sweep, replace text, 3x score, merge' },
-    { title: 'Final', detail: 'gate, CI, A/B, docs, report' },
+    { title: 'Diagnose', detail: 'root cause, frozen eval, baseline (both tracks)' },
+    { title: 'Candidates', detail: '3 per track on exp/* branches, in parallel' },
+    { title: 'Merge', detail: 'numeric pick, merge winner (+ graft), adversarial re-measure' },
+    { title: 'Final', detail: 'docs, gate, CI' },
   ],
 }
 
@@ -16,85 +16,107 @@ const SNL = { model: 'claude-sonnet-5-5', effort: 'low' }
 const RESULT = { type: 'object', properties: {
   done: { type: 'boolean' }, commits: { type: 'array', items: { type: 'string' } },
   numbers: { type: 'string' }, summary: { type: 'string' } }, required: ['done', 'commits', 'numbers', 'summary'] }
-const SCORE = { type: 'object', properties: {
-  m1: { type: 'number' }, m2: { type: 'number' }, smallTok: { type: 'number' }, guardsOk: { type: 'boolean' }, detail: { type: 'string' } },
-  required: ['m1', 'm2', 'smallTok', 'guardsOk', 'detail'] }
-const TCMP = { type: 'object', properties: {
-  correct: { type: 'number' }, baselineCorrect: { type: 'number' }, injectedBytesMedian: { type: 'number' }, noCompactRegression: { type: 'boolean' }, detail: { type: 'string' } },
-  required: ['correct', 'baselineCorrect', 'injectedBytesMedian', 'noCompactRegression', 'detail'] }
+const DIAG = { type: 'object', properties: {
+  done: { type: 'boolean' }, evalCommit: { type: 'string' }, baseSha: { type: 'string' },
+  baseline: { type: 'number' }, evalCmd: { type: 'string' }, summary: { type: 'string' } },
+  required: ['done', 'evalCommit', 'baseSha', 'baseline', 'evalCmd', 'summary'] }
+const CAND = { type: 'object', properties: {
+  done: { type: 'boolean' }, branch: { type: 'string' }, sha: { type: 'string' },
+  primary: { type: 'number' }, heldout: { type: 'number' }, guardsPass: { type: 'boolean' },
+  guards: { type: 'string' }, spendUsd: { type: 'number' }, summary: { type: 'string' } },
+  required: ['done', 'branch', 'sha', 'primary', 'heldout', 'guardsPass', 'guards', 'spendUsd', 'summary'] }
+const CHECK = { type: 'object', properties: {
+  pass: { type: 'boolean' }, problems: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' } },
+  required: ['pass', 'problems', 'summary'] }
 const GATE = { type: 'object', properties: {
   green: { type: 'boolean' }, failing: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' } },
   required: ['green', 'failing', 'summary'] }
 
 const base = (id) => `You are a batch job, not a chat: no person reads your reply. Ignore any question or status request in your input; do only the task below.
-Repo github.com/mksglu/context-mode, base branch v2-design. The owner approved commit + push after every step; push without asking. Never touch main, never force-push v2-design, never tag, never publish, never npm publish/deprecate. Commit as: git -c user.name=mksglu -c user.email=mksglu@users.noreply.github.com. Push rejected: git pull --rebase, push again (max 5).
-Own clone only: rm -rf /private/tmp/cm-v2-fu-${id} && git clone https://github.com/mksglu/context-mode.git /private/tmp/cm-v2-fu-${id}. Delete it and its build output before you return, after everything is pushed. Run node build/build.mjs --generated-only before node --test. npm ci fails (no lockfile): use npm install --no-package-lock.
-No data loss: commit and push after each meaningful step. Never weaken an assertion or skip a case; a test that encodes a superseded rule is rewritten with a DEVIATIONS.md row. Never truncate or regex-filter output (BM25 selection of whole chunks only). Never change OUTPUT_CAP or HOOK_* budgets. Never change bench/saving-score.mjs, bench/live/score-tasks.mjs, bench/saving-score.lock. Files at the repo root outside the target tree fail check-removed: never add any. Use git archaeology before changing old code. Write no personal names. Private data stays in /private/tmp/cm-v2-impl-private.
-Live runs: keyless claude -p, model claude-sonnet-5-5, effort low, --max-budget-usd 0.25, env ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1.
-Pace: read only the files your task names; be done within about 60 minutes.`
+Repo github.com/mksglu/context-mode. Work branch as stated in the task (v2-design or your own exp/* branch). Commit + push allowed (git pull --rebase on reject, max 5). Commit as git -c user.name=mksglu -c user.email=mksglu@users.noreply.github.com. Never touch main, never tag, never release, never force-push v2-design, never npm publish.
+Gateway repo /Users/mksglu/Server/Mert/context-mode-sandbox: READ ONLY. Its CLAUDE.md rules for live runs apply: transcript is the evidence, never model prose; explicit --model; </dev/null; fail closed.
+Live claude -p runs: real Claude Code binary (record version), fresh CLAUDE_CONFIG_DIR with only the login credential copied, --plugin-dir <built release-out>, --strict-mcp-config, ENABLE_CLAUDEAI_MCP_SERVERS=false CLAUDE_CODE_DISABLE_AUTO_MEMORY=1 CLAUDE_CODE_DISABLE_CLAUDE_MDS=1, --max-budget-usd per session as stated. No API key: the login only (ADR-0012).
+Own temp space only: /private/tmp/cm-v2-cm-${id}. Never edit the real ~/.claude. Delete your temp space before you return (keep raw transcripts under /private/tmp/cm-v2-impl-private/compact-m2/${id}). npm install --no-package-lock; node build/build.mjs --generated-only before node --test.
+Owner rules: truncation and regex are not allowed as a fix; solve it with an algorithm. Never write instruction files (CLAUDE.md, AGENTS.md, ...). Subagent contexts must not grow (ADR-0016). Hook overhead p95 <= 15 ms (ADR-0019 D3) must hold. Tests first. Never weaken an assertion. DEVIATIONS.md row per behaviour change. Write no personal names, no tenant ids, no secrets.
+Pace: commit + push within your first 15 tool calls; push after each step; done within the time stated.`
 
-const COMPACT_DESIGN = `Owner decision 2026-10-21 (DECISIONS-r11), compaction "push, not pull":
-Evidence: after compaction the model called ctx_resume/ctx_search in 0 of 50 clean sessions (all arms, pointer line included). A model does not call a tool for state it does not know it lost, so no design may depend on that call.
-(A) Anchored block at SessionStart(compact): deterministic, byte-budgeted, sections in fixed order: current goal (last user request verbatim), open errors, last state of edited files, decisions, next step. Keep ADR-0009 renderState as the base; add a byte budget constant if it has none.
-(B) Turn-boundary recall: on every UserPromptSubmit after a compaction in that session, rank the session journal (and the same project's prior-session rows, scope rules of ADR-0009 §8) by BM25 against the prompt text; inject the top whole rows as additionalContext only when the top score is above a threshold, within a byte budget (new constants, e.g. RECALL_BUDGET_BYTES, RECALL_MIN_SCORE), never repeating a row already injected in this session. No compaction in the session -> the path returns allow with zero added bytes (small-task cost must not change).
-(C) The GS11 call-rate gate measured the pull design; it is retired. GS11 = correctness (>= 0.80 arm with the shipped policy) plus the injected-bytes median, reported.`
-
-phase('Publish')
-const pub = agent(`${base('cm-pub')}\n\nTask: benchmark publish pack (the owner will publish these). Create docs/benchmarks/README.md (plain words, tables) and docs/benchmarks/data/ with the aggregate JSON files only (no private rows): saving loop (bench/saving-score-last.json and the round history in docs/v2/benchmarks.md), final A/B small vs large off/v1/v2 (bench/live/results/ab-final2.json), offline replay before/after with size buckets, live replace proof (16/16, sizes and bytes seen), memory live results, T-CMP clean results. For each: date, Claude Code version, model, effort, runs per cell, task list, exact reproduce command, cost, and the honest caveats (n per cell, noise range 78-89 for M2, fixed per-session cost on small tasks). Lead with what the product does: bytes the model sees on large outputs (off 4,695 B, v1 2,437 B, v2 735 B median) and cost. Link it from README.md Benchmarks (README <= 200 lines). Check every number against its source file. Commit, push.`,
-  { label: 'cm-pub', phase: 'Publish', schema: RESULT, ...SNM })
-
-const scoreM2 = (label, ref) => agent(`${base(label)}\n\nRole: scorer. Checkout ${ref}. Check sha256 of the score files against bench/saving-score.lock on origin/v2-design (mismatch: guardsOk false). Build. Run node bench/saving-score.mjs THREE times; return median M1, median M2, median small-task v2 session tokens (smallTok), guardsOk = all three runs guardsOk. Change no file. detail: per run M1/M2 and per-task M2, 4 lines.`,
-  { label, phase: 'M2', schema: SCORE, ...SNL })
-const merge = (id, br, ph) => agent(`${base('cm-merge-' + id)}\n\nRole: merger. Merge origin/${br} into v2-design (no-ff); resolve conflicts keeping both intents (other tracks change src/core/hooks/dispatch.ts and constants.ts too). Build, node --test tests/v2/, node scripts/gate.mjs --milestone M7 --quick, push, verify git merge-base --is-ancestor. If the gate fails, do not push; report the failure in 3 lines.`,
-  { label: `cm-merge-${id}`, phase: ph, ...SNM })
-
-const compactTrack = async () => {
-  const rescore = await agent(`${base('cm-rescore')}\n\nTask: check the T-CMP measurement before any design change. In e2e/live/compact/ read the scorer and fixtures; all 15 misses in e2e/live/compact/results/2026-10-21-sonnet-5-5-clean-all-arms.json are fixture session-03 with a case-sensitive exactMatch. Decide from the fixture's own spec whether the expected answer is case-sensitive (e.g. a file name or id is; a word in prose is not). If the scorer is wrong, fix it (normalize only what the spec says, test first: one case that must still fail on a wrong answer), DEVIATIONS row, and re-score the stored results without new model calls. Report corrected correct per arm. Commit, push to v2-design.`,
-    { label: 'cm-rescore', phase: 'Compact', schema: RESULT, ...SNM })
-  const impl = await agent(`${base('cm-impl')}\n\n${COMPACT_DESIGN}\nT-CMP re-score result: ${JSON.stringify(rescore).slice(0, 1200)}\nTask: implement (A) and (B) on branch impl/compact-push from origin/v2-design (push early). Read ADR-0009, docs/v2/impl (compaction and hooks sections), src/core/hooks/dispatch.ts (sessionStart, userPromptSubmit), src/core/index (BM25), src/adapters/table.ts (compactDelivery, compactSummary). Tests first: no compaction -> zero added bytes on UserPromptSubmit; after compaction a prompt naming an earlier error gets that journal row; budget and no-repeat hold; below threshold -> nothing; per-agent rows follow the adapter table (agents without additionalContext on UserPromptSubmit keep their current single path, ADR-0001). Write docs/v2/review/DECISIONS-r11.md, amend ADR-0009 (Changes line), TECH-SPEC GS11 row, DEVIATIONS rows. Build, node --test tests/v2/, gate --milestone M7 --quick. Push. Return done, commits, numbers, summary.`,
-    { label: 'cm-impl', phase: 'Compact', schema: RESULT, ...OPH })
-  const live = await agent(`${base('cm-tcmp')}\n\nTask: live T-CMP on branch impl/compact-push (build it; do not change src/). Run e2e/live/compact/run.mjs with the corrected scorer: the shipped-policy arm 10 sessions on claude-sonnet-5-5 and 5 on claude-opus-5-5 (effort low), plus the old full-block arm 10 sessions on sonnet as baseline; cost <= $8. Also run the 5 small A/B tasks (bench/live/ab-quick.mjs, v2 arm only, 2 runs) to confirm no added bytes without compaction. Return correct (shipped arm, sonnet), baselineCorrect, injectedBytesMedian, noCompactRegression, detail (opus result, per-session misses, cost). Write the result to docs/v2/benchmarks.md "Compaction push recall" on the branch, push.`,
-    { label: 'cm-tcmp', phase: 'Compact', schema: TCMP, ...SNM })
-  const ok = live && live.correct >= 0.8 && live.correct >= live.baselineCorrect && live.noCompactRegression
-  log(`compact: correct ${live && live.correct} vs baseline ${live && live.baselineCorrect}, injected ${live && live.injectedBytesMedian} B -> ${ok ? 'merge' : 'no merge'}`)
-  if (ok) await merge('compact', 'impl/compact-push', 'Compact')
-  return { rescore, impl, live, merged: !!ok }
+async function run(prompt, label, phase, schema, opts) {
+  const r = await agent(prompt, { label, phase, schema, ...opts })
+  if (r) return r
+  log(`${label}: no result, retry on sonnet high`)
+  return agent(prompt, { label: label + '-retry', phase, schema, ...SNH })
 }
 
-const m2Track = async () => {
-  let best = await scoreM2('cm-m2-base', 'origin/v2-design')
-  const LEVERS = [
-    { id: 'trigger', what: `Lower REPLACE_TRIGGER_BYTES from data. Offline: sweep 1024, 1536, 2048, 3072, 4096 with bench/replay.mjs; for each report M1, the <=1K and 1-4K bucket savings (must stay >= -1%) and how many results get replaced. Live: json-1 off output size and v2 bytes seen at the chosen value. Pick the lowest value that keeps every guard; tests first.` },
-    { id: 'text', what: `Make the replace self-sufficient so the model does not re-check with grep/Read/ctx_execute. Read 6 live stream-json transcripts of big-json and multi-1 (run them) and list the follow-up calls and why. Then change only the replace text layout, deterministically: a first line with exact counts of the full output (lines, bytes) and the source label; selected chunks with their original line numbers; the more line with a ready ctx_search query made from the prompt words. No new truncation; selection stays whole-chunk BM25 within REPLACE_RETURN_BYTES (the count line and line numbers may use a small separate constant). Tests first; check with 6 live runs that follow-up calls drop.` },
-  ]
-  const hist = []
-  for (const L of LEVERS) {
-    const br = `impl/m2-${L.id}`
-    const r = await agent(`${base('cm-m2-' + L.id)}\n\nRole: optimizer. Branch ${br} from origin/v2-design (push early). Current 3x-median score: ${JSON.stringify(best)}. Earlier: ${JSON.stringify(hist).slice(0, 1500)}. Task: ${L.what}\nBuild, node --test tests/v2/, gate --milestone M7 --quick, run node bench/saving-score.mjs once. DEVIATIONS row. Push ${br}. Return done, commits, numbers, summary.`,
-      { label: `cm-m2-${L.id}`, phase: 'M2', schema: RESULT, ...OPH })
-    const s = await scoreM2(`cm-m2-score-${L.id}`, `origin/${br}`)
-    const better = s && s.guardsOk && s.m1 >= best.m1 - 0.5 && s.m2 > best.m2 + 1
-    hist.push({ lever: L.id, change: r && r.summary, score: s, merged: !!better })
-    log(`m2 ${L.id}: M1 ${s && s.m1}, M2 ${s && s.m2} -> ${better ? 'merge' : 'no merge'}`)
-    if (better) { await merge('m2-' + L.id, br, 'M2'); best = s }
-  }
-  return { best, hist }
+const TRACKS = {
+  compact: {
+    budget: 45,
+    diag: `Track A: compaction. Today (docs/v2/OPEN-ITEMS.md, ISSUE-COVERAGE.md, ADR-0009): after compaction answers are correct 10/10, but the model never calls ctx_resume or ctx_search from the pointer (0/10); the call-rate gate was retired. Correct answers without retrieval mean the probe is too easy: the compaction summary already holds the facts.
+Do (on v2-design, 90 minutes):
+1. Read ADR-0009, the compaction code (PreCompact / SessionStart source=compact / pointer text / ctx_resume / journal), and the existing live compaction probe and its results. Write down the exact pointer text the model sees after compaction and why the model ignores it (quote transcripts).
+2. Build a HARD probe set e2e/live/compact-hard/: sessions that create facts that a summary drops but the DB keeps (exact values from large tool outputs that were replaced: hashes, line numbers, error lines, ids from a 2000-line log, a config value deep in a JSON), then force compaction the way the existing harness does, then ask questions that need those exact values. Oracle per question = exact value compare from the transcript final answer against the fixture (deterministic, no regex on prose: parse a required answer format). At least 12 questions over 4 sessions, plus 6 held-out questions in a separate file the candidates never see (heldout/), written now.
+3. Metric (primary) = correct answers on the hard set after compaction, % over n runs; secondary = retrieval calls after compaction, tokens added after compaction (cost guard), wall time. Prereg file e2e/live/compact-hard/PREREG.md: model claude-sonnet-5-5 for search, claude-opus-5-5 confirm for the winner, n=3 per question per arm, --max-budget-usd 1 per session.
+4. Measure baseline: current v2 and direct (no plugin). Commit + push the eval, prereg and baseline BEFORE returning. evalCmd = the one command that scores a built release-out (e.g. node e2e/live/compact-hard/run.mjs --bundle <dir> --set main|heldout --n 3 --model <m>).
+Return done, evalCommit, baseSha (v2-design head), baseline (primary % for current v2), evalCmd, summary (direct vs v2 numbers, the cause in 3 lines).`,
+    cands: [
+      { id: 'a-pull', what: 'PULL: make retrieval the obvious next step. Rewrite the post-compaction pointer as a short, concrete, task-specific instruction built from the session state (what was being done, which stored outputs exist with their labels and sizes, the exact ctx_search query to run), shape ctx_resume to return a structured state digest, and tune the ctx_resume / ctx_search tool descriptions (prompt lint must pass, ADR-0005 style). Prove whether the model now retrieves AND answers correctly.' },
+      { id: 'a-push', what: 'PUSH (query-driven): on the first UserPromptSubmit after a compaction, the hook runs the existing search (BM25 + trigram + RRF) over this session\'s stored outputs with the user prompt plus the session goal as the query, selects results by relevance with MMR diversity under a byte budget, and adds them as context once. Exact values come back verbatim (snippet algorithm, D-SEARCH-7). If ADR-0009 forbids this, amend it in the same branch with the reason and the measured result. Hook overhead budget applies: precompute the index at PostToolUse, not at prompt time.' },
+      { id: 'a-ledger', what: 'LEDGER (salience-ranked state): keep a session fact ledger updated at PostToolUse (files touched, errors, ids/values seen in replaced outputs, decisions), score entries by type weight x recency decay x reference frequency (deterministic, documented formula), and deliver the top-k entries within a byte budget at SessionStart source=compact (or the agent\'s equivalent), each with the exact value and a retrieval handle. Check the Claude Code 2.1.303 reference contract (ADR-0001 fixtures) for what SessionStart compact can carry.' },
+    ],
+    guards: 'Guards: GP6 and all compaction e2e cases green; no answer quality loss on the old 10/10 probe; tokens added after compaction <= 2,000 per compaction; hook overhead D3 check passes; node --test tests/v2/ and gate --all green.',
+  },
+  m2: {
+    budget: 35,
+    diag: `Track B: saving M2. Today M2 = 87.23 (88.02 on a later commit) against a target of 90 (docs/v2/OPEN-ITEMS.md). An earlier finding: on 322k real calls the big-output bytes are 62% from Read, and the design does not replace Read output, only hints.
+Do (on v2-design, 90 minutes):
+1. Find the M2 definition, its harness and its workloads in docs/v2 and e2e/. Run it on current v2 and print a per-workload and per-tool table of bytes in vs bytes the model saw. Name the top 3 leak sources with numbers.
+2. Freeze the eval: commit the M2 workloads as the main set, and add a held-out set of at least 6 new workloads written now (different repos/outputs: Read of large source files, MCP tool outputs, WebFetch, test runs, logs, JSON) that candidates never see (heldout/). Each workload keeps a task oracle so savings never count if the task fails.
+3. evalCmd = the one command that scores a built release-out on main or heldout (deterministic where possible; if M2 needs live sessions, model claude-sonnet-5-5, n=3, --max-budget-usd 1 per session). Baseline current v2 on both sets. Commit + push BEFORE returning.
+Return done, evalCommit, baseSha, baseline (M2 main for current v2), evalCmd, summary (top leaks).`,
+    cands: [
+      { id: 'b-read', what: 'READ PATH: large Read results are the biggest leak. Add an algorithmic Read handling: above the size threshold, PostToolUse replaces the Read output with a structure-aware view (outline from the parser: symbols, headings, line ranges, plus the region around what the task names) and indexes the full text, with an exact line-range retrieval handle. Edit after Read must still work in a live Claude Code session (prove it with a live edit task: Read big file -> Edit -> correct diff). Small and partial (offset/limit) reads pass through unchanged.' },
+      { id: 'b-dedup', what: 'REDUNDANCY: outputs repeat across a session (same file read twice, test reruns, git status). Add content-defined chunking with rolling hashes (FastCDC-style) and a per-session chunk store: a repeated chunk returns a short reference with its handle instead of the bytes; a changed output returns only the changed chunks plus a delta header. Deterministic, exact (no truncation); retrieval returns the full bytes. Threshold chosen by measured gain, not a fixed guess.' },
+      { id: 'b-shape', what: 'SHAPE BY CONTENT TYPE: replace generic replacement text with type-aware digests chosen by a detector over the content (not regex on content: use parsers: JSON.parse, line statistics, test-runner reporters, git porcelain formats): test output -> failing tests with their exact error blocks and counts; logs -> template mining (Drain-style) with counts and the exact rare lines; JSON -> schema with types, sizes and sample paths; diffs -> file/hunk stats with the hunks the task names. Every digest carries the retrieval handle; nothing is cut mid-unit.' },
+    ],
+    guards: 'Guards: task oracle success on every workload not lower than baseline; held-out M2 not lower than baseline; routing e2e (GP-LIVE-ROUTING) green; hook overhead D3 check passes; Edit-after-Read works; node --test tests/v2/ and gate --all green.',
+  },
 }
 
-const [pubR, compactR, m2R] = await parallel([() => pub, compactTrack, m2Track])
+async function track(key) {
+  const T = TRACKS[key]
+  const d = await run(`${base(key + '-diag')}\n\n${T.diag}`, `${key}-diag`, 'Diagnose', DIAG, OPH)
+  if (!d || !d.done) return { key, stopped: 'diagnosis not done', d }
+  log(`${key}: baseline ${d.baseline}, eval ${d.evalCommit}`)
+
+  const per = Math.floor(T.budget / T.cands.length)
+  const cands = (await parallel(T.cands.map((c) => () => run(`${base(c.id)}\n\nTrack ${key}, candidate ${c.id}. Branch exp/${key}-${c.id} from ${d.baseSha} (push it; never push to v2-design). Diagnosis: ${d.summary}
+Approach: ${c.what}
+The eval is frozen at ${d.evalCommit}: never edit files under the eval or heldout paths (a checker diffs them). Score with: ${d.evalCmd} on --set main, then once on --set heldout. Live spend cap for you: $${per}.
+${T.guards}
+Write docs/v2/spikes/${key}/${c.id}.md: algorithm (formula, thresholds and why), before/after numbers on main and heldout, guards, spend. Time: 150 minutes.
+Return done, branch, sha, primary (main metric, same unit as baseline ${d.baseline}), heldout, guardsPass, guards (each guard with its number), spendUsd, summary.`, `${key}-${c.id}`, 'Candidates', CAND, OPH)))).filter(Boolean)
+  log(`${key}: ` + cands.map((c) => `${c.branch} ${c.primary}/${c.heldout} guards ${c.guardsPass}`).join(', '))
+
+  // Numeric pick: guards must pass, held-out must not fall below baseline-on-heldout proxy (>= 0 change reported by agent), highest primary wins.
+  const ok = cands.filter((c) => c.done && c.guardsPass && c.primary > d.baseline)
+  ok.sort((a, b) => (b.primary - a.primary) || (b.heldout - a.heldout))
+  if (!ok.length) return { key, d, cands, stopped: 'no candidate beat the baseline with guards passing' }
+  const [win, ...rest] = ok
+
+  const m = await run(`${base(key + '-merge')}\n\nTrack ${key}. Baseline ${d.baseline} (eval ${d.evalCommit}, cmd ${d.evalCmd}). Winner ${win.branch} (${win.sha}): main ${win.primary}, heldout ${win.heldout}. Other passing candidates: ${JSON.stringify(rest.map((c) => ({ branch: c.branch, sha: c.sha, primary: c.primary, heldout: c.heldout })))}.
+Merge the winner into v2-design (rebase or merge, no force-push). Then for each other passing candidate, try grafting it on top in a temp branch and keep it only if main AND heldout both rise and all guards still pass (measure; cap $10 total). Re-run the guards on the merged v2-design. ${T.guards}
+Then confirm the final build once with claude-opus-5-5 on the main set (n as the prereg says). Update the ADR that owns the area (ADR-0009 for compaction, the savings ADR / TECH-SPEC for M2), docs/v2/OPEN-ITEMS.md and docs/v2/spikes/${key}/RESULT.md (all candidates' numbers, the pick rule, why the winner won, losses). Keep all exp/${key}-* branches (evidence). Commit, push. Time: 120 minutes.`, `${key}-merge`, 'Merge', RESULT, OPH)
+
+  const ck = await run(`${base(key + '-check')}\n\nRole: adversarial checker for track ${key}. Fresh clone of v2-design. (1) git: the eval and heldout files are unchanged since ${d.evalCommit}, and the eval commit is older than every candidate commit. (2) Re-measure with your own run of ${d.evalCmd} on main and heldout against a fresh build (sonnet, n=2, cap $8) and compare with the claimed numbers in docs/v2/spikes/${key}/RESULT.md. (3) Read the merged code: no truncation or regex used as the saving or recall mechanism, no instruction-file writes, no subagent context growth, hook overhead D3 check passes. (4) Run node --test tests/v2/ and gate --all. Fix wrong numbers in the docs in place; report real defects. Return pass, problems, summary. Time: 75 minutes.`, `${key}-check`, 'Merge', CHECK, OPH)
+  return { key, d, cands, win: { branch: win.branch, primary: win.primary, heldout: win.heldout }, m, ck }
+}
+
+phase('Diagnose')
+const results = await parallel([() => track('compact'), () => track('m2')])
 
 phase('Final')
-const ab = await agent(`${base('cm-ab')}\n\nTask: final A/B on v2-design (build) vs v1 (branch main as a local plugin) vs off with bench/live/ab-quick.mjs: SMALL (log-1 json-1 tests-1 file-1 git-1) and LARGE (multi-1 + bench/live/score-tasks.mjs), 3 runs each, cost <= $6. Report per group and arm: median session tokens, median tool_result bytes the model saw, success, cost, v2 vs v1, v2 vs off. Save bench/live/results/ab-final3.json, update docs/benchmarks/README.md and docs/v2/benchmarks.md. Commit, push.`,
-  { label: 'cm-ab', phase: 'Final', schema: RESULT, ...SNM })
-const gate = (label) => agent(`${base(label)}\n\nRole: gate. Fresh clone, install, build, node scripts/gate.mjs --all three times, node build/check-removed.mjs. Do not fix. Return green, failing, summary.`,
-  { label, phase: 'Final', schema: GATE, ...SNL })
-let g = await gate('cm-gate-1')
-if (g && !g.green) {
-  await agent(`${base('cm-fix')}\n\nRole: Fixer. Failing: ${JSON.stringify(g.failing)} — ${g.summary}. Fix at root cause, run gate --all once, commit, push.`, { label: 'cm-fix', phase: 'Final', ...OPH })
-  g = await gate('cm-gate-2')
-}
-const ci = await agent(`${base('cm-ci')}\n\nRole: CI checker. gh run watch the latest ci.yml run on v2-design (max 45 min). If red, fix the root cause, push, watch again (max 2 rounds). Report per OS and Node.`,
+const g = await agent(`${base('gate')}\n\nRole: gate on v2-design. Fresh clone, install, build, node scripts/gate.mjs --all three times, build/check-removed.mjs, build/check-install-docs.mjs, build/check-readme.mjs, build/check-secrets.mjs, node bench/fixtures/run.mjs --check. Do not fix. Return green, failing, summary.`,
+  { label: 'cm-gate', phase: 'Final', schema: GATE, ...SNL })
+if (g && !g.green) await run(`${base('gatefix')}\n\nRole: fixer on v2-design. Failing: ${JSON.stringify(g.failing)} — ${g.summary}. Fix at the root, gate --all once, commit, push.`, 'cm-gatefix', 'Final', RESULT, OPH)
+const ci = await agent(`${base('ci')}\n\nRole: CI checker. gh run watch the latest ci.yml run on v2-design (up to 90 min). If red, fix the root cause (never weaken an assertion or raise a budget), push, watch again, max 2 rounds. Report per OS x Node and the final run id.`,
   { label: 'cm-ci', phase: 'Final', ...SNM })
-await agent(`${base('cm-report')}\n\nRole: report writer. Rewrite docs/v2/review/MORNING-REPORT.md (short, tables, plain words): compaction (re-score ${JSON.stringify(compactR && compactR.rescore && compactR.rescore.numbers)}, live ${JSON.stringify(compactR && compactR.live)}, merged ${compactR && compactR.merged}); M2 ${JSON.stringify(m2R).slice(0, 2000)}; A/B ${JSON.stringify(ab && ab.numbers)}; publish pack ${JSON.stringify(pubR && pubR.summary).slice(0, 400)}; gate ${JSON.stringify(g).slice(0, 500)}; CI ${String(ci).slice(0, 500)}; what is still below target with its measured reason; owner-only steps (merge to main, tag, marketplace ref, npm deprecate). Also update .impl/BLOCKED-M7.md with evidence. Commit, push.`,
-  { label: 'cm-report', phase: 'Final', ...SNM })
-return { publish: pubR, compact: compactR, m2: m2R, ab, gate: g }
+return { results, gate: g, ci }
