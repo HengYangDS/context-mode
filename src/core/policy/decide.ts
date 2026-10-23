@@ -2,7 +2,8 @@
 // Rule order (T-ROUTE, DECISIONS-r9 V6): user deny, WebFetch, curl/http/build (rows with no replace and subagent
 // calls only, D-M7-RR-1), Read and shell dump. No hints (D-M7-RR-2). ADR-0008, DECISIONS-r8 (Read deny), DECISIONS-r9 E1-E5. DEVIATIONS D-M3-E4-1..10. No regex, nothing cut.
 // Never returns "replace" (PostToolUse only). Subagent case B/C is applied by hooks/dispatch.ts (D-M3-E4-1).
-import { statSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { statSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { resolve } from "node:path";
 import {
   BUILD_COMMANDS, CURL_COMMANDS, CURL_DUMP_HEADER_FLAG, CURL_SILENT_FLAGS, CURL_VERBOSE_FLAGS,

@@ -1,6 +1,7 @@
 // impl/02 §3, TECH-SPEC GP7 "path containment by components" (A61, #954, #1294), DEVIATIONS D-M1-T3-4.
 // One shared containment predicate for every tool. Never a string-prefix check.
-import { realpathSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { dirname, sep } from "node:path";
 
 // D-M1-T3-4: a path that cannot be realpath'd (missing, no access) cannot be proven inside: false.

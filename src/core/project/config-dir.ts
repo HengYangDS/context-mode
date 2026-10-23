@@ -1,6 +1,7 @@
 // impl/02 §4, impl/00 §2 (store), DEVIATIONS D-M1-6, D-M1-T3-1.
 // The one config-dir reader: every module gets ~/.context-mode from here, none reads HOME again.
-import { mkdirSync, realpathSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { mkdirSync, realpathSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { join } from "node:path";
 import { DATA_ROOT } from "../contracts/constants.ts";
 import { CtxError } from "../contracts/errors.ts";

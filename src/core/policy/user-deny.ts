@@ -1,6 +1,7 @@
 // impl/08 §4 (module enforcement): the user's own deny rules. DECISIONS-r9 E2 (fail-closed signal), V17
 // (Read glob anchors). DEVIATIONS D-M3-E2-1..4. No regex: patterns are walked by a hand-written glob matcher.
-import { readFileSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { readFileSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { isAbsolute, join, relative, sep } from "node:path";
 import type { AgentId } from "../contracts/agents.ts";
 import { homeDirOf } from "../project/config-dir.ts";

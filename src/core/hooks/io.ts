@@ -1,6 +1,7 @@
 // impl/09 §5.2 hook entry I/O, DEVIATIONS D-M7-HP-1 (GS6). Re-exported by dispatch.ts so the entry keeps
 // its import rule (contracts + dispatch only, D-M3-H2-9).
-import { writeSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { writeSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 
 // stdin stays a stream read: a sync readFileSync(0) on the spawnSync socket pair hung once in a live
 // Case B run (child blocked in read(0), never reproduced in 180 reruns). A hook must never hang the

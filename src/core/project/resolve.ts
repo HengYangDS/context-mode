@@ -2,7 +2,8 @@
 // DEVIATIONS D-M1-1, D-M1-5, D-M1-T3-2, D-M1-T3-3, D-M1-T3-5.
 // One project source per host. Claude Code has one fixed order (D-FU-PS-1, ADR-0001): CLAUDE_PROJECT_DIR,
 // then the hook payload cwd, then process.cwd(). Every other host: its one source; missing -> NO_PROJECT.
-import { existsSync, readFileSync, realpathSync, statSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { existsSync, readFileSync, realpathSync, statSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { basename, dirname, join, resolve } from "node:path";
 import type { AgentId } from "../contracts/agents.ts";
 import {

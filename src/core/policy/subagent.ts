@@ -1,6 +1,7 @@
 // impl/08 §5 (case A/B/C pick, toolSet resolution), Assumption B4; ADR-0016 "How the subagent's tools are
 // known"; DECISIONS-r3 Q23; DEVIATIONS D-M3-E3-1..4. No regex: frontmatter is read line by line.
-import { readFileSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { readFileSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { join } from "node:path";
 import {
   AGENT_FILE_EXT, AGENTS_DIR_NAME, FRONTMATTER_DISALLOWED_KEY, FRONTMATTER_FENCE, FRONTMATTER_TOOLS_KEY,

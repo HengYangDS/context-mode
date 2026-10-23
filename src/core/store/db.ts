@@ -1,7 +1,8 @@
 // impl/02 §6 (openDb, withWrite, closeDb), impl/00 §4 signatures (DEVIATIONS D-M1-1),
 // metaGet/metaSet/metaTake (DEVIATIONS D-M1-7), ADR-0002 decisions 2-3, impl/02 A-S3,
 // DEVIATIONS D-M1-T5-1.
-import { existsSync, linkSync, mkdirSync, rmSync } from "node:fs";
+// D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { existsSync, linkSync, mkdirSync, rmSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import type { DatabaseSync } from "node:sqlite";
 import {
   DB_SHM_SUFFIX,
