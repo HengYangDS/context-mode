@@ -73,7 +73,7 @@ export function snippetTerms(words: readonly string[]): Term[] {
 
 function byteLen(s: string): number { return Buffer.byteLength(s, "utf8"); }
 
-export function buildSnippet(row: string, terms: readonly Term[], maxBytes: number, codeMaxBytes: number = SNIPPET_CODE_MAX_BYTES): string {
+export function buildSnippet(row: string, given: readonly Term[], maxBytes: number, codeMaxBytes: number = SNIPPET_CODE_MAX_BYTES): string {
   if (row === "") return "";
   const codeCap = Math.max(maxBytes, codeMaxBytes);
 
@@ -139,7 +139,7 @@ export function buildSnippet(row: string, terms: readonly Term[], maxBytes: numb
   // ---- term positions (token-start matches, case-insensitive) ----
   const lower = row.toLowerCase();
   const hay = lower.length === row.length ? lower : row;
-  const pos: number[][] = terms.map((t) => {
+  const find = (t: Term): number[] => {
     const out: number[] = [];
     if (t.text === "") return out;
     for (let p = hay.indexOf(t.text); p >= 0 && out.length < MAX_POSITIONS; p = hay.indexOf(t.text, p + 1)) {
@@ -147,7 +147,15 @@ export function buildSnippet(row: string, terms: readonly Term[], maxBytes: numb
       if (!isAlnum(prev) || (isLowerOrDigit(prev) && isUpper(row.charCodeAt(p)))) out.push(p);
     }
     return out;
-  });
+  };
+  let terms: readonly Term[] = given;
+  let pos: number[][] = terms.map(find);
+  // Typo fallback: the chunk came back by trigram or edit distance, so no query word is in it as typed.
+  // Each word of 5+ characters then matches by its first max(4, length - 2) characters.
+  if (pos.every((p) => p.length === 0)) {
+    terms = given.filter((t) => t.text.length >= 5).map((t) => ({ ...t, text: t.text.slice(0, Math.max(4, t.text.length - 2)) }));
+    pos = terms.map(find);
+  }
   const count = (ti: number, a: number, b: number): number => {
     const ps = pos[ti];
     let lo = 0, hi = ps.length;
@@ -220,7 +228,7 @@ export function buildSnippet(row: string, terms: readonly Term[], maxBytes: numb
 
   // ---- fenced code block ----
   if (bk.code) {
-    if (blen[best] <= codeCap) return grow(best, Math.max(maxBytes, blen[best]));
+    if (blen[best] <= codeCap) return grow(best);
     const close = fenceClose.get(best) ?? -1;
     const open = bk.first;
     const innerA = open + 1;
@@ -245,23 +253,27 @@ export function buildSnippet(row: string, terms: readonly Term[], maxBytes: numb
   }
 
   // ---- prose ----
-  if (blen[best] <= maxBytes) return grow(best, maxBytes);
+  if (blen[best] <= maxBytes) return grow(best);
   const win = lineWindow(bk.first, bk.last, maxBytes);
   if (win !== null) return slice(win[0], win[1]);
   let anchor = bk.first, top = -1;
   for (let i = bk.first; i <= bk.last; i++) { const s = lineScore(i); if (s > top) { top = s; anchor = i; } }
   return clipLine(row, ls[anchor], le[anchor], firstHit(anchor), maxBytes);
 
-  // Whole neighbour blocks join (higher score first, the next block on a tie) while they fit.
-  function grow(k: number, budget: number): string {
+  // Whole neighbour blocks join (higher score first, the next block on a tie) while they fit: a window
+  // that holds a fenced block may use codeCap, a prose-only window maxBytes.
+  function grow(k: number): string {
     let a = k, b = k;
+    let code = blocks[k].code;
+    const fits = (i: number, j: number, c: boolean): boolean => rangeBytes(blocks[i].first, blocks[j].last) <= (c ? codeCap : maxBytes);
     for (;;) {
-      const up = a > 0 && rangeBytes(blocks[a - 1].first, blocks[b].last) <= budget;
-      const down = b < N - 1 && rangeBytes(blocks[a].first, blocks[b + 1].last) <= budget;
+      const up = a > 0 && fits(a - 1, b, code || blocks[a - 1].code);
+      const down = b < N - 1 && fits(a, b + 1, code || blocks[b + 1].code);
       if (!up && !down) break;
       if (up && down) { if (scores[a - 1] > scores[b + 1]) a--; else b++; }
       else if (up) a--;
       else b++;
+      code = code || blocks[a].code || blocks[b].code;
     }
     return slice(blocks[a].first, blocks[b].last);
   }

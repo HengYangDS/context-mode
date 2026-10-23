@@ -103,3 +103,21 @@ test("[search-L5] ftsQuery hit returns a whole fence with < > & intact", async (
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("[search-L5] a prose hit next to a fence grows to include the whole fence (code budget)", () => {
+  const fence = "```js\n" + Array.from({ length: 14 }, (_, i) => `export async function getServerSideProps${i}() { return { props: { n: ${i} } }; }`).join("\n") + "\n```";
+  const head = "### Migrate getServerSideProps to the App Router";
+  const prose = "Shows how to replace getServerSideProps with an async Server Component.";
+  const body = head + "\n\n" + prose + "\n\n" + fence + "\n\n" + filler("tail", 30);
+  assert.ok(bytes(head + prose + fence) > C.SNIPPET_MAX_BYTES);
+  const out = highlight(body, "getServerSideProps", C.SNIPPET_MAX_BYTES);
+  assert.ok(out.includes(fence), out.slice(0, 200));
+  assert.ok(bytes(out) <= C.SNIPPET_CODE_MAX_BYTES);
+});
+
+test("[search-L5] typo query words place the window by their prefix", () => {
+  const target = "Connect to Postgres with the pooled client.";
+  const body = filler("lead", 30) + "\n\n" + target + "\n\n" + filler("tail", 30);
+  const out = highlight(body, "postgress", C.SNIPPET_MAX_BYTES);
+  assert.ok(out.includes(target), out.slice(0, 200));
+});
