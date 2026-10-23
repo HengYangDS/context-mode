@@ -14,6 +14,11 @@ import { BACKUP_DIR, LOCK_FILE, STATE_DIR, assertWritable, buildRegistry, hookCo
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
+/** CI-only knob: shared runners add jitter the D3 budget was not measured on. Unset means the 15 ms budget. */
+function overheadBudgetMs(env: SetupContext["env"]): number {
+  const n = Number(env.CM_HOOK_OVERHEAD_BUDGET_MS);
+  return Number.isFinite(n) && n >= OVERHEAD_P95_MS ? n : OVERHEAD_P95_MS;
+}
 const HOOK_SAMPLES = 9;
 const HOOK_ROUNDS = 5; // noise only adds time: a real overhead over budget fails every round
 const P95 = 0.95;
@@ -181,8 +186,9 @@ function hookRound(row: CheckRow, env: SetupContext["env"]): Check {
   const wallP95Ms = Math.round(p95(wall));
   const bareP95Ms = Math.round(p95(bare));
   const overheadP95Ms = Math.max(0, wallP95Ms - bareP95Ms);
-  const ok = overheadP95Ms <= OVERHEAD_P95_MS;
-  return { name: "hook", ok, overheadP95Ms, wallP95Ms, bareP95Ms, detail: ok ? undefined : `hook overhead p95 ${overheadP95Ms} ms > ${OVERHEAD_P95_MS} ms` };
+  const budget = overheadBudgetMs(env);
+  const ok = overheadP95Ms <= budget;
+  return { name: "hook", ok, overheadP95Ms, wallP95Ms, bareP95Ms, detail: ok ? undefined : `hook overhead p95 ${overheadP95Ms} ms > ${budget} ms` };
 }
 
 /** D3 gate: best of HOOK_ROUNDS rounds; a hook that exits non-zero fails at once. */
