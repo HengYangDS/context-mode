@@ -54,7 +54,8 @@ const COMMAND_SKILLS = Object.freeze(["ctx-stats", "ctx-doctor", "ctx-upgrade"])
 // run.mjs and search.mjs are one entry; the file name picks the job (D-M3-X1-2).
 const BUNDLES = Object.freeze([
   { name: "server", entry: "src/entries/server.ts", out: "server.mjs" },
-  { name: "hook", entry: "src/entries/hook.ts", out: "hook.mjs" },
+  // D-CI-PERF-3: the hook is spawned once per tool call, so its parse+compile time is on every call; minified.
+  { name: "hook", entry: "src/entries/hook.ts", out: "hook.mjs", minify: true },
   { name: "run", entry: "src/entries/run.ts", out: "run.mjs" },
   { name: "search", entry: "src/entries/run.ts", out: "search.mjs" },
   { name: "pi", entry: "src/entries/pi.ts", out: "pi/index.js" }, // impl/13 §2.2 step 2 (D-M5-arch-1)
@@ -165,7 +166,8 @@ async function buildBundle(bundle, outDir, define) {
   let result;
   try {
     const banner = bundle.banner === undefined ? {} : { banner: bundle.banner };
-    result = await esbuild.build({ ...ESBUILD_COMMON, ...banner, define, entryPoints: [entry], outfile: path.join(outDir, bundle.out) });
+    const minify = bundle.minify === true ? { minify: true } : {};
+    result = await esbuild.build({ ...ESBUILD_COMMON, ...banner, ...minify, define, entryPoints: [entry], outfile: path.join(outDir, bundle.out) });
   } catch (err) {
     const first = err && Array.isArray(err.errors) && err.errors.length > 0 ? err.errors[0] : undefined;
     const where = first && first.location ? ` (${first.location.file}:${first.location.line})` : "";
