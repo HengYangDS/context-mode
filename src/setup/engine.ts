@@ -2,7 +2,7 @@
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { AGENT_HOME_DIR, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
@@ -48,12 +48,41 @@ interface Manifest { runId: string; path: string; entries: Entry[]; }
 
 // ---------- small helpers ----------
 
-function which(bin: string, env: SetupContext["env"]): string | undefined {
-  for (const dir of (env.PATH ?? "").split(path.delimiter).filter(Boolean)) {
-    const f = path.join(dir, bin);
-    try { accessSync(f, fsc.X_OK); return f; } catch { /* next */ }
+const WIN_EXT = ".COM;.EXE;.BAT;.CMD";
+
+/** PATH lookup the way the host shell does it. On Windows, npm installs an agent CLI as `<bin>.cmd` (next to an
+ *  extensionless sh script that cmd.exe cannot run), so only PATHEXT names match there. Env keys are matched without
+ *  case, since Windows spells PATH as `Path`. */
+export function whichBin(bin: string, env: SetupContext["env"], platform: NodeJS.Platform = process.platform): string | undefined {
+  const get = (k: string): string | undefined => env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
+  const win = platform === "win32";
+  const exts = win ? (get("PATHEXT") || WIN_EXT).split(";").filter(Boolean) : [""];
+  const names = win && path.extname(bin) ? [bin] : exts.map((e) => bin + e.toLowerCase());
+  for (const dir of (get("PATH") ?? "").split(win ? ";" : ":").filter(Boolean)) {
+    for (const n of names) {
+      const f = path.join(dir, n);
+      try { accessSync(f, fsc.X_OK); if (statSync(f).isFile()) return f; } catch { /* next */ }
+    }
   }
   return undefined;
+}
+const which = whichBin;
+
+/** cmd.exe line for a .cmd/.bat shim: Node refuses to spawn those without a shell (CVE-2024-27980). Each argument is
+ *  quoted, so paths with spaces survive; the outer quotes are the /s form. */
+export function winCmdLine(file: string, args: string[]): string {
+  const q = (a: string): string => (a === "" || /[\s"&|<>^()%!]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a);
+  return `"${[file, ...args].map(q).join(" ")}"`;
+}
+
+/** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe. */
+function runBin(bin: string, args: string[], env: SetupContext["env"]): ReturnType<typeof spawnSync> {
+  const file = which(bin, env) ?? bin;
+  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(file)) {
+    return spawnSync(env.ComSpec || "cmd.exe", ["/d", "/s", "/c", winCmdLine(file, args)],
+      { env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: true, windowsHide: true });
+  }
+  return spawnSync(file, args, { env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
 }
 
 function readOr(file: string): string | undefined { return existsSync(file) ? readFileSync(file, "utf8") : undefined; }
@@ -131,7 +160,7 @@ function planRow(row: CheckRow, listed: boolean): Plan {
 function listCheck(row: CheckRow, env: SetupContext["env"]): Check | undefined {
   const l = row.listCommand;
   if (!l || !which(l.bin, env)) return undefined;
-  const r = spawnSync(l.bin, l.args, { env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
+  const r = runBin(l.bin, l.args, env);
   const ok = r.status === 0 && `${r.stdout}`.includes("context-mode");
   return { name: "list", ok, detail: ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode` };
 }
@@ -250,7 +279,7 @@ class Run {
 
 function undo(dir: string, entries: Entry[], env: SetupContext["env"]): void {
   for (const e of [...entries].reverse()) {
-    if (e.undo) { spawnSync(e.undo.bin, e.undo.args, { env, timeout: VERIFY_TIMEOUT_MS }); continue; }
+    if (e.undo) { runBin(e.undo.bin, e.undo.args, env); continue; }
     if (!e.file) continue;
     if (e.existed && e.backup) atomicWrite(e.file, readFileSync(path.join(dir, e.backup), "utf8"));
     else if (existsSync(e.file)) unlinkSync(e.file);
@@ -342,7 +371,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       atomicWrite(e.file, e.after);
     }
     for (const args of plan.cli) {
-      const r = spawnSync(row.cli!.bin, args, { env: ctx.env, encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
+      const r = runBin(row.cli!.bin, args, ctx.env);
       if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
     }
     if (plan.cli.length) for (const args of row.cli!.remove) run.record({ agent: row.id, undo: { bin: row.cli!.bin, args } });

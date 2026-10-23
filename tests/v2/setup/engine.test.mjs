@@ -10,7 +10,7 @@ import path from "node:path";
 
 import { ADAPTERS } from "../../../src/adapters/table.ts";
 import { TOOL_ORDER } from "../../../src/core/contracts/constants.ts";
-import { assertWritable, buildRegistry, runRemove, runSetup, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
+import { assertWritable, buildRegistry, runRemove, runSetup, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
 
 const NODE = process.execPath;
 
@@ -230,4 +230,24 @@ test("[M7] setup/doctor: a report-only v1 finding (shared OS temp file) does not
   const res = await runDoctor(opts);
   assert.equal(res.exitCode, 0, JSON.stringify(res.agents));
   assert.ok(res.agents[0].v1.length > 0, "the temp finding is still reported");
+});
+
+test("whichBin: on Windows only PATHEXT names match (npm's <bin>.cmd shim), PATH key in any case", (t) => {
+  const s = sandbox(t);
+  writeFileSync(path.join(s.bin, "claude"), "#!/bin/sh\n"); // npm also writes an sh script cmd.exe cannot run
+  chmodSync(path.join(s.bin, "claude"), 0o755);
+  assert.equal(whichBin("claude", { Path: s.bin, PATHEXT: ".EXE;.CMD" }, "win32"), undefined, "extensionless file is not a Windows command");
+  writeFileSync(path.join(s.bin, "claude.cmd"), "@echo off\r\n");
+  chmodSync(path.join(s.bin, "claude.cmd"), 0o755);
+  assert.equal(whichBin("claude", { Path: s.bin, PATHEXT: ".EXE;.CMD" }, "win32"), path.join(s.bin, "claude.cmd"));
+  assert.equal(whichBin("claude", { PATH: s.bin }, "win32"), path.join(s.bin, "claude.cmd"), "default PATHEXT has .CMD");
+  assert.equal(whichBin("claude", { PATH: s.bin }, "linux"), path.join(s.bin, "claude"));
+  assert.equal(whichBin("nope", { PATH: s.bin }, "linux"), undefined);
+  mkdirSync(path.join(s.bin, "dir.cmd"));
+  assert.equal(whichBin("dir", { PATH: s.bin }, "win32"), undefined, "a directory is not a command");
+});
+
+test("winCmdLine: quotes each argument for cmd.exe /d /s /c", () => {
+  assert.equal(winCmdLine("C:\\a b\\claude.cmd", ["plugin", "add", "C:\\x y", ""]), '""C:\\a b\\claude.cmd" plugin add "C:\\x y" """');
+  assert.equal(winCmdLine("c.cmd", ['say "hi"']), '"c.cmd "say ""hi""""');
 });
