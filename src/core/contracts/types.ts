@@ -94,7 +94,7 @@ export interface SourceRow {
   kind: SourceKind; label: string;   // label = path, "content", or final URL
   bytes: number; chunkCount: number; createdAt: number;
 }
-export interface Chunk { ord: number; text: string; bytes: number; }
+export interface Chunk { ord: number; text: string; bytes: number; title?: string; }
 export type SearchScope = "session" | "worktree" | "project";
 export interface Hit { sourceId: number; label: string; ord: number; snippet: string; score: number; }
 
