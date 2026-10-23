@@ -44,6 +44,6 @@ export function runHook(bundlePath, opts) {
  * entry (src/entries/hook.ts) only reads --agent off argv, so no event name
  * is needed to run the bundle.
  */
-export function runHookFixture(bundlePath, agent, payload) {
-  return runHook(bundlePath, { agent, event: undefined, payload });
+export function runHookFixture(bundlePath, agent, payload, env) {
+  return runHook(bundlePath, { agent, event: undefined, payload, env });
 }

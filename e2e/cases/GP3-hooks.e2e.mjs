@@ -204,6 +204,38 @@ for (const fx of fixtures) {
   });
 }
 
+// D-FU-OI-KIRO-1: Kiro CLI V3 SessionStart, payload shape from https://kiro.dev/docs/hooks/types/ (read 2026-10-23).
+// Fresh git repo and temp HOME. Documented contract: exit 0 stdout goes to the agent context. First call of a
+// session id prints the resume line; the same id again prints nothing (once per session, not a failure).
+test("[M3] GP3/kiro-sessionstart-prints-once", async () => {
+  const { mkdtempSync, mkdirSync, realpathSync, rmSync } = await import("node:fs");
+  const { execFileSync } = await import("node:child_process");
+  const { tmpdir } = await import("node:os");
+  const root = realpathSync.native(mkdtempSync(path.join(tmpdir(), "cm-gp3-kiro-ss-")));
+  try {
+    const proj = path.join(root, "proj");
+    const home = path.join(root, "home");
+    mkdirSync(proj);
+    mkdirSync(home);
+    execFileSync("git", ["init", "-q", proj]);
+    const fx = discoverFixtures().find((f) => f.agent === "kiro" && f.event === "SessionStart");
+    assert.ok(fx, "no recorded e2e/fixtures/kiro/<ver>/SessionStart.json");
+    const payload = { ...JSON.parse(readFileSync(fx.filePath, "utf8")), cwd: proj, session_id: "gp3-kiro-session-1" };
+    const env = { PATH: process.env.PATH, HOME: home };
+    const first = await runHookFixture(HOOK_BUNDLE, "kiro", payload, env);
+    const second = await runHookFixture(HOOK_BUNDLE, "kiro", payload, env);
+    const other = await runHookFixture(HOOK_BUNDLE, "kiro", { ...payload, session_id: "gp3-kiro-session-2" }, env);
+    const legacy = await runHookFixture(HOOK_BUNDLE, "kiro", { ...payload, hook_event_name: "agentSpawn", session_id: "gp3-kiro-session-3" }, env);
+    const noSid = await runHookFixture(HOOK_BUNDLE, "kiro", { hook_event_name: "SessionStart", cwd: proj }, env);
+    const shape = (r) => ({ exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr });
+    checkGolden("GP3", "kiro-sessionstart-prints-once", normalize({
+      first: shape(first), sameSessionAgain: shape(second), newSession: shape(other), legacyAgentSpawn: shape(legacy), noSessionId: shape(noSid),
+    }, { home, proj }));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // --- M5: in-process Pi/OpenCode hook-shape cases ---
 test("[M5] GP3/pi-injected-message-timestamp: the injected message carries a finite numeric timestamp (#1180)", async () => {
   const bundlePath = path.join(path.resolve(__dirname, "..", ".."), "release-out", "pi", "index.js");

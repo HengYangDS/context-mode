@@ -68,6 +68,38 @@ test("kiro UserPromptSubmit trigger from hooks/kiro.json is decoded, not dropped
   assert.doesNotMatch(r.stderr, /decode failed|unknown hook event/);
 });
 
+// D-FU-OI-KIRO-1: Kiro CLI V3 SessionStart (https://kiro.dev/docs/hooks/types/, read 2026-10-23): payload
+// hook_event_name, cwd, session_id; exit 0 stdout is added to the agent's context. The hook prints the resume
+// line once per session id (E5, A20): empty stdout is the right answer for a repeat or a payload without session_id.
+const KIRO_RESUME = "This session may have run before. Call mcp_context-mode_ctx_resume for a summary of what happened.";
+
+test("kiro SessionStart: first call of a session prints the resume line with the kiro tool prefix, exit 0", () => {
+  const p = { hook_event_name: "SessionStart", cwd: repo, session_id: "kiro-ss-1" };
+  const r = run(["--agent", "kiro"], JSON.stringify(p));
+  assert.equal(r.status, 0);
+  assert.equal(r.stdout, KIRO_RESUME);
+  assert.equal(r.stderr, "");
+});
+
+test("kiro SessionStart: same session id again prints nothing (once per session, not a failure)", () => {
+  const p = { hook_event_name: "SessionStart", cwd: repo, session_id: "kiro-ss-2" };
+  assert.equal(run(["--agent", "kiro"], JSON.stringify(p)).stdout, KIRO_RESUME);
+  const again = run(["--agent", "kiro"], JSON.stringify(p));
+  assert.equal(again.status, 0);
+  assert.equal(again.stdout, "");
+  assert.equal(again.stderr, "");
+  const other = run(["--agent", "kiro"], JSON.stringify({ ...p, session_id: "kiro-ss-3" }));
+  assert.equal(other.stdout, KIRO_RESUME);
+});
+
+test("kiro SessionStart: legacy agentSpawn prints the same line; no session_id prints nothing (E5)", () => {
+  const spawn = { hook_event_name: "agentSpawn", cwd: repo, session_id: "kiro-ss-4" };
+  assert.equal(run(["--agent", "kiro"], JSON.stringify(spawn)).stdout, KIRO_RESUME);
+  const none = run(["--agent", "kiro"], JSON.stringify({ hook_event_name: "SessionStart", cwd: repo }));
+  assert.equal(none.status, 0);
+  assert.equal(none.stdout, "");
+});
+
 test("detached journal write lands before the process ends (D-M3-H2-8)", () => {
   const p = { session_id: "e2", cwd: repo, hook_event_name: "UserPromptSubmit", prompt: "hello entry" };
   const r = run(["--agent", "claude-code"], JSON.stringify(p));

@@ -88,8 +88,10 @@ function commandsOf(node, out = []) {
 /** GP3 fixture payload: e2e/fixtures/<agent>/<newest ver>/PreToolUse.json, or the Claude-shape one. */
 function fixturePayload(project) {
   const own = path.join(FIXTURES, agent);
-  const base = existsSync(own) ? own : path.join(FIXTURES, FIXTURE_FALLBACK_AGENT);
-  const vers = readdirSync(base).filter((v) => statSync(path.join(base, v)).isDirectory()).sort();
+  const versIn = (b) => readdirSync(b).filter((v) => statSync(path.join(b, v)).isDirectory() && existsSync(path.join(b, v, FIXTURE_EVENT))).sort();
+  // D-FU-OI-KIRO-1: an agent dir that holds no PreToolUse.json (kiro: SessionStart only) uses the Claude-shape payload.
+  const base = existsSync(own) && versIn(own).length > 0 ? own : path.join(FIXTURES, FIXTURE_FALLBACK_AGENT);
+  const vers = versIn(base);
   const payload = JSON.parse(readFileSync(path.join(base, vers[vers.length - 1], FIXTURE_EVENT), "utf8"));
   payload.cwd = project;
   return payload;
