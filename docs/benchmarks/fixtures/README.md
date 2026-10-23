@@ -30,9 +30,9 @@ The v1 code strings are byte-exact (`bench/fixtures/scenarios.json`). v2 adds on
 
 | Scenario | Source | Raw Size | v1 Context | v2 Tool | v2 Hook | v1 Savings | v2 Tool Savings | v2 Hook Savings | v2 Time |
 |----------|--------|----------|-----------|---------|---------|-----------|----------------|----------------|---------|
-| React useEffect docs | Context7 | 5.9 KB | 1,494 B | 6,407 B | 75% | -5% | 2 / 3 | 4 | 3 / 5 | 8ms |
-| Next.js App Router docs | Context7 | 6.5 KB | 3,311 B | 6,848 B | 50% | -3% | 1 / 3 | 5 | 9 / 9 | 10ms |
-| Tailwind CSS docs | Context7 | 4.0 KB | 620 B | 4,273 B | 85% | -4% | 1 / 2 | 5 | 6 / 6 | 7ms |
+| React useEffect docs | Context7 | 5.9 KB | 261 B | 277 B | 216 B | 96% | 95% | 96% | 57ms |
+| Next.js App Router docs | Context7 | 6.5 KB | 249 B | 265 B | 218 B | 96% | 96% | 97% | 50ms |
+| Tailwind CSS docs | Context7 | 4.0 KB | 186 B | 202 B | 221 B | 95% | 95% | 95% | 49ms |
 | Page snapshot (HN) | Playwright | 56.2 KB | 299 B | 315 B | 215 B | 99% | 99% | 100% | 78ms |
 | Network requests | Playwright | 0.4 KB | 349 B | 365 B | 400 B | 13% | 9% | 0% | 46ms |
 | PR list (Next.js) | GitHub | 6.4 KB | 719 B | 735 B | 188 B | 89% | 89% | 97% | 47ms |
@@ -57,9 +57,9 @@ Queries are byte-exact from v1 `tests/live-benchmark.ts`. "Queries with hits" = 
 | Scenario | Source | Raw Size | v1 Search Result | v2 Search Result | v1 Savings | v2 Savings | v2 Queries with hits | v1 Code Chunks | v2 Code Blocks whole | v2 Time |
 |----------|--------|----------|-----------------|-----------------|-----------|-----------|-------------------|----------------|-------------------|---------|
 | Supabase Edge Functions (5 examples) | Context7: Supabase | 3.9 KB | 2,246 B | 4,218 B | 44% | -6% | 1 / 3 | 4 | 5 / 5 | 13ms |
-| React useEffect docs | Context7: React | 5.9 KB | 1,494 B | 6,033 B | 75% | 1% | 2 / 3 | 4 | 1 / 5 | 9ms |
-| Next.js App Router docs | Context7: Next.js | 6.5 KB | 3,311 B | 4,177 B | 50% | 37% | 1 / 3 | 5 | 0 / 9 | 10ms |
-| Tailwind CSS docs | Context7: Tailwind | 4.0 KB | 620 B | 3,822 B | 85% | 7% | 1 / 2 | 5 | 0 / 6 | 8ms |
+| React useEffect docs | Context7: React | 5.9 KB | 1,494 B | 6,407 B | 75% | -5% | 2 / 3 | 4 | 3 / 5 | 8ms |
+| Next.js App Router docs | Context7: Next.js | 6.5 KB | 3,311 B | 6,848 B | 50% | -3% | 1 / 3 | 5 | 9 / 9 | 10ms |
+| Tailwind CSS docs | Context7: Tailwind | 4.0 KB | 620 B | 4,273 B | 85% | -4% | 1 / 2 | 5 | 6 / 6 | 7ms |
 | Skill: context-mode (main prompt) | Skill: context-mode | 16.3 KB | 0 B | 11,570 B | 100% | 31% | 3 / 3 | 8 | 3 / 8 | 17ms |
 | Skill references (4 files combined) | Skill Refs: context-mode | 35.2 KB | 2,412 B | 15,919 B | 93% | 56% | 3 / 3 | 33 | 10 / 37 | 15ms |
 | MCP tools/list (40 tools) | MCP: tools/list | 2.5 KB | 1,016 B | 1,353 B | 60% | 46% | 3 / 3 | 0 | 0 / 0 | 10ms |
