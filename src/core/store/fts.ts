@@ -29,7 +29,8 @@ INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?,
 const QUERY = `
 WITH m AS (
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
-         chunks.worktree AS worktree, chunks.ord AS ord, s.label AS label, s.created_ts AS created_ts, bm25(chunks) AS bm
+         chunks.worktree AS worktree, chunks.ord AS ord, s.label AS label, s.created_ts AS created_ts, bm25(chunks) AS bm,
+         (chunks.rowid IN (SELECT rowid FROM chunks WHERE chunks MATCH :all)) AS full
   FROM chunks JOIN sources s ON s.id = chunks.source_id
   WHERE chunks MATCH :match
     AND (:scope <> 'session' OR chunks.session_id = :session_id)
@@ -37,19 +38,19 @@ WITH m AS (
     AND (:source IS NULL OR s.label = :source)
 ), r AS (
   SELECT *,
-         ROW_NUMBER() OVER (ORDER BY bm ASC, source_id DESC, ord ASC) AS rank_a,
+         ROW_NUMBER() OVER (ORDER BY full DESC, bm ASC, source_id DESC, ord ASC) AS rank_a,
          ROW_NUMBER() OVER (ORDER BY created_ts DESC, source_id DESC, ord ASC) AS rank_b
   FROM m
 ), p AS (
-  SELECT rid, source_id, session_id, worktree, label, ord,
+  SELECT rid, source_id, session_id, worktree, label, ord, full,
          CASE WHEN :scope = 'project' THEN 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) ELSE -bm END AS score
   FROM r
-  ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, score DESC, source_id DESC, ord ASC
+  ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC
   LIMIT :limit OFFSET :offset
 )
 SELECT p.source_id AS source_id, p.label AS label, p.ord AS ord, c.body AS body, p.score AS score
 FROM p JOIN chunks c ON c.rowid = p.rid
-ORDER BY (p.session_id = :session_id) DESC, (p.worktree = :worktree) DESC, p.score DESC, p.source_id DESC, p.ord ASC`;
+ORDER BY (p.session_id = :session_id) DESC, (p.worktree = :worktree) DESC, p.full DESC, p.score DESC, p.source_id DESC, p.ord ASC`;
 
 // Fixed character-escape map (#341); a format table, not a tunable value.
 const ESCAPES: Readonly<Record<string, string>> = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
@@ -139,12 +140,6 @@ function searchTerms(q: string): string[] {
   return kept.length > 0 ? kept : all;
 }
 
-const COUNT_MATCH = `
-SELECT count(*) AS n FROM chunks JOIN sources s ON s.id = chunks.source_id
-WHERE chunks MATCH :match
-  AND (:scope <> 'session' OR chunks.session_id = :session_id)
-  AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
-  AND (:source IS NULL OR s.label = :source)`;
 
 interface QueryRow { source_id: number; label: string; ord: number; body: string; score: number; }
 
@@ -162,16 +157,13 @@ export function ftsQuery(
 ): Hit[] {
   const terms = searchTerms(q);
   if (terms.length === 0) return [];
-  // D-SEARCH-2: AND first; when AND has fewer than `limit` hits in scope, every page uses OR (BM25 ranks
-  // chunks with more terms first). The choice does not depend on `offset`, so pages stay consistent.
-  const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
-  let match = terms.join(" ");
-  if (terms.length > 1) {
-    const n = Number((db.raw.prepare(COUNT_MATCH).get({ match, ...filter }) as { n: number }).n);
-    if (n < limit) match = terms.join(" OR ");
-  }
+  // D-SEARCH-2: AND first, then OR. The OR form matches; chunks that also match the AND form (every term)
+  // rank before partial matches inside each session/worktree tier. So the first page equals the AND result
+  // when AND has at least `limit` hits, and the OR hits fill the rest; every page reads one ordering.
+  const all = terms.join(" ");
   const rows = db.raw.prepare(QUERY).all({
-    match,
+    match: terms.join(" OR "),
+    all,
     scope,
     session_id: sessionId,
     worktree: ctx.worktree,

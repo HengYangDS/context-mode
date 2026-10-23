@@ -457,3 +457,19 @@ test("[search-L2] ftsQuery: AND results are kept when there are at least `limit`
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+test("[search-L2] ftsQuery: under the OR fallback, chunks that match every term come before partial matches", async () => {
+  const { db, root, project } = await freshDb("d".repeat(16));
+  try {
+    const filler = Array.from({ length: 60 }, (_, i) => "filler" + i).join(" ");
+    const all = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "all.txt" }), [{ ord: 0, text: filler + " journal mode wal " + filler, bytes: 900 }]);
+    ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "part.txt" }), [{ ord: 0, text: "mode mode wal wal", bytes: 17 }]);
+    const hits = ftsQuery(db, "journal mode WAL", "session", project, "s1", 10, 0);
+    assert.equal(hits.length, 2);
+    assert.equal(hits[0].sourceId, all);
+    assert.deepEqual(ftsQuery(db, "journal mode WAL", "session", project, "s1", 1, 1).map((h) => h.sourceId).length, 1);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
