@@ -97,6 +97,7 @@ const SELF = "build/check-removed.mjs";
 // (every ALLOWED_DIRS entry ends with "/"). Any other tracked path fails. Literal compares only.
 const ALLOWED_DIRS = [
   "src/core/", "src/prompt/", "src/entries/",
+  "src/cli/", "src/setup/", // ADR-0019 D5-D7: npm CLI and setup engine (D-CR-0019-1)
   "tests/v2/", "e2e/", "build/", "bench/", "tickets/", "metrics/",
   "docs/v2/", "docs/install/", "docs/benchmarks/",
   "scripts/release/",

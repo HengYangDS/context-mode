@@ -162,7 +162,7 @@
         "language selection guide",
         "anti-patterns avoid"
       ],
-      "fixture": "skills/SKILL.md"
+      "fixture": "skills/skill-main.md"
     },
     {
       "scenario": "Skill references (4 files combined)",

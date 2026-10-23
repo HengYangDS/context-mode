@@ -204,3 +204,18 @@ test("allow-list: docs/benchmarks/ passes, a stray root file still fails (D-FU-R
   const sibling = run(fixture({ ...ALLOWED, "docs/benchmarks-old/a.md": "x" }));
   assert.equal(sibling.status, 1);
 });
+
+test("allow-list: ADR-0019 src/cli/ and src/setup/ pass; src/cli.ts stays removed (D-CR-0019-1)", () => {
+  const ok = run(fixture({ ...ALLOWED, "src/cli/args.ts": "x", "src/setup/engine.ts": "x" }));
+  assert.equal(ok.status, 0);
+  assert.deepEqual(ok.lines, ["check-removed: clean"]);
+  const bad = run(fixture({ ...ALLOWED, "src/cli/args.ts": "x", "src/cli.ts": "x", "src/setupx/a.ts": "x" }));
+  assert.equal(bad.status, 1);
+  assert.deepEqual(bad.lines.slice().sort(), ["check-removed: outside target tree: src/setupx/a.ts", "check-removed: still present: src/cli.ts"]);
+});
+
+test("bench fixture data holds no file named SKILL.md (GS5, D-CR-0019-1)", () => {
+  const r = run(fixture({ ...ALLOWED, "bench/fixtures/data/skills/SKILL.md": "x" }));
+  assert.equal(r.status, 1);
+  assert.deepEqual(r.lines, ["check-removed: still present: bench/fixtures/data/skills/SKILL.md"]);
+});
