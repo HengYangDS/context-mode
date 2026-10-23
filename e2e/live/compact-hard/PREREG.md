@@ -61,3 +61,20 @@ Why the model does not use it:
 
 The direct arm answers from the host's own saved copy of the oversized Bash output (the compact summary keeps
 its path: "The full cat output is persisted at .../tool-results/..."), then greps it.
+
+4. The `more:` line sends the model to the wrong scope. Hooks index the replaced output under the Claude Code
+   session id. The MCP server gets no session id in the request meta, so its ctx tools use `mcp:<serverId>`
+   (`src/entries/server.ts`). `ctx_search(scope:"session")` from the pointer therefore returns
+   `No hits in scope "session" across 0 source(s).` (8 of 16 ctx calls after compaction). The same call with
+   `scope:"project"` returns the stored lines (`#414: "mailer": { "replicas": 0`); that run is one of the two v2 passes.
+
+## Baseline (main set, n=3, claude-sonnet-5-5, effort low, Claude Code 2.1.303)
+
+| Arm | Correct | Retrieval call rate | ctx call rate | Tokens after (median) | Wall (median) | Cost |
+|---|---|---|---|---|---|---|
+| direct | 26/36 = 72.2% | 1.000 | 0 | 31757 | 35.2 s | $9.14 |
+| v2 | 2/36 = 5.6% | 1.000 | 0.278 | 32227 | 26.6 s | $1.72 |
+
+Result file: `results/2026-10-24-baseline-main-sonnet-5-5.json`. The held-out set has not been run; it is scored once, on the winner.
+
+Score command: `node e2e/live/compact-hard/run.mjs --bundle <release-out> --set main|heldout --n 3 --model <id>`
