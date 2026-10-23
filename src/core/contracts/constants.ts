@@ -22,6 +22,7 @@ export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks f
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
 export const SNIPPET_MAX_BYTES = 800; // DECISIONS-r9 M21: under floor(OUTPUT_CAP / SEARCH_PAGE_SIZE) = 819
+export const SNIPPET_CODE_MAX_BYTES = 2048; // D-SEARCH-7: a whole fenced block up to this; 7 fit one OUTPUT_CAP reply
 export const READ_MAX_LINES = 200; // DECISIONS-r8: hint text only, never enforced (READ_HINT_BYTES retired)
 
 // Prompt surface (chars)

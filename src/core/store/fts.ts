@@ -11,6 +11,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
 import { FTS_TOKENIZE } from "./schema.ts";
+import { buildSnippet, snippetTerms } from "./snippet.ts";
 
 // The DB owns sources.id (AUTOINCREMENT, D-M1-4, D-M2-1).
 const INSERT_SOURCE = `
@@ -73,8 +74,6 @@ const INSERT_TRI = "INSERT INTO chunks_tri(rowid, body, title) VALUES (?, ?, ?)"
 // Contentless FTS5 delete: the row's own indexed text goes back in with the 'delete' command.
 export const TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title) SELECT 'delete', rowid, body, title FROM chunks";
 
-// Fixed character-escape map (#341); a format table, not a tunable value.
-const ESCAPES: Readonly<Record<string, string>> = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
 
 // impl/02 §9.1, impl/05 step 4, D-M2-1: one sources INSERT + chunk INSERTs, each withWrite holding at
 // most INDEX_WRITE_CHUNK bytes of chunk text (ADR-0002 decision 2). The source row rides the first
@@ -352,23 +351,16 @@ export function ftsListSource(
   }));
 }
 
-// impl/02 §9.3, impl/05 step 8, D-M1-9, D-M1-T8-3: clip first at a code-point boundary, then
-// escape. The clip stops at the last code point whose escaped form still fits maxBytes, so the
-// escaped output never exceeds maxBytes and never ends inside an entity. No emphasis markers in M1.
-export function highlight(row: string, _terms: string, maxBytes: number = SNIPPET_MAX_BYTES): string {
-  let clipped = "";
-  let used = 0;
-  for (const ch of row) {
-    const out = ESCAPES[ch] ?? ch;
-    const n = Buffer.byteLength(out, "utf8");
-    if (used + n > maxBytes) break;
-    clipped += ch;
-    used += n;
-  }
-  let escaped = "";
-  for (const ch of clipped) escaped += ESCAPES[ch] ?? ch;
-  return escaped;
+// D-SEARCH-7 (owner decision 2026-10-23; was impl/02 §9.3 clip-then-escape, #341/#963): the snippet is
+// one contiguous slice of the stored text, never entity-encoded, chosen by term score and grown to
+// whole blocks (src/core/store/snippet.ts). Prose stays within maxBytes; a fenced block may use up to
+// SNIPPET_CODE_MAX_BYTES. Stopwords do not steer the window unless the query is only stopwords.
+export function highlight(row: string, terms: string, maxBytes: number = SNIPPET_MAX_BYTES): string {
+  const words = terms.split(WORD_SPLIT).filter((w) => w !== "");
+  const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
+  return buildSnippet(row, snippetTerms(kept.length > 0 ? kept : words), maxBytes);
 }
+const WORD_SPLIT = /[\s\u0000]+/;
 
 // ---- ctx_search sort:"timeline" (ADR-0009 §8.1 rules 2-6, DECISIONS-r9 M14-M18, D-M2-3, D-M2-T3-1) ----
 
