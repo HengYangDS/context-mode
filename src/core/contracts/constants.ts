@@ -323,6 +323,7 @@ export const HOOK_FIXTURE_FILE = "hook-roundtrip.json"; // D5 fixture, one JSON 
 export const HOOK_ENTRY_FILE = "hook.mjs"; // D5 runs this next to the server bundle (D-M3-arch-3)
 export const REPORT_HEADER = "| Check | Status | Detail | Fix |"; // impl/07 §4 Output
 export const REPORT_HEADER_RULE = "|---|---|---|---|";
+export const REPORT_COMMAND_PREFIX = "Run in a terminal: "; // ADR-0019 D7: one keyless line after the rows, before env lines
 export const REPORT_TRUNCATED_LINE = `(report truncated at ${REPORT_CAP} B; run ctx_doctor again after the first fix)`; // impl/07 §4 step 4
 export function DOCTOR_FAIL_LINE(host: string, check: string, cause: string, command: string): string {
   return `FAIL ${host}: ${check} — ${cause}. Fix: ${command}`; // ADR-0010 per-host FAIL string, impl/07 §4 step 2

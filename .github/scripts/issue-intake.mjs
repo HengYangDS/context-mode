@@ -9,13 +9,14 @@ export const REQUIRED_HEADINGS = ["Summary", "ctx-report", "What happened", "Exp
 
 // Mirror of the ctx_doctor report (src/core/ops/report.ts, src/core/contracts/constants.ts):
 // REPORT_HEADER, REPORT_HEADER_RULE, DOCTOR_CHECK_ORDER, REPORT_ENV_PREFIX + REPORT_ENV_ENUMS keys,
-// REPORT_TRUNCATED_LINE prefix. GP11/issue-intake-allowed-keys fails when the two sides differ.
+// REPORT_COMMAND_PREFIX (ADR-0019 D7), REPORT_TRUNCATED_LINE prefix. GP11/issue-intake-allowed-keys fails when the two sides differ.
 export const REPORT_HEADER = "| Check | Status | Detail | Fix |";
 export const REPORT_HEADER_RULE = "|---|---|---|---|";
 export const CHECK_KEYS = ["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"];
 export const ENV_KEYS = ["env.NODE_ENV"];
 export const ALLOWED_KEYS = new Set([...CHECK_KEYS, ...ENV_KEYS]);
 const TRUNCATED_PREFIX = "(report truncated at ";
+const COMMAND_PREFIX = "Run in a terminal: ";
 const ROW_PREFIX = "| ";
 const ENV_PREFIX = "env.";
 const FENCE = "```";
@@ -42,10 +43,10 @@ function splitHeadings(body) {
   return { sections, order };
 }
 
-// One report line -> its key, or null when the line carries no key (header, rule, truncation).
+// One report line -> its key, or null when the line carries no key (header, rule, command, truncation).
 // A line that is none of these returns undefined: it was not written by ctx_doctor.
 export function lineKey(line) {
-  if (line === REPORT_HEADER || line === REPORT_HEADER_RULE || line.startsWith(TRUNCATED_PREFIX)) return null;
+  if (line === REPORT_HEADER || line === REPORT_HEADER_RULE || line.startsWith(TRUNCATED_PREFIX) || line.startsWith(COMMAND_PREFIX)) return null;
   if (line.startsWith(ROW_PREFIX)) {
     const cell = line.slice(ROW_PREFIX.length);
     const end = cell.indexOf(" ");

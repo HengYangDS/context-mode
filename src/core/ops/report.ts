@@ -4,6 +4,7 @@
 import {
   DOCTOR_FAIL_LINE,
   REPORT_CAP,
+  REPORT_COMMAND_PREFIX,
   REPORT_ENV_ENUMS,
   REPORT_ENV_PREFIX,
   REPORT_HEADER,
@@ -50,7 +51,7 @@ export function buildReport(input: ReportInput): string {
     REPORT_HEADER,
     REPORT_HEADER_RULE,
     ...input.rows.map((row) => rowLine(input.agent, row)),
-    ...(input.command === undefined ? [] : ["Run in a terminal: " + input.command]),
+    ...(input.command === undefined ? [] : [REPORT_COMMAND_PREFIX + input.command]),
     ...Object.keys(input.env).sort().map((key) => envLine(key, input.env[key])),
   ];
   const text = lines.join("\n");

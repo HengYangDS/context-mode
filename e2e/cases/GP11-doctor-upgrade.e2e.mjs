@@ -47,8 +47,15 @@ test("[M5] GP11/doctor-table-golden: ctx_doctor renders a Markdown table of D1-D
   await c.close();
   // D-M5-R1-2: D5 timing and D4 host state vary per run, so the golden holds the table shape only:
   // the header lines and the Check column, in order.
+  // ADR-0019 D7 (D-DOCTOR-CMD-1): after the rows comes one "Run in a terminal:" line, then env lines.
   const lines = text(reply).split("\n");
-  const shape = { header: lines.slice(0, 2), checks: lines.slice(2).map((l) => l.split(" | ")[0].slice(2)) };
+  const body = lines.slice(2);
+  const rows = body.filter((l) => l.startsWith("| "));
+  const rest = body.filter((l) => !l.startsWith("| "));
+  assert.deepEqual(rest.filter((l) => !l.startsWith("env.")), [rest[0]], "only one non-row, non-env line");
+  assert.match(rest[0] ?? "", /^Run in a terminal: context-mode (setup|doctor) --agents claude-code$/);
+  assert.deepEqual(body, [...rows, ...rest], "rows come before the command line");
+  const shape = { header: lines.slice(0, 2), checks: rows.map((l) => l.split(" | ")[0].slice(2)) };
   checkGolden("GP11", "doctor-table-golden", normalize(shape, { home, proj: repo }));
 });
 
