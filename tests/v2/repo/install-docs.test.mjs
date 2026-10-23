@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkLines } from "../../../build/check-install-docs.mjs";
+import { checkLines, checkPages } from "../../../build/check-install-docs.mjs";
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "docs", "install");
 
@@ -58,4 +58,24 @@ test("install-docs: npm install of context-mode needs a version tag", () => {
 
 test("install-docs: the root README fences pass", () => {
   assert.deepEqual(checkLines("README.md", readFileSync(path.join(DIR, "..", "..", "README.md"), "utf8")), []);
+});
+
+// D-INST-4: npm route rules. A fenced `context-mode setup|doctor|upgrade` line may only use flags the CLI has.
+test("install-docs: a fenced context-mode command with an unknown flag fails", () => {
+  const bad = checkLines("f.md", ["```sh", "context-mode setup --yes --agents codex", "context-mode setup --everything", "context-mode doctor --fix-all", "```"].join("\n")).join("\n");
+  assert.ok(!bad.includes("f.md:2"), bad);
+  assert.ok(bad.includes("f.md:3 unknown flag --everything") && bad.includes("f.md:4 unknown flag --fix-all"), bad);
+  assert.deepEqual(checkLines("f.md", ["```sh", "context-mode setup --remove && npm rm -g context-mode", "context-mode upgrade --tag next --dry-run", "```"].join("\n")), []);
+});
+
+test("install-docs: page rules for the install page and the agent pages", () => {
+  const good = "Node 24.15.0\n```sh\nnpm i -g context-mode@next && context-mode setup\ncontext-mode setup --remove && npm rm -g context-mode\n```\n";
+  assert.deepEqual(checkPages({ "README.md": good, "codex.md": "run context-mode setup\n## Upgrade from v1\n" }), []);
+  const out = checkPages({ "README.md": "nothing", "codex.md": "## Install\n" }).join("\n");
+  for (const s of ["README.md needs Node 24.15.0", "README.md needs the two-command install", "README.md needs the uninstall command", "codex.md needs context-mode setup", "codex.md needs a ## Upgrade from v1 heading"]) assert.ok(out.includes(s), s + "\n" + out);
+});
+
+test("install-docs: the real pages pass the page rules", () => {
+  const pages = Object.fromEntries(readdirSync(DIR).filter((f) => f.endsWith(".md")).map((f) => [f, readFileSync(path.join(DIR, f), "utf8")]));
+  assert.deepEqual(checkPages(pages), []);
 });

@@ -10,6 +10,8 @@
 // $env:USERPROFILE in sh, and ~ or %USERPROFILE% in powershell (Windows PowerShell 5.1 passes them to git/node as is).
 // A fenced `npm i -g context-mode` without a version tag fails (@next = v2 preview, @1 = v1): latest is v1 until the owner moves it (ADR-0019 D2). The default run also checks README.md.
 // Any fenced line with "change this", "your path" or "edit this" fails: the reader must not edit a block.
+// D-INST-4 (npm route): a fenced `context-mode setup|doctor|upgrade` line may use only flags that command has (checkLines);
+// checkPages: README.md names Node 24.15.0, the two-command install and the uninstall command; each agent page names `context-mode setup` and has a "## Upgrade from v1" heading.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -29,6 +31,25 @@ const SH_LANG = /^(sh|bash|zsh|shell|console)$/i;
 const PS_LANG = /^(powershell|pwsh|ps1)$/i;
 const EDIT_HINT = /change this|edit this|your (own )?path|replace (this|with your)/i;
 
+const CLI_FLAGS = new Set(["--list", "--dry-run", "--remove", "--repair", "--agents", "--yes", "-y", "--no-input", "--json", "-q", "--quiet",
+  "--verbose", "--debug", "--no-color", "-h", "--help", "--tag"]); // setup, doctor and upgrade --help
+const CLI_CMD = /(?:^|[&|;]\s*|^\s*)context-mode\s+(setup|doctor|upgrade)\b([^&|;\n]*)/g;
+
+export function checkPages(pages) {
+  const bad = [];
+  for (const [name, text] of Object.entries(pages)) {
+    if (name === "README.md") {
+      if (!text.includes("24.15.0")) bad.push("README.md needs Node 24.15.0");
+      if (!text.includes("npm i -g context-mode@next && context-mode setup")) bad.push("README.md needs the two-command install");
+      if (!text.includes("context-mode setup --remove && npm rm -g context-mode")) bad.push("README.md needs the uninstall command");
+    } else {
+      if (!text.includes("context-mode setup")) bad.push(`${name} needs context-mode setup`);
+      if (!text.split("\n").includes("## Upgrade from v1")) bad.push(`${name} needs a ## Upgrade from v1 heading`);
+    }
+  }
+  return bad;
+}
+
 export function checkLines(name, text) {
   const bad = [];
   let fence = null;
@@ -47,6 +68,9 @@ export function checkLines(name, text) {
     if (/npx\s+(-y\s+)?context-mode/.test(line)) bad.push(`${at} npx context-mode: ${line.trim()}`);
     // v2 preview is on dist-tag next; a bare install gets v1 until the owner moves latest (ADR-0019 D2).
     if (/\bnpm\s+(i|install|add)\b[^\n&;|]*\bcontext-mode(?![\w./@-])/.test(line)) bad.push(`${at} npm install of context-mode needs a version tag (@next for v2, @1 for v1): ${line.trim()}`);
+    for (const c of line.matchAll(CLI_CMD)) {
+      for (const f of c[2].match(/(?:^|\s)(--?[A-Za-z][\w-]*)/g) ?? []) if (!CLI_FLAGS.has(f.trim())) bad.push(`${at} unknown flag ${f.trim()} for context-mode ${c[1]}: ${line.trim()}`);
+    }
     if (USER_PATH.test(line)) bad.push(`${at} user path: ${line.trim()}`);
     if (EDIT_HINT.test(line)) bad.push(`${at} edit step: ${line.trim()}`);
     if (SH_LANG.test(lang)) {
