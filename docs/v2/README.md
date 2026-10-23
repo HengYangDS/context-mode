@@ -15,7 +15,7 @@ This is the map. Start here, then follow the links.
 |---|---|
 | [`PRD-v2.md`](../../PRD-v2.md) | The product plan. |
 | [`TECH-SPEC.md`](TECH-SPEC.md) | The build spec: test strategy, prompt delivery, tool names per agent, open spikes, decisions. |
-| `adr/0001`–`0018` | One decision each. Table below. |
+| `adr/0001`–`0019` | One decision each. Table below. |
 | [`docs/v2/impl/`](impl/README.md) | Per-module implementation files for `src/`: exact paths, signatures, pseudocode, constants. Binding under ADR-0018. |
 | [`review/DECISIONS-r3.md`](review/DECISIONS-r3.md) | Owner answers to the round-3 open questions (Q1–Q24). |
 | [`review/DECISIONS-r4.md`](review/DECISIONS-r4.md) | Round-4 fixes, one row per root cause, merged from 4 reviewers. |
@@ -28,7 +28,7 @@ This is the map. Start here, then follow the links.
 | ADR | Summary | Status |
 |---|---|---|
 | 0001 | Claude Code is the reference contract; other agents adapt to it. | Accepted |
-| 0002 | One `context.db` per project; git-only distribution, no npm for v2. | Accepted |
+| 0002 | One `context.db` per project; git `release` branch for the Claude Code marketplace. The "no npm" rule is replaced by ADR-0019. | Accepted (GS7 amended) |
 | 0003 | Three test layers: v1 KEEP-PASS unit tests, E2E-style GP1–GP11, E2E-live. | Accepted |
 | 0004 | No per-agent routing files or skills; routing ships as MCP `instructions` + tool descriptions. | Accepted |
 | 0005 | Prompt text follows plain, non-caps rules, checked by `lint.mjs`. | Accepted |
@@ -45,6 +45,7 @@ This is the map. Start here, then follow the links.
 | 0016 | A subagent must never receive a large tool output either. | Accepted as a requirement; mechanism proposed |
 | 0017 | An E2E case at every step, on `claude-sonnet-5 --effort low`; v1 users keep a working setup through the switch. | Accepted |
 | 0018 | One architecture contract (`docs/v2/impl/00-architecture.md`), one file per module; implementers follow `docs/v2/impl/` file by file. | Accepted |
+| 0019 | One interactive `context-mode setup`; npm (`context-mode`, dist-tag `next`) is the user channel; the git `release` branch stays for the Claude Code marketplace. | Accepted |
 
 ## 2a. Glossary
 

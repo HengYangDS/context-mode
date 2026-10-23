@@ -36,7 +36,7 @@ Trigger: `workflow_dispatch` only (input `sha`, or `mode: rollback`). The `/rele
 |---|---|
 | ci | GP1–GP11 on macOS, Linux and Windows (reuses `ci.yml`) |
 | plan | `scripts/release/plan.mjs`: next version from Conventional Commits since the `Source-Commit:` trailer of the current `release` head (`!` → major, `feat` → minor, `fix`/`perf` → patch); release notes with `git-cliff` |
-| build | bundles, every manifest generated from `adapters/table.ts`, 3 skills, no `package.json`; checks the tree; `claude plugin validate`; `SHA256SUMS`; build provenance attestation |
+| build | bundles, every manifest generated from `adapters/table.ts`, 3 skills, the ADR-0019 D1 `package.json` and `cli.mjs`; checks the tree; `claude plugin validate`; `SHA256SUMS`; build provenance attestation |
 | publish (stage) | commit to `release-staging` with the `Source-Commit:` trailer, tag `v2.x.y` as a draft |
 | smoke | clean-HOME installs from `@release-staging`: Claude Code plugin install, Codex `config.toml` install + MCP handshake, Gemini extension (if the CLI installs) |
 | publish (promote) | only on smoke success: fast-forward `release` to the `release-staging` commit, publish the GitHub Release with the notes and `SHA256SUMS` |
@@ -84,7 +84,7 @@ On `v2`:
 
 ## Trust boundary (dev-time npm install)
 
-`SKILL.md`'s step 2 runs `npm install` for the dev toolchain only (lint, build, tests) — this is separate from the no-npm-for-v2 rule, which covers how v2 is *installed by users*, not how the repo's own dev dependencies are managed. The release skill does not run `npm audit` on every release: dev dependencies are not shipped (the `build` job ships bundles with no `package.json`), so a dev-dependency CVE cannot reach an installed user. `weekly.yml` already runs `npm audit` of a v2 checkout on `main` on a schedule; that is where dependency drift is caught, not in the release's trust boundary.
+`SKILL.md`'s step 2 runs `npm install` for the dev toolchain only (lint, build, tests) — this is separate from the no-install-time-npm rule, which covers how v2 is *installed by users* (no dependencies, no install scripts; ADR-0019), not how the repo's own dev dependencies are managed. The release skill does not run `npm audit` on every release: dev dependencies are not shipped (the `build` job ships bundles and a `package.json` with no `dependencies`), so a dev-dependency CVE cannot reach an installed user. `weekly.yml` already runs `npm audit` of a v2 checkout on `main` on a schedule; that is where dependency drift is caught, not in the release's trust boundary.
 
 ## Amendment 2026-10-22 (ADR-0019)
 

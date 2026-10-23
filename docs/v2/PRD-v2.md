@@ -123,7 +123,7 @@ One SQLite file per project: `~/.context-mode/projects/<git-common-dir-hash>/con
 - Corruption: on `SQLITE_CORRUPT`, only `ctx_doctor` renames `context.db`, `-wal` and `-shm` aside (timestamp suffix) and recreates empty, or runs a lossless heal first (`VACUUM INTO` a clean copy, atomic swap) when the checkpoint owner is the one running. The file is never deleted. Any other writer whose path has vanished gets a hard error naming `ctx_doctor` as the fix.
 - Cleanup: a project DB with no live owner PID is deleted inside the same lock as the liveness check, so a server cannot start in the gap (closes #880's race class).
 - Minimum Node: **24.15.0** (spike S-NODE, `tickets/spikes-r5/S-NODE.md`): the lowest version measured with `node:sqlite` unflagged, a sleeping `timeout` on `SQLITE_BUSY`, FTS5 compiled in, and no experimental warning. Install hard-fails below this version; no fallback.
-- Distribution: a CI-built git `release` branch. No npm publish, no CLI, no npm install at runtime.
+- Distribution (ADR-0019 D2): npm package `context-mode` (dist-tag `next`, `latest` stays on v1 until the owner moves it) is the user channel; the CI-built git `release` branch stays for the Claude Code marketplace. One command: `npm i -g context-mode && context-mode setup`. No npm install at runtime: the package has no dependencies and no install scripts.
 
 ## 5. Project and session identity (ADR-0007)
 
@@ -295,7 +295,7 @@ The server never imports `node:sqlite` statically: if Node or `node:sqlite` fail
 
 ## 14. Release, branches and v1 transition (ADR-0011, ADR-0013, ADR-0017)
 
-- `main`: v1, frozen, protected by GitHub branch protection (decision Q14). `v2`: development. `release`: built output only, no `package.json`.
+- `main`: v1, frozen, protected by GitHub branch protection (decision Q14). `v2`: development. `release`: built output only. It carries the one publishable `package.json` (ADR-0019 D1: `bin`, `type`, `engines`, `files`, `pi`; no `dependencies`, no `scripts`).
 - One release command, `/release` (repo skill): it runs the tests and the live harness (§15), shows the version and notes, then starts `release.yml` (`workflow_dispatch`), which builds, publishes to a `release-staging` ref, smoke-tests installs from it, and only then fast-forwards `release`.
 - v1 users must not leave (ADR-0017 R1–R8, release gate):
   - `main` stays frozen, so v1's own `/ctx-upgrade` keeps being a no-op.
@@ -346,7 +346,8 @@ The module structure, dependency rules, constants, and per-module file map for i
 
 ## 19. Changes
 
-- 2026-10-13: dropped the v1.x line (fixes land only in v2); no npm, no CLI, no skills beyond the 3 commands; Antigravity/agy removed; v2.0 scope fixed at 10 agents.
+- 2026-10-22 (ADR-0019): the 2026-10-13 "no npm, no CLI" rule is replaced. npm is the user channel and `context-mode setup|doctor|upgrade` is the CLI. See `PRD-setup.md`.
+- 2026-10-13: dropped the v1.x line (fixes land only in v2); no skills beyond the 3 commands; Antigravity/agy removed; v2.0 scope fixed at 10 agents.
 - 2026-10-14 (r3, `docs/v2/review/DECISIONS-r3.md`): accepted Q1–Q24 and D1 — output cap, timeout value, deny scope and mechanism, Node minimum, project-source rule, search default, uninstall mode, and the rest, folded into §4–§16 above.
 - 2026-10-14/15 (r4 fix pass, recorded in each ADR's own Changes section): corrected citations, closed cross-ADR contradictions (the §10/§11 selection-formula claim, Q6 checkpoint ownership, Kiro's seven open findings), added the missing per-host rows.
 - 2026-10-15 (r5 spikes): S-NODE (Node 24.15.0), S-TIMEOUT (600,000 ms), and the ADR-0006 alwaysLoad re-probe on Opus 5.5 and Sonnet 5 — all folded into §4, §7 and §8 above.

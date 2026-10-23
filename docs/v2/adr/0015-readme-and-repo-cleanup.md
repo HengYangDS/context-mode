@@ -10,9 +10,9 @@ Target length is about 165 lines, with a CI cap of 200. Written in English.
 | # | Section | Lines | Content |
 |---|---|---|---|
 | 1 | Title, tagline, badges | 7 | 3 badges: clones (`metrics/traffic.json`), stars, license. The npm, users, HN and 18 empty logo badges are removed |
-| 2 | Callout | 4 | "v2 installs from git, not npm. Coming from v1? See Upgrading from v1." |
+| 2 | Callout | 4 | "Install with `npm i -g context-mode && context-mode setup` (ADR-0019; the Claude Code marketplace still uses the git `release` branch). Coming from v1? See Upgrading from v1." |
 | 3 | What it does | 12 | the problem in 3 lines, then 3 bullets: sandbox tools, one index per project with search, state after compaction |
-| 4 | `## Install` | 28 | Keep this exact heading: the npm deprecate message links `#install`. A 10-row table: Agent, Command, Guide. **A row gets a command only after a live install test on that agent passes.** Until then it says "see guide" |
+| 4 | `## Install` | 28 | Keep this exact heading: ADR-0019 removed the npm deprecate step; v1 reporters still reach the install steps through `#install`. A 10-row table: Agent, Command, Guide. **A row gets a command only after a live install test on that agent passes.** Until then it says "see guide" |
 | 5 | Upgrading from v1 | 22 | Steps in ADR-0011 order, done in one sitting. Explains that v1 Codex, Copilot and VS Code hooks call the global binary and fail until `/ctx-upgrade` runs. Includes a v1-feature → v2 table (each removed feature names why and what replaces it) and the exact per-agent rollback command (ADR-0017 R5/R7) |
 | 6 | Tools | 13 | 9 rows, one line each, no byte claims |
 | 7 | Commands | 7 | `/ctx-stats`, `/ctx-doctor`, `/ctx-upgrade` |

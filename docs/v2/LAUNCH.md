@@ -120,9 +120,10 @@ Caveats: n=3 per cell, one model, one date, list-price cost. Full caveats are in
   (`docs/v2/impl/DEVIATIONS.md`, D-M2-T5-1, D-M2-T10-6); we do not claim
   this has been proven for every code path yet, only for the ones listed
   in `DEVIATIONS.md`.
-- We do not claim a CLI or `cli.mjs` entry point. Install, update and
-  diagnosis run through each host's own mechanism plus the `ctx_doctor`
-  and `ctx_upgrade` tools (`PRD-v2.md` §3).
+- We do not claim `context-mode setup` has passed a live test on every
+  agent. The CLI exists (ADR-0019, `docs/v2/CLI-REPORT.md`) and its offline
+  and clean-HOME tests pass; the npm package is not published yet
+  (`NPM-OWNER-STEPS.md`).
 
 ## Short copy for a release post
 

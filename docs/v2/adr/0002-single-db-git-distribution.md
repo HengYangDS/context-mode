@@ -29,14 +29,14 @@
    - Only `ctx_doctor` performs this rename. Any other live writer whose open handle's path has vanished (because `ctx_doctor` renamed it aside) gets a hard error naming `ctx_doctor` as the fix.
    - This trades v1's mid-session self-heal (lossless VACUUM-INTO rebuild, added across 50aafdce/a5c449df/8a1607e9) for hard-error + `ctx_doctor`, per owner rule P1 ("no fallback chains, hard deny"). That is a named decision, not a silent loss of capability.
 4. **Cleanup:** a DB file for a project with no live owner PID is eligible for deletion. The live-PID check runs inside the same transaction/lock as the delete itself, not as a separate step, so a server cannot start between the check and the delete and have its file removed out from under it (closes the #880 race class). This path has a contract test asserting the check and the delete are atomic.
-5. **Distribution:** CI builds a git `#release` branch. No npm publish, no CLI, and no npm install at runtime.
-   - GS7 (amended 2026-10-22, D-FU-RM-PI-1): the `#release` tree has no `node_modules`. It may hold ONE `package.json`, with only `name`, `version`, `private: true`, `type: "module"` and a `pi` key (`extensions: ["./pi/index.js"]`, `skills: ["./skills"]`). It has no `dependencies` and no `scripts`, so the `npm install` that Pi runs on a git install does nothing. Pi reads `pi.extensions` from this file to find the extension. `build/build.mjs` fails the build on any other key.
+5. **Distribution:** CI builds a git `#release` branch. *Amended by ADR-0019 D2 (2026-10-22): the build is also published to npm as `context-mode` with dist-tag `next`, and `context-mode setup` is the CLI. The "no npm publish, no CLI" words no longer hold; "no npm install at runtime" still holds (no dependencies, no install scripts).*
+   - GS7 (amended 2026-10-22, D-FU-RM-PI-1; *superseded by the next bullet, which drops `private: true`*): the `#release` tree has no `node_modules`. It may hold ONE `package.json`, with only `name`, `version`, `private: true`, `type: "module"` and a `pi` key (`extensions: ["./pi/index.js"]`, `skills: ["./skills"]`). It has no `dependencies` and no `scripts`, so the `npm install` that Pi runs on a git install does nothing. Pi reads `pi.extensions` from this file to find the extension. `build/build.mjs` fails the build on any other key.
    - GS7 (amended again 2026-10-22, ADR-0019 D1; decided by PO on delegation, owner reviews in the morning): the `#release` tree and the npm tarball carry one `package.json`: `name: "context-mode"`, `version` (2.0.0 first), `type: "module"`, `bin: {"context-mode": "cli.mjs"}` (no `./`), `engines: {"node": ">=24.15.0"}`, `license`, `repository.url`, `files` = the release tree, the `pi` key, and no `private`, no `dependencies`, no `scripts`. `package.json` and `cli.mjs` are listed in `SHA256SUMS`; the tarball file list and hashes equal `SHA256SUMS`. `build/build.mjs` fails the build on any other key.
 6. **Migration order (G22):**
    1. version bump
    2. marketplace `ref:"release"`
    3. docs and release note
-   4. `npm deprecate`
+   4. ~~`npm deprecate`~~ removed (ADR-0019 D2): v2 is published on npm with dist-tag `next`
 
    Each outward step is approved separately.
 

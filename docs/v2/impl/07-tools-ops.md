@@ -262,7 +262,7 @@ export const ctxUpgrade: ToolDef<CtxUpgradeInput>;
      b. Verify the bundle hash against `SHA256SUMS` in the fetched tree. Mismatch → throw `CtxError("BUNDLE_HASH_MISMATCH", ...)`.
      c. Atomically `fs.rename` the `current` symlink (from `resolvePluginRoot`'s `"plugin"` case) to point at the new dir.
      d. Keep the previous dir on disk (do not delete) — exactly one rollback generation; a second upgrade deletes the generation two back.
-   - `opencode` additionally: this is the same git-checkout path, never an npm spec (ADR-0010 §3(c): "no npm for v2 per owner rule").
+   - `opencode` additionally: this is the same git-checkout path, never an npm spec for the plugin entry (ADR-0010 §3(c); the npm channel is `context-mode upgrade`, ADR-0019).
 5. **Config regeneration** (all modes reach this step): `current = readHostConfig(adapter.id, resolveConfigDir(...))`; `result = mergeOwnEntries(adapter.id, current.text, current.format, adapter)`; write `result.text` back to the same path. For OpenCode specifically, write to the `.jsonc` path when one exists (format already selected by `readHostConfig`, #849).
 6. **v1 removal**: `findings = detectV1(adapter.id, home)`. For each finding whose rule says "remove" (every ADR-0011 row except the Claude-Code/VS-Code "report, don't remove" exceptions for a user-added MCP entry/`statusLine`/`.vscode/mcp.json` entry): delete the file or strip the entry, add one `UpgradeChangeRow` per removal (`area: finding.file`, `before: finding.reason`, `after: "removed"`). For the report-only exceptions: add one `UpgradeChangeRow` with `after` equal to the fix text, and do not touch the file.
 7. Build the final table: step 4's rows + step 5's `result.edits` (as rows) + step 6's rows.

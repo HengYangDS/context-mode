@@ -10,7 +10,7 @@
 |---|---|
 | `main` | v1, frozen. `package.json` stays at the last v1 version |
 | `v2` | development. CI runs on `[main, v2]` (today `ci.yml:5-8` says `next`) |
-| `release` | **built output only**: bundles, generated manifests, skills. No `package.json`, because Pi runs npm when that file exists. Every release is a new commit with a higher `version` in `plugin.json` / `.codex-plugin/plugin.json`. Codex and Pi see only new commits, not tags; Claude Code keeps a cached copy unless the version changes |
+| `release` | **built output only**: bundles, generated manifests, skills. One `package.json` in the ADR-0019 D1 shape (no `dependencies`, no `scripts`, so the npm run that Pi starts when it sees the file does nothing). Every release is a new commit with a higher `version` in `plugin.json` / `.codex-plugin/plugin.json`. Codex and Pi see only new commits, not tags; Claude Code keeps a cached copy unless the version changes |
 
 Why `main` stays frozen: v1 `/ctx-upgrade` clones `main` and compares the `package.json` version (`cli.ts:1308-1321`). If the versions are equal, it prints "Already on latest" and builds nothing. So v1 users cannot be broken by v2 work.
 
@@ -41,7 +41,7 @@ Every outward step needs its own approval.
 | Codex | re-write `config.toml`'s `[mcp_servers.context-mode*]` block to the v2 entry, then restart Codex to pick it up (Codex has no marketplace-upgrade command for a git-sourced plugin; the config.toml rewrite is `ctx_upgrade`'s step 4, same as every other config-rewrite agent) |
 | Gemini / Qwen | remove the v1 MCP entry, then `gemini extensions install https://github.com/mksglu/context-mode --ref release --auto-update` (Qwen: same form) |
 | Pi | `pi install git:github.com/mksglu/context-mode@release` (source only, test first) |
-| OpenCode 2 | remove the bare npm spec (`"context-mode"`) from `.plugin[]`, then add the v2 git spec: `"git+https://github.com/mksglu/context-mode.git#release"` (no npm for v2, owner rule; test first) |
+| OpenCode 2 | remove the bare npm spec (`"context-mode"`) from `.plugin[]`, then add the v2 git spec: `"git+https://github.com/mksglu/context-mode.git#release"` (git spec kept for the OpenCode plugin path; `context-mode setup` writes the MCP entry, ADR-0019; test first) |
 | Copilot CLI, VS Code, Kiro, ZCode | test first, then document |
 | npm users | `npm uninstall -g context-mode`, then the agent's git install. On first run, `ctx_doctor` lists the v1 leftovers and `ctx_upgrade` removes them |
 
@@ -66,7 +66,7 @@ There is one pure `detectV1(agent)` per agent. It returns `{file, path, reason}`
 | VS Code | whole file `<project>/.github/hooks/context-mode.json`; data `<project>/.github/context-mode/sessions/` or `~/.vscode/context-mode/sessions/` | Delete the file and the session-data dirs (project scope). `ctx_doctor` also flags a leftover context-mode entry inside `.vscode/mcp.json`, the same way it flags a user-added MCP entry for Claude Code |
 | Kiro | `~/.kiro/agents/default.json` `.hooks.*` flat entries; data `~/.kiro/context-mode/` | Kiro's hooks are flat, not nested like Claude Code's — scan the flat `.hooks.*` list for any entry whose command contains `context-mode` **and** either a v1 script name or `context-mode hook`, and flag it; do not reuse Claude Code's nested-inner-hook matcher verbatim |
 | Pi | `~/.pi/agent/settings.json` `packages[]` `"npm:context-mode"`; data `~/.pi/context-mode/` | Replace with the git entry. `ctx_doctor`'s D4 check also re-scans `packages[]` for `"npm:context-mode"` **after** the git entry is added, and flags it as a leftover if still present — the git entry alone does not prove the stale npm entry was removed (same "two install trees" failure class as #901) |
-| OpenCode | `"context-mode"` in `.plugin[]` of the first config found | Remove the bare npm spec (same id, v1 shape); add the v2 git spec (`git+https://...#release`) — no npm for v2 |
+| OpenCode | `"context-mode"` in `.plugin[]` of the first config found | Remove the bare npm spec (same id, v1 shape); add the v2 git spec (`git+https://...#release`); `setup` writes the MCP entry instead (ADR-0019) |
 | ZCode | `~/.zcode/cli/config.json` and `~/.zcode/cli/hooks.json`, scanned for a context-mode-tagged entry (ZCode reuses the Codex-shaped config path, per #1268) | Remove the entries. (v1 claimed zero footprint here; that was wrong — report, don't claim zero) |
 | All | `~/.context-mode/` (v1 content), tmp files `context-mode-*` | Delete |
 

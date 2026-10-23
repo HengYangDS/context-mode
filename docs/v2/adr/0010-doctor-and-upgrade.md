@@ -64,7 +64,7 @@ All three operations — install, `ctx_upgrade`, and `ctx_doctor`'s D4/D7 checks
    - verify the bundle hash
    - switch to it atomically (rename)
    - keep the previous dir for one rollback
-   - OpenCode 2 uses this same git-checkout path for upgrades too — there is no separate host-managed-plugin-spec alternative for OpenCode (that alternative is rejected: no npm for v2 per the owner's rule, ADR-0011)
+   - OpenCode 2 uses this same git-checkout path for upgrades too — there is no separate host-managed-plugin-spec alternative for OpenCode (that alternative is rejected: the OpenCode plugin spec stays on the git path; ADR-0019 sends users to `context-mode setup` for the npm channel)
 4. **Config:** regenerate only context-mode's entries from `adapters/table.ts`.
    - Keep user keys and user-set values (#1226).
    - Remove v1 entries using the ADR-0011 rules.

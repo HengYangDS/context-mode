@@ -92,7 +92,7 @@ Note (DECISIONS-r9 V9): Claude Code's `compactSummary: "host"` row stays `"host"
 | `qwen` | `SessionStart` | `UserPromptSubmit` | `PreToolUse` | `PostToolUse` | — (source on SessionStart) |
 | `copilot-cli` | `sessionStart` | `userPromptSubmitted` | `preToolUse` | `postToolUse` | — (no PreCompact hook; substitute is the next `userPromptSubmitted`/`preToolUse`) |
 | `vscode` | `SessionStart` | `UserPromptSubmit` | `PreToolUse` | `PostToolUse` | — (no PreCompact hook; substitute is the next `UserPromptSubmit`) |
-| `kiro` | `SessionStart` (legacy `agentSpawn`) | `PromptSubmit` (legacy `userPromptSubmit`) | `PreToolUse` | `PostToolUse` | none — documented gap (DECISIONS-r3 Q24 item 6) |
+| `kiro` | `SessionStart` (legacy `agentSpawn`) | `UserPromptSubmit` (D-FU-RM-KIRO-1; legacy `PromptSubmit`, `userPromptSubmit` still decode) | `PreToolUse` | `PostToolUse` | none — documented gap (DECISIONS-r3 Q24 item 6) |
 | `zcode` | `SessionStart` | `UserPromptSubmit` | `PreToolUse` | `PostToolUse` | — (source on SessionStart) |
 | `pi` | `session_start` (compact: `session_compact`) | `input` | `tool_call` | `tool_result` | — (`session_compact` event covers it) |
 | `opencode` | session hook `context` | session hook `prompt` | `execute.before` | `execute.after` | session hook `compaction` |

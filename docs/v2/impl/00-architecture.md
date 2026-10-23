@@ -84,7 +84,7 @@ Owner column = module id (§2).
 
 | Path | Purpose | Owner |
 |---|---|---|
-| `build/build.mjs` | esbuild: 4 bundles, inline prompt md, no `package.json` out | build-release |
+| `build/build.mjs` | esbuild: 7 bundles (server, hook, run, search, pi, opencode, cli), inline prompt md; the hook bundle is minified (D-CI-PERF-4); writes the ADR-0019 D1 `package.json` out | build-release |
 | `build/manifests.ts` | generate every manifest + hook config from `adapters/table.ts` | build-release |
 | `build/hash.mjs` | `SHA256SUMS` over the release tree | build-release |
 | `build/check-removed.mjs` | GS5: fail if a removed path or routing file exists | v1-transition |
@@ -118,7 +118,9 @@ Owner column = module id (§2).
 
 ```
 server.mjs            src/entries/server.ts bundle (prompt inlined)
-hook.mjs              src/entries/hook.ts bundle
+hook.mjs              src/entries/hook.ts bundle (minified, D-CI-PERF-4)
+cli.mjs               src/entries/cli.ts bundle, npm bin (ADR-0019 D1)
+package.json          ADR-0019 D1 shape: name, version, bin, type, engines, files, pi
 run.mjs               subagent case-B wrapper
 pi/index.js           Pi plugin
 opencode/plugin.js    OpenCode 2 plugin
@@ -128,7 +130,7 @@ skills/ctx-{stats,doctor,upgrade}/SKILL.md
 copilot/plugin.json  hooks/<agent>.json (generated)
 SHA256SUMS
 ```
-No `package.json`, no `node_modules` (ADR-0002, GS7).
+One `package.json` in the ADR-0019 D1 shape (no `dependencies`, no `scripts`), no `node_modules` (ADR-0002 GS7 as amended, ADR-0019).
 
 ## 2. Modules
 

@@ -182,10 +182,10 @@ None owned by this module. The harness constants (`--model claude-sonnet-5 --eff
 
    | v1 feature | Status in v2 | Why / replacement |
    |---|---|---|
-   | `statusline` (`context-mode statusline`) | Removed | no npm CLI entry point in v2 (ADR-0002, no npm); `ctx_doctor`/`ctx_stats` give the same numbers inside the agent |
+   | `statusline` (`context-mode statusline`) | Removed | no `statusline` command in the v2 CLI (ADR-0019 has `setup`, `doctor`, `upgrade`); `ctx_doctor`/`ctx_stats` give the same numbers inside the agent |
    | `ctx_insight` | Removed | folded into `ctx_stats`'s existing numbers; no separate tool in the 9-tool set (README §4) |
    | `ctx_purge` scopes | Changed | kept, but scopes now match v2's three-level `SearchScope` (`session`/`worktree`/`project`) instead of v1's ad-hoc scope strings |
-   | the CLI (`context-mode <cmd>`) | Removed | v2 has no `package.json` on the `release` branch (00-architecture.md "release branch" tree) and installs only as an MCP server/plugin per agent; every v1 CLI action maps to an MCP tool or a skill (`/ctx-stats`, `/ctx-doctor`, `/ctx-upgrade`) |
+   | the CLI (`context-mode <cmd>`) | Replaced | ADR-0019: v2 ships a small CLI, `context-mode setup|doctor|upgrade` (the v1 forms `hook <platform> <event>` and `mcp` are accepted, D4). Every other v1 CLI action maps to an MCP tool or a skill (`/ctx-stats`, `/ctx-doctor`, `/ctx-upgrade`) |
    | call-rate throttling on search (`flood-guard.ts`) | Removed, not replaced | a single global counter re-trips on legitimate fan-out from v2's concurrent subagents (ADR-0015, replaying #769); no replacement is planned |
 
 5. Rollback table — one row per agent, the exact command to reinstall v1:
