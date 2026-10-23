@@ -60,7 +60,7 @@ function main() {
   }
 
   // Open item 1: the D3 hook overhead gate runs on every OS of the ci matrix (no runner.os condition on its step).
-  const hookGate = src.match(/-\s*run:\s*node e2e\/checks\/setup-hook-overhead\.mjs[^\n]*\n((?:\s+(?!-\s)[^\n]*\n)*)/);
+  const hookGate = src.match(/-\s*run:\s*node e2e\/checks\/setup-hook-overhead\.mjs[^\n]*\n((?:(?![ \t]*-\s)[ \t]+[^\n]*\n)*)/);
   if (!hookGate) return fail("ci.yml needs the D3 step node e2e/checks/setup-hook-overhead.mjs");
   if (/\bif:/.test(hookGate[1])) return fail("ci.yml D3 hook overhead step must run on all three OSes (no if: condition)");
 
