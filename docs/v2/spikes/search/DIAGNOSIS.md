@@ -114,3 +114,74 @@ What v2 dropped and the stated reason:
   where RRF in v2 fuses BM25 with recency for scope `project` only, not porter with trigram.
 - **Markdown chunking for `ctx_index {content}`**: v2 has the `"md"` chunker but `itemsOf`
   passes kind `"text"` for inline content (no DEVIATIONS row found).
+
+## 3. Held-out set
+
+`e2e/fixtures/search/heldout.json`, frozen in `13cba162` before any engine change. 50 queries over
+the 7 bench inputs plus `docs/v2/impl/02-store.md`, `docs/v2/PRD-v2.md`, `docs/v2/LAUNCH.md`.
+Kinds: natural 14, identifier 8, typo 8, code 7, morph (plural / verb form) 6, phrase 5, flag 2.
+Each label is an exact substring copied from the source text; no label holds `< > &`, so v2 entity
+escaping cannot cause a miss. Scoring: a hit at rank r is the r-th result that holds any `expect`
+string; recall@5 and MRR@10 as defined in the file.
+
+Harness: `bench/search/heldout.mjs` (MCP stdio, fresh HOME and project per run).
+`node bench/search/heldout.mjs --engine v2` or `--engine v1 --v1 <origin/main checkout with build/>`.
+Raw output: `docs/v2/spikes/search/results/baseline-v2.json`, `baseline-v1.json`.
+
+## 4. Baseline numbers (2026-10-23, node 26, macOS)
+
+| Metric | v1 (origin/main, MCP) | v1 engine top 10 | v2 (v2-design, MCP) |
+|---|---|---|---|
+| Bench 7: scenarios with no hits | 0 / 7 | n/a | 3 / 7 |
+| Bench 7: queries with hits | 20 / 20 | n/a | 6 / 20 |
+| Bench 7: fences whole in replies | 21 / 70 | n/a | 0 / 70 |
+| Held-out recall@5 | 0.84 | 1.00 | 0.38 |
+| Held-out MRR@10 | 0.76 | 0.856 | 0.324 |
+| Held-out queries with zero hits | 0 / 50 | 0 / 50 | 25 / 50 |
+| Search p50 / p95 ms, +1 MB indexed | 3.0 / 7.7 | n/a | 1.3 / 3.2 |
+
+Notes:
+
+- v1 MCP shows at most 2 hits per query (`Math.min(limit, 2)` in v1 `server.ts`), so its recall@5
+  over MCP is capped by the reply, not the ranking. "v1 engine top 10" calls
+  `ContentStore.searchWithFallback(q, 10, source)` on the same inputs.
+- v2 held-out recall@5 by kind: code 7/7, identifier 6/8, flag 2/2, phrase 4/5, natural 0/14,
+  typo 0/8, morph 0/6. v2 finds exact tokens and fails every query that needs OR, stemming or
+  typo recovery.
+- v1 engine scores 50/50 on recall@5. The set is still useful as a floor: any v2 fix must reach
+  the v1 engine on it without new queries tuned to the fix. A second held-out set written after
+  the fix (by someone who has not seen the engine output) is the check against over-fit.
+- Fences whole is lower for v1 over MCP (21/70) than v1-baseline.json says (exact code preserved)
+  because v1 MCP shows 2 hits and `extractSnippet` clips chunks over 1500 chars; the v1 bench
+  counted code chunks in the store, not in the reply.
+
+## 5. Plan (order, and the cause each layer fixes)
+
+Each step: tests first (unit in `tests/v2/store`, `tests/v2/index`; E2E through
+`bench/search/heldout.mjs` and `bench/fixtures/run.mjs`), one DEVIATIONS.md row, commit, push,
+re-run the held-out set. A step stays only if recall@5 and MRR@10 do not drop and p95 stays under
+10 ms with 1 MB indexed.
+
+1. **OR fallback + stopwords** (causes 1, 3). Keep AND as the first pass (precision), run
+   `toMatchAny` minus stopwords when AND returns nothing. BM25 ranks chunks with more terms first.
+   v1 history: `6a5f131b`, `707c4aea`.
+2. **Markdown chunking for `ctx_index {content}`** (cause 2, split code). Route inline content
+   through the existing `"md"` chunker (heading-aware, fence-aware, 4096 B cap) when it holds a
+   heading or a fence. Keeps heading and body, and tool name and description, in one chunk.
+   v1 history: `60a1a254`, `609a3a5a`.
+3. **Porter stemming** (cause 4). `porter unicode61 remove_diacritics 2`: keeps the V24 Cyrillic
+   and accent folding and adds English stems. Needs a schema migration (FTS table rebuild) and a
+   DECISIONS-r9 V24 amendment.
+4. **Trigram table + fuzzy correction** (typos, substrings like `useEff`). Second FTS5 table with
+   `tokenize='trigram'`, vocabulary table, Levenshtein correction only when steps 1-3 return
+   nothing. Measure index growth first: RFC #962 (index size on logs/JSONL) is open.
+5. **RRF (k=60) over porter and trigram, then proximity rerank with title boost** (ranking of
+   natural-language and multi-word queries). v1 history: `bce072b5`, `00d948a9`, `393839ac`, `2c63add6`.
+6. **Reply text for code** (code blocks whole). Two ADR-level items, not engine changes:
+   the 800 B snippet clip (DECISIONS-r9 M21) and `& < >` entity escaping in `highlight`.
+   Options for the owner: return a hit whose chunk holds a fence as the whole chunk (up to 4096 B,
+   fewer hits per page under OUTPUT_CAP 16384), and stop escaping (MCP text is not HTML). No
+   truncation is proposed as a fix.
+
+Targets for the fix: 0 / 7 no-hit scenarios, held-out recall@5 >= 0.84 (v1 over MCP) and MRR@10
+>= 0.76, fences whole >= 21 / 70 (and all fences under 4096 B after step 6), p95 <= 10 ms.
