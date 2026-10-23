@@ -1,14 +1,32 @@
 // impl/09 §5.2 hook entry I/O, DEVIATIONS D-M7-HP-1 (GS6). Re-exported by dispatch.ts so the entry keeps
 // its import rule (contracts + dispatch only, D-M3-H2-9).
 // D-CI-PERF-3: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
-const { writeSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
+const { read, writeSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 
-// stdin stays a stream read: a sync readFileSync(0) on the spawnSync socket pair hung once in a live
-// Case B run (child blocked in read(0), never reproduced in 180 reruns). A hook must never hang the
-// host, so the ~1.5 ms stream setup stays (DEVIATIONS D-M7-HP-1).
+// D-CI-PERF-6: stdin is read with async fs.read on fd 0 (libuv thread pool), not the process.stdin stream: the
+// stream builds net, stream and pipe_wrap (28 internal modules, about 3.5 ms per call on Node 24 and 26). It is not
+// a sync read, so the event loop never blocks in read(0) (the D-M7-HP-1 hang was a sync readFileSync(0)). Any error
+// other than EOF (EAGAIN on a non-blocking pipe, EISDIR, ...) falls back to the stream and keeps the bytes read so far.
+const CHUNK = 65536;
+
+function readFd0(parts: Buffer[]): Promise<boolean> {
+  const buf = Buffer.allocUnsafe(CHUNK);
+  return new Promise((resolve) => {
+    const step = (): void => {
+      read(0, buf, 0, CHUNK, null, (err, n) => {
+        if (err) return resolve((err as NodeJS.ErrnoException).code === "EOF"); // Windows pipe end = EOF error
+        if (n === 0) return resolve(true);
+        parts.push(Buffer.from(buf.subarray(0, n)));
+        step();
+      });
+    };
+    step();
+  });
+}
+
 export async function readStdin(): Promise<string> {
   const parts: Buffer[] = [];
-  for await (const c of process.stdin) parts.push(c as Buffer);
+  if (!(await readFd0(parts))) for await (const c of process.stdin) parts.push(c as Buffer);
   return Buffer.concat(parts).toString("utf8");
 }
 
