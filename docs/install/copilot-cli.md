@@ -1,38 +1,25 @@
 # Install context-mode v2 on Copilot CLI
 
-This guide adds the MCP server with `copilot mcp add` and writes `~/.copilot/hooks/context-mode.json` with one command. The plugin install does not work yet: the release branch has no `marketplace.json`.
-
-The shipped `hooks/copilot-cli.json` is a template: the writer fills the path; do not copy hooks/copilot-cli.json by hand.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Copilot CLI, the manual fallback, the known limits and what was checked.
 
 ## Install
 
-Get the files first. See [Get the files](./README.md#get-the-files).
+What setup does for Copilot CLI: Runs `copilot mcp add context-mode -- node <package>/server.mjs --agent copilot-cli`. It rewrites v1 hook commands in `~/.copilot/hooks/context-mode.json` to the absolute v2 form, but only if that file exists.
 
-macOS / Linux:
+It writes `~/.copilot/mcp-config.json`. Hooks: not written on a fresh HOME. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. Same command that setup runs, with the package path filled by `npm root -g`.
 
 ```sh
-npm install -g @github/copilot
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
-copilot mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent copilot-cli
-node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=p.join(process.env.COPILOT_HOME||p.join(h,".copilot"),"hooks"),k=JSON.parse(fs.readFileSync(p.join(a,"hooks","copilot-cli.json"),"utf8"));for(const e in k.hooks)for(const x of k.hooks[e])x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent copilot-cli";fs.mkdirSync(d,{recursive:true});fs.writeFileSync(p.join(d,"context-mode.json"),JSON.stringify(k,null,2)+"\n")'
+copilot mcp add context-mode -- node "$(npm root -g)/context-mode/server.mjs" --agent copilot-cli
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-npm install -g @github/copilot
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
-copilot mcp add context-mode -- node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent copilot-cli
-@'
-const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=p.join(process.env.COPILOT_HOME||p.join(h,".copilot"),"hooks"),k=JSON.parse(fs.readFileSync(p.join(a,"hooks","copilot-cli.json"),"utf8"));for(const e in k.hooks)for(const x of k.hooks[e])x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent copilot-cli";fs.mkdirSync(d,{recursive:true});fs.writeFileSync(p.join(d,"context-mode.json"),JSON.stringify(k,null,2)+"\n")
-'@ | node -
-```
-
-The last command writes the hook file with the real path to `hook.mjs`. Restart Copilot CLI.
+Restart Copilot CLI after the install.
 
 ## Verify
 
 ```sh
+context-mode doctor --agents copilot-cli
 copilot mcp list
 ```
 
@@ -40,77 +27,48 @@ copilot mcp list
 
 ## Update
 
-macOS / Linux:
-
 ```sh
-git -C ~/.context-mode-app pull
+npm i -g context-mode@next && context-mode setup --repair --agents copilot-cli
 ```
 
-Windows (PowerShell):
+Or run `context-mode upgrade --agents copilot-cli`. After the owner moves the `latest` tag, drop `@next`.
 
-```powershell
-git -C "$env:USERPROFILE\.context-mode-app" pull
-```
+## Known limits
 
-Restart Copilot CLI.
+- On a fresh HOME setup writes `~/.copilot/mcp-config.json` only; no hook file.
+- The plugin install does not work yet: the release branch has no `marketplace.json` for Copilot.
+- The shipped `hooks/copilot-cli.json` is a template: the writer fills the path; do not copy hooks/copilot-cli.json by hand.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. In Copilot CLI, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Copilot CLI it rewrites a v1 hook command (`context-mode hook ...`) to the absolute v2 form when the hook file exists. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Rollback to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for Copilot CLI as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Copilot CLI as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-macOS / Linux:
-
 ```sh
+context-mode setup --remove --agents copilot-cli
 copilot mcp remove context-mode
-node -e 'const p=require("path");require("fs").rmSync(p.join(process.env.COPILOT_HOME||p.join(require("os").homedir(),".copilot"),"hooks","context-mode.json"),{force:true})'
-rm -rf ~/.context-mode-app
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-copilot mcp remove context-mode
-@'
-const p=require("path");require("fs").rmSync(p.join(process.env.COPILOT_HOME||p.join(require("os").homedir(),".copilot"),"hooks","context-mode.json"),{force:true})
-'@ | node -
-Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
-```
-
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
+Run `context-mode doctor --agents copilot-cli`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
 | Command | Copilot CLI version | Date | Result |
 |---|---|---|---|
-| `copilot mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent copilot-cli` | 1.0.102 | 2026-10-21 | Pass |
-| `copilot mcp list` | 1.0.102 | 2026-10-21 | Pass: context-mode (local) |
-| hooks command (sh), then the written sessionStart command from another folder | n/a | 2026-10-21 | Pass: exit 0 |
-| `copilot plugin marketplace add` on the release branch | 1.0.102 | 2026-10-21 | Fail: no marketplace.json |
-| `copilot mcp remove context-mode` | 1.0.102 | 2026-10-21 | Pass |
+| `context-mode setup --yes --agents copilot-cli` | 1.0.103 | 2026-10-23 | Pass: `~/.copilot/mcp-config.json` written |
+| `context-mode setup --yes --agents copilot-cli` (second run) | 1.0.103 | 2026-10-23 | Pass |
+| `context-mode doctor --agents copilot-cli` | 1.0.103 | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | 1.0.103 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live Copilot CLI session that fires the hooks (needs a login). Windows commands.
+Not run: a live, logged-in Copilot CLI session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).

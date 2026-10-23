@@ -15,7 +15,7 @@ test("qwen guide installs with the extension (method 1), which registers the ser
   assert.match(md, /qwen extensions uninstall context-mode/);
   assert.match(md, /qwen extensions update context-mode/);
   const readme = read("docs/install/README.md");
-  assert.match(readme, /\| Qwen Code \| \[qwen\.md\]\(\.\/qwen\.md\) \| 1 \(/, "README method row for Qwen Code is not method 1");
+  assert.match(readme, /\| Qwen Code \| \[qwen\.md\]\(\.\/qwen\.md\) \| `qwen extensions link/, "README row for Qwen Code does not name the extension command");
 });
 
 test("kiro guide does not claim the release hook file uses PromptSubmit or that hook.mjs drops UserPromptSubmit", () => {

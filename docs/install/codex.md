@@ -1,38 +1,25 @@
 # Install context-mode v2 on Codex
 
-This guide adds the MCP server with `codex mcp add` and writes the hooks to `~/.codex/hooks.json` (or `$CODEX_HOME/hooks.json`) with one command. A Codex plugin install does not work yet: the release branch has no `.agents/plugins/marketplace.json`.
-
-The shipped `hooks/codex.json` is a template: the writer fills the path; do not copy hooks/codex.json by hand.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Codex, the manual fallback, the known limits and what was checked.
 
 ## Install
 
-Get the files first. See [Get the files](./README.md#get-the-files).
+What setup does for Codex: Writes a `[mcp_servers.context-mode]` table to `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) with the absolute `node` and `server.mjs` paths. It rewrites v1 hook commands in `~/.codex/hooks.json` to the absolute v2 form, but only if they exist.
 
-macOS / Linux:
+It writes `~/.codex/config.toml`. Hooks: not written on a fresh HOME. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. Adds the MCP server only.
 
 ```sh
-npm install -g @openai/codex
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
-codex mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent codex
-node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=process.env.CODEX_HOME||p.join(h,".codex"),f=p.join(d,"hooks.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.hooks=c.hooks||{};const s=JSON.parse(fs.readFileSync(p.join(a,"hooks","codex.json"),"utf8")).hooks;for(const k in s){c.hooks[k]=(c.hooks[k]||[]).filter(e=>!JSON.stringify(e).includes(".context-mode-app"));for(const e of s[k]){for(const x of e.hooks)x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent codex";c.hooks[k].push(e)}}fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+codex mcp add context-mode -- node "$(npm root -g)/context-mode/server.mjs" --agent codex
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-npm install -g @openai/codex
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
-codex mcp add context-mode -- node "$env:USERPROFILE\.context-mode-app\server.mjs" --agent codex
-@'
-const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),d=process.env.CODEX_HOME||p.join(h,".codex"),f=p.join(d,"hooks.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.hooks=c.hooks||{};const s=JSON.parse(fs.readFileSync(p.join(a,"hooks","codex.json"),"utf8")).hooks;for(const k in s){c.hooks[k]=(c.hooks[k]||[]).filter(e=>!JSON.stringify(e).includes(".context-mode-app"));for(const e of s[k]){for(const x of e.hooks)x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent codex";c.hooks[k].push(e)}}fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
-'@ | node -
-```
-
-The last command writes the hooks with the real path to `hook.mjs`. It keeps your other hooks and adds no duplicates. Start Codex and approve the context-mode hooks once in the trust prompt.
+Restart Codex after the install.
 
 ## Verify
 
 ```sh
+context-mode doctor --agents codex
 codex mcp list
 ```
 
@@ -40,82 +27,48 @@ codex mcp list
 
 ## Update
 
-macOS / Linux:
-
 ```sh
-git -C ~/.context-mode-app pull
+npm i -g context-mode@next && context-mode setup --repair --agents codex
 ```
 
-Windows (PowerShell):
+Or run `context-mode upgrade --agents codex`. After the owner moves the `latest` tag, drop `@next`.
 
-```powershell
-git -C "$env:USERPROFILE\.context-mode-app" pull
-```
+## Known limits
 
-Restart Codex.
+- On a fresh HOME setup does not create `~/.codex/hooks.json`. It writes only `config.toml`, so a new Codex install has the MCP server and no hooks (see [Verified](#verified), clean-HOME run).
+- A Codex plugin install does not work yet: there is no `.agents/plugins/marketplace.json`.
+- The shipped `hooks/codex.json` is a template: the writer fills the path; do not copy hooks/codex.json by hand.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. In Codex, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Codex it rewrites a v1 hook command (`context-mode hook ...`) to the absolute v2 form when the hook file exists. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Rollback to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for Codex as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Codex as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-macOS / Linux:
-
 ```sh
+context-mode setup --remove --agents codex
 codex mcp remove context-mode
-node -e 'const fs=require("fs"),p=require("path"),f=p.join(process.env.CODEX_HOME||p.join(require("os").homedir(),".codex"),"hooks.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));for(const k in c.hooks){c.hooks[k]=c.hooks[k].filter(e=>!JSON.stringify(e).includes(".context-mode-app"));if(!c.hooks[k].length)delete c.hooks[k]}fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
-rm -rf ~/.context-mode-app
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-codex mcp remove context-mode
-@'
-const fs=require("fs"),p=require("path"),f=p.join(process.env.CODEX_HOME||p.join(require("os").homedir(),".codex"),"hooks.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));for(const k in c.hooks){c.hooks[k]=c.hooks[k].filter(e=>!JSON.stringify(e).includes(".context-mode-app"));if(!c.hooks[k].length)delete c.hooks[k]}fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
-'@ | node -
-Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
-```
-
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
+Run `context-mode doctor --agents codex`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 05e97724 (rows dated 2026-10-21 ran on 0438537; the 2026-10-22 re-run on 05e97724 passed the same install, `codex mcp list` and hook checks).
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
 | Command | Codex version | Date | Result |
 |---|---|---|---|
-| `codex mcp add context-mode -- node "$HOME/.context-mode-app/server.mjs" --agent codex` | 0.163.0 | 2026-10-21 | Pass: config.toml has the real path |
-| `codex mcp list` | 0.163.0 | 2026-10-21 | Pass: context-mode enabled |
-| hooks command (sh), then the written hook command from another folder | 0.163.0 | 2026-10-21 | Pass: exit 0, hook JSON returned |
-| `codex mcp remove context-mode` and hooks cleanup | 0.163.0 | 2026-10-21 | Pass |
+| `context-mode setup --yes --agents codex` | 0.164.0 | 2026-10-23 | Pass: `~/.codex/config.toml` written |
+| `context-mode setup --yes --agents codex` (second run) | 0.164.0 | 2026-10-23 | Pass |
+| `context-mode doctor --agents codex` | 0.164.0 | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | 0.164.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a live Codex session that fires the hooks and shows the trust prompt (needs a login). Windows commands.
-
-## Sources
-
-- https://learn.chatgpt.com/docs/extend/mcp?surface=cli
-- https://learn.chatgpt.com/docs/hooks
-- https://github.com/openai/codex/blob/main/codex-rs/hooks/src/engine/command_runner.rs
+Not run: a live, logged-in Codex session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).

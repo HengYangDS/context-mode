@@ -1,84 +1,73 @@
 # Install context-mode v2 on Qwen Code
 
-This guide uses the Qwen Code extension install. It adds the MCP server and the four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse) from the release branch. You do not need `~/.context-mode-app`.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Qwen Code, the manual fallback, the known limits and what was checked.
 
 ## Install
 
-The same commands work in PowerShell (not run on Windows yet).
+What setup does for Qwen Code: Runs `qwen extensions link <package folder>` and answers its risk prompt with `y` on stdin, because Qwen has no consent flag. The extension ships the MCP server and four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse). Setup drops v1 hook commands from `~/.qwen/settings.json`.
+
+It writes `~/.qwen/extensions/context-mode/` (link), `extension-store/state.json`. Hooks: shipped by the extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. The git route installs the extension from the `release` branch. Keep the `:context-mode` suffix: without `--consent` a URL with no suffix opens a plugin picker.
 
 ```sh
-npm install -g @qwen-code/qwen-code
 qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release --consent
 ```
 
-`--consent` accepts the extension risk prompt, so the command does not stop to ask.
+Restart Qwen Code after the install.
 
 ## Verify
 
 ```sh
-qwen mcp list
+context-mode doctor --agents qwen
 qwen extensions list
 ```
 
-`context-mode` must show as Connected, and `qwen extensions list` must show `context-mode (2.0.0)` with Ref `release`. Then run `/ctx-doctor` in Qwen Code, and `/hooks` to see the four context-mode hooks.
+`context-mode` must be listed. `qwen mcp list` must show it Connected. Then run `/ctx-doctor` in Qwen Code, and `/hooks` to see the four context-mode hooks.
 
 ## Update
 
 ```sh
-qwen extensions update context-mode
+npm i -g context-mode@next && context-mode setup --repair --agents qwen
 ```
 
-Restart Qwen Code.
+Or run `context-mode upgrade --agents qwen`. After the owner moves the `latest` tag, drop `@next`.
+
+## Known limits
+
+- `qwen extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
+- No logged-in Qwen session ran `/ctx-doctor`, `/hooks` or the other three hooks.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. In Qwen Code, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Qwen Code it drops the v1 hook commands (`context-mode hook ...`) from the host settings file, because the plugin or extension ships its own hooks. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Roll back to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for Qwen Code as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Qwen Code as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
 ```sh
+context-mode setup --remove --agents qwen
 qwen extensions uninstall context-mode
 ```
 
-If you used the older `qwen mcp add` method, also run:
-
-```sh
-qwen mcp remove -s user context-mode
-rm -rf ~/.context-mode-app
-```
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
+Run `context-mode doctor --agents qwen`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 05e97724.
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
 | Command | Qwen Code version | Date | Result |
 |---|---|---|---|
-| `qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release --consent` | 0.26.0 | 2026-10-22 | Pass: installed and enabled, server path `<home>/.qwen/extensions/context-mode/server.mjs` |
-| `qwen mcp list` | 0.26.0 | 2026-10-22 | Pass: Connected |
-| hook registration (`qwen -p` with `--debug`, no login) | 0.26.0 | 2026-10-22 | Pass: "Hook registry initialized with 4 hook entries"; SessionStart ran `hook.mjs` with `${CLAUDE_PLUGIN_ROOT}` set to the extension folder, exit 0 |
-| `qwen extensions update context-mode` | 0.26.0 | 2026-10-22 | Pass: "already up to date" |
-| `qwen extensions uninstall context-mode` | 0.26.0 | 2026-10-22 | Pass: extension folder removed, `qwen mcp list` empty |
+| `context-mode setup --yes --agents qwen` | 0.26.0 | 2026-10-23 | Pass: `~/.qwen/extensions/context-mode/` (link), `extension-store/state.json` written |
+| `context-mode setup --yes --agents qwen` (second run) | 0.26.0 | 2026-10-23 | Pass |
+| `context-mode doctor --agents qwen` | 0.26.0 | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | 0.26.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Without `--consent`, the URL with no `:context-mode` suffix opens a plugin picker, so keep the suffix. Not run: a logged-in Qwen session, so `/ctx-doctor`, `/hooks` and the other three hooks did not run. Windows commands.
+Not run: a live, logged-in Qwen Code session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).

@@ -1,81 +1,75 @@
 # Install context-mode v2 on Pi
 
-Pi installs context-mode as a package straight from the release branch. Pi does not need `~/.context-mode-app`.
-
-The release branch has a `package.json` with a `pi` key that points at `pi/index.js` and `skills`. Pi has no `/ctx-doctor` or `/ctx-upgrade` command. Not proven yet: that a logged-in Pi session fires the hooks.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Pi, the manual fallback, the known limits and what was checked.
 
 ## Install
 
+What setup does for Pi: Runs `pi install <package folder>`. Pi reads the `pi` key in the package `package.json` (`pi/index.js` and `skills`), so Pi gets the extension and the skills. Pi does not need an MCP entry.
+
+It writes `~/.pi/agent/settings.json` (`packages`). Hooks: in-process extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. The git route installs from the `release` branch. `pi update --extensions` updates it.
+
 ```sh
-npm install -g @earendil-works/pi-coding-agent
 pi install git:github.com/mksglu/context-mode@release
 ```
 
-The same commands work in PowerShell (not run on Windows yet).
+Restart Pi after the install.
 
 ## Verify
 
 ```sh
+context-mode doctor --agents pi
 pi list
 ```
 
-`git:github.com/mksglu/context-mode@release` must be listed. In a run with no login, Pi loads the extension and its hooks print a `hooks: no project: NO_PROJECT` line before the "No API key" error. That line shows the extension loaded.
+The package must be listed. In a run with no login, Pi loads the extension and its hooks print a `hooks: no project: NO_PROJECT` line before the "No API key" error. That line shows the extension loaded.
 
 ## Update
 
 ```sh
-pi update --extensions
+npm i -g context-mode@next && context-mode setup --repair --agents pi
 ```
 
-Plain `pi update` skips packages: it updates only Pi itself.
+Or run `context-mode upgrade --agents pi`. After the owner moves the `latest` tag, drop `@next`.
 
+## Known limits
+
+- Pi has no `/ctx-doctor` or `/ctx-upgrade` command (D-FU-RM-DOCS-1). Use `context-mode doctor` in a shell.
+- No logged-in Pi session (needs an API key) fired a hook. The git-route runs below used commit 05e97724.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. Remove the v1 entry `"npm:context-mode"` from `packages[]` in `~/.pi/agent/settings.json` by hand.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Pi it writes a new v2 entry. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Rollback to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for Pi as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Pi as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
 ```sh
+context-mode setup --remove --agents pi
 pi remove git:github.com/mksglu/context-mode@release
 ```
 
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `pi list` and `pi --version`. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste both outputs.
+Run `context-mode doctor --agents pi`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 05e97724.
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
 | Command | Pi version | Date | Result |
 |---|---|---|---|
-| `npm install -g @earendil-works/pi-coding-agent` | 1.4.0 | 2026-10-22 | Pass |
-| `pi install git:github.com/mksglu/context-mode@release` | 1.4.0 | 2026-10-22 | Pass: cloned to `$HOME/.pi/agent/git/`, HEAD 05e97724 |
-| `pi list` | 1.4.0 | 2026-10-22 | Pass: package listed |
-| load `pi/index.js` with a stub API | 1.4.0 | 2026-10-22 | Pass: handlers on `before_agent_start`, `input`, `tool_call`, `tool_result`, `session_compact`; no `registerCommand` |
-| `pi -p` with no login | 1.4.0 | 2026-10-22 | Pass: hooks printed `hooks: no project: NO_PROJECT`, then "No API key" |
-| `pi update --extensions` (checkout set one commit back first) | 1.4.0 | 2026-10-22 | Pass: moved to 05e97724 |
-| `pi remove git:github.com/mksglu/context-mode@release` | 1.4.0 | 2026-10-22 | Pass: `pi list` printed "No packages installed." |
-| `/ctx-doctor` in Pi | 1.4.0 | 2026-10-22 | Fail: the command does not exist in the extension (D-FU-RM-DOCS-1) |
+| `context-mode setup --yes --agents pi` | 1.4.0 | 2026-10-23 | Pass: `~/.pi/agent/settings.json` (`packages`) written |
+| `context-mode setup --yes --agents pi` (second run) | 1.4.0 | 2026-10-23 | Pass |
+| `context-mode doctor --agents pi` | 1.4.0 | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | 1.4.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: a logged-in Pi session (needs an API key), so no tool call and no hook fired in a real session. The Upgrade from v1 and Rollback to v1 steps. Windows commands.
+Not run: a live, logged-in Pi session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
+
+Earlier git-route run, commit 05e97724, Pi 1.4.0, 2026-10-22: `pi install git:github.com/mksglu/context-mode@release` Pass; `pi list` Pass; `pi update --extensions` Pass; `pi remove` Pass; `/ctx-doctor` in Pi Fail (the command does not exist, D-FU-RM-DOCS-1).

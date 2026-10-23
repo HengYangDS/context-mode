@@ -1,105 +1,71 @@
 # Install context-mode v2 on ZCode
 
-This guide covers the ZCode CLI. It writes the MCP entry to `~/.zcode/cli/config.json` with one command, with the real path to the context-mode files.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for ZCode, the manual fallback, the known limits and what was checked.
 
 ## Install
 
-Get the files first. See [Get the files](./README.md#get-the-files).
+What setup does for ZCode: Writes the `context-mode` entry to `~/.zcode/cli/config.json` with the absolute `node` and `server.mjs` paths.
 
-macOS / Linux:
+It writes `~/.zcode/cli/config.json`. Hooks: not written. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. Writes the same entry with one `node` command.
 
 ```sh
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
-node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),d=p.join(h,".zcode","cli"),f=p.join(d,"config.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcp=c.mcp||{};c.mcp.servers=c.mcp.servers||{};c.mcp.servers["context-mode"]={type:"stdio",command:"node",args:[p.join(h,".context-mode-app","server.mjs"),"--agent","zcode"]};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
+node -e 'const fs=require("fs"),p=require("path"),cp=require("child_process"),h=require("os").homedir(),f=p.join(h,".zcode","cli","config.json"),s=p.join(cp.execSync("npm root -g").toString().trim(),"context-mode","server.mjs");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}(c.mcpServers??={})["context-mode"]=({command:process.execPath,args:[s,"--agent","zcode"]});fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2))'
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
-@'
-const fs=require("fs"),p=require("path"),h=require("os").homedir(),d=p.join(h,".zcode","cli"),f=p.join(d,"config.json");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch(e){}c.mcp=c.mcp||{};c.mcp.servers=c.mcp.servers||{};c.mcp.servers["context-mode"]={type:"stdio",command:"node",args:[p.join(h,".context-mode-app","server.mjs"),"--agent","zcode"]};fs.mkdirSync(d,{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
-'@ | node -
-```
-
-The command keeps your other settings. Restart ZCode.
+Restart ZCode after the install.
 
 ## Verify
 
-In ZCode, run `/mcp list`. `context-mode` must be listed. Then run `/ctx-doctor`.
+```sh
+context-mode doctor --agents zcode
+```
+
+Run `/ctx-doctor` in ZCode.
 
 ## Update
 
-macOS / Linux:
-
 ```sh
-git -C ~/.context-mode-app pull
+npm i -g context-mode@next && context-mode setup --repair --agents zcode
 ```
 
-Windows (PowerShell):
+Or run `context-mode upgrade --agents zcode`. After the owner moves the `latest` tag, drop `@next`.
 
-```powershell
-git -C "$env:USERPROFILE\.context-mode-app" pull
-```
+## Known limits
 
-Restart ZCode.
+- Setup writes no hooks for ZCode.
+- ZCode has no npm package, so no run showed ZCode load the server. The ZCode desktop app is not covered.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. In ZCode, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For ZCode it writes a new v2 entry. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Rollback to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for ZCode as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for ZCode as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-macOS / Linux:
-
 ```sh
-node -e 'const fs=require("fs"),p=require("path"),f=p.join(require("os").homedir(),".zcode","cli","config.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcp.servers["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")'
-rm -rf ~/.context-mode-app
+context-mode setup --remove --agents zcode
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-@'
-const fs=require("fs"),p=require("path"),f=p.join(require("os").homedir(),".zcode","cli","config.json"),c=JSON.parse(fs.readFileSync(f,"utf8"));delete c.mcp.servers["context-mode"];fs.writeFileSync(f,JSON.stringify(c,null,2)+"\n")
-'@ | node -
-Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
-```
-
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
+Run `context-mode doctor --agents zcode`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
 | Command | ZCode version | Date | Result |
 |---|---|---|---|
-| install command (sh) | not installed | 2026-10-21 | Pass: entry written with the real path |
-| uninstall command (sh) | not installed | 2026-10-21 | Pass |
+| `context-mode setup --yes --agents zcode` | not installed | 2026-10-23 | Pass: `~/.zcode/cli/config.json` written |
+| `context-mode setup --yes --agents zcode` (second run) | not installed | 2026-10-23 | Pass |
+| `context-mode doctor --agents zcode` | not installed | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | not installed | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: ZCode itself (no package we could put in a temporary folder). Hooks: this guide does not add them yet. The ZCode desktop app. Windows commands.
-
-## Sources
-
-- https://github.com/zai-org/ZCode (apps/zcode-cli README)
+ZCode was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that ZCode loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.

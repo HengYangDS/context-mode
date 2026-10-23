@@ -1,117 +1,72 @@
-# Install context-mode v2 on VS Code
+# Install context-mode v2 on VS Code (Copilot)
 
-VS Code (GitHub Copilot agent mode) reads MCP servers from `.vscode/mcp.json` and hooks from `.github/hooks/` in your project. Run the command below in the root folder of each project. It writes both files with the real path to the context-mode files.
-
-The shipped `hooks/vscode.json` is a template: the writer fills the path; do not copy hooks/vscode.json by hand.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for VS Code (Copilot), the manual fallback, the known limits and what was checked.
 
 ## Install
 
-Get the files first. See [Get the files](./README.md#get-the-files).
+What setup does for VS Code (Copilot): Writes the `context-mode` entry (key `servers`) to `.vscode/mcp.json` under your home folder, with the absolute `node` and `server.mjs` paths.
 
-macOS / Linux:
+It writes `~/.vscode/mcp.json`. Hooks: not written. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. Writes the same entry with one `node` command. For one project, run it from a copy that points `f` at that project's `.vscode/mcp.json`.
 
 ```sh
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git ~/.context-mode-app
-node -e 'const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),m=p.join(process.cwd(),".vscode","mcp.json");let c={};try{c=JSON.parse(fs.readFileSync(m,"utf8"))}catch(e){}c.servers=c.servers||{};c.servers["context-mode"]={type:"stdio",command:"node",args:[p.join(a,"server.mjs"),"--agent","vscode"]};fs.mkdirSync(p.dirname(m),{recursive:true});fs.writeFileSync(m,JSON.stringify(c,null,2)+"\n");const k=JSON.parse(fs.readFileSync(p.join(a,"hooks","vscode.json"),"utf8"));for(const e in k.hooks)for(const x of k.hooks[e])x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent vscode";fs.mkdirSync(p.join(process.cwd(),".github","hooks"),{recursive:true});fs.writeFileSync(p.join(process.cwd(),".github","hooks","context-mode.json"),JSON.stringify(k,null,2)+"\n")'
+node -e 'const fs=require("fs"),p=require("path"),cp=require("child_process"),h=require("os").homedir(),f=p.join(h,".vscode","mcp.json"),s=p.join(cp.execSync("npm root -g").toString().trim(),"context-mode","server.mjs");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}(c.servers??={})["context-mode"]=({command:process.execPath,args:[s,"--agent","vscode"]});fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2))'
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-git clone --depth 1 --branch release https://github.com/mksglu/context-mode.git "$env:USERPROFILE\.context-mode-app"
-@'
-const fs=require("fs"),p=require("path"),h=require("os").homedir(),q=String.fromCharCode(34),a=p.join(h,".context-mode-app"),m=p.join(process.cwd(),".vscode","mcp.json");let c={};try{c=JSON.parse(fs.readFileSync(m,"utf8"))}catch(e){}c.servers=c.servers||{};c.servers["context-mode"]={type:"stdio",command:"node",args:[p.join(a,"server.mjs"),"--agent","vscode"]};fs.mkdirSync(p.dirname(m),{recursive:true});fs.writeFileSync(m,JSON.stringify(c,null,2)+"\n");const k=JSON.parse(fs.readFileSync(p.join(a,"hooks","vscode.json"),"utf8"));for(const e in k.hooks)for(const x of k.hooks[e])x.command="node "+q+p.join(a,"hook.mjs")+q+" --agent vscode";fs.mkdirSync(p.join(process.cwd(),".github","hooks"),{recursive:true});fs.writeFileSync(p.join(process.cwd(),".github","hooks","context-mode.json"),JSON.stringify(k,null,2)+"\n")
-'@ | node -
-```
-
-The command keeps your other servers. Reload the VS Code window.
+Restart VS Code (Copilot) after the install.
 
 ## Verify
 
-Open the Command Palette and run **MCP: List Servers**. `context-mode` must be listed. Then run `/ctx-doctor` in Copilot Chat.
+```sh
+context-mode doctor --agents vscode
+```
+
+Open VS Code, open the MCP server list, and run `/ctx-doctor` in Copilot agent mode.
 
 ## Update
 
-macOS / Linux:
-
 ```sh
-git -C ~/.context-mode-app pull
+npm i -g context-mode@next && context-mode setup --repair --agents vscode
 ```
 
-Windows (PowerShell):
+Or run `context-mode upgrade --agents vscode`. After the owner moves the `latest` tag, drop `@next`.
 
-```powershell
-git -C "$env:USERPROFILE\.context-mode-app" pull
-```
+## Known limits
 
-Reload the VS Code window.
+- Setup writes no hook file. VS Code reads hooks from `.github/hooks/` in a project; that is not part of the setup run.
+- VS Code itself was not run, so no run showed that VS Code reads `.vscode/mcp.json` under the home folder.
+- The shipped `hooks/vscode.json` is a template: the writer fills the path; do not copy hooks/vscode.json by hand.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. In VS Code, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For VS Code (Copilot) it writes a new v2 entry. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Rollback to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for VS Code as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for VS Code (Copilot) as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
-In the root folder of each project:
-
-macOS / Linux:
-
 ```sh
-node -e 'const fs=require("fs"),p=require("path"),m=p.join(process.cwd(),".vscode","mcp.json"),c=JSON.parse(fs.readFileSync(m,"utf8"));delete c.servers["context-mode"];fs.writeFileSync(m,JSON.stringify(c,null,2)+"\n");fs.rmSync(p.join(process.cwd(),".github","hooks","context-mode.json"),{force:true})'
+context-mode setup --remove --agents vscode
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-@'
-const fs=require("fs"),p=require("path"),m=p.join(process.cwd(),".vscode","mcp.json"),c=JSON.parse(fs.readFileSync(m,"utf8"));delete c.servers["context-mode"];fs.writeFileSync(m,JSON.stringify(c,null,2)+"\n");fs.rmSync(p.join(process.cwd(),".github","hooks","context-mode.json"),{force:true})
-'@ | node -
-```
-
-When no project uses it any more:
-
-macOS / Linux:
-
-```sh
-rm -rf ~/.context-mode-app
-```
-
-Windows (PowerShell):
-
-```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
-```
-
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
+Run `context-mode doctor --agents vscode`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 0438537.
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
-| Command | VS Code version | Date | Result |
+| Command | VS Code (Copilot) version | Date | Result |
 |---|---|---|---|
-| install command (sh) in a project folder | not installed | 2026-10-21 | Pass: both files written with the real path |
-| uninstall command (sh) | not installed | 2026-10-21 | Pass |
+| `context-mode setup --yes --agents vscode` | not installed | 2026-10-23 | Pass: `~/.vscode/mcp.json` written |
+| `context-mode setup --yes --agents vscode` (second run) | not installed | 2026-10-23 | Pass |
+| `context-mode doctor --agents vscode` | not installed | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | not installed | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: VS Code itself, so no run showed VS Code load the server or fire the hooks. Windows commands.
+VS Code (Copilot) was not installed, so a Pass here means the config entry and the MCP handshake checked out, not that VS Code (Copilot) loaded the server. See [CLI report](../v2/CLI-REPORT.md) and the [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md). Windows commands are not run.

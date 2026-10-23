@@ -1,117 +1,76 @@
 # Install context-mode v2 on Gemini CLI
 
-This guide installs the extension. It adds the MCP server and the hooks, and it updates by itself.
+Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Gemini CLI, the manual fallback, the known limits and what was checked.
 
 ## Install
 
-macOS / Linux:
+What setup does for Gemini CLI: Runs `gemini extensions link <package folder> --consent`. The extension ships the MCP server (`gemini-extension.json`) and the hooks (`hooks/hooks.json`). Setup uses `link`, not `install`, because `install <folder>` waits on a trust prompt and hangs (D-INST-1). It checks the result with `gemini extensions list`, which prints to stderr in 0.65.0 (D-INST-2). It drops v1 hook commands from `~/.gemini/settings.json`.
+
+It writes `~/.gemini/extensions/context-mode/` (link), `extension-enablement.json`. Hooks: shipped by the extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+
+Manual fallback. The git route installs the extension from the `release` branch. It updates by itself.
 
 ```sh
-npm install -g @google/gemini-cli
 gemini extensions install https://github.com/mksglu/context-mode --ref release --consent
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-npm install -g @google/gemini-cli
-gemini extensions install https://github.com/mksglu/context-mode --ref release --consent
-```
-
-Gemini turns off all MCP servers in a folder you have not trusted. Start `gemini` once in your project folder and choose to trust it.
+Restart Gemini CLI after the install.
 
 ## Verify
 
-`gemini mcp list` does not ask about trust, so in an untrusted folder it shows `Disabled`. This command checks the server without that step:
-
-macOS / Linux:
-
 ```sh
+context-mode doctor --agents gemini
 GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list
 ```
 
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-$env:GEMINI_CLI_TRUST_WORKSPACE="true"; gemini mcp list; Remove-Item Env:GEMINI_CLI_TRUST_WORKSPACE
-```
-
-`context-mode` must show as Connected, from the extension `context-mode`. Then start `gemini` in a trusted folder and run `/ctx-doctor`.
-
-Resume hint: Gemini gets no SessionStart hook from context-mode (D-FU-GCH-1). So the hint "This session may have run before. Call mcp_context-mode_ctx_resume ..." comes with your first prompt of a new session, once. It comes only when this folder already has context-mode history from Gemini. Later prompts in the same session never get it (D-FU-GCH-2).
+`gemini mcp list` does not ask about trust, so in an untrusted folder it shows `Disabled`. The variable above checks the server without that step. `context-mode` must show Connected. Then run `/ctx-doctor` in Gemini CLI.
 
 ## Update
 
 ```sh
-gemini extensions update context-mode
+npm i -g context-mode@next && context-mode setup --repair --agents gemini
 ```
 
-Restart Gemini CLI.
+Or run `context-mode upgrade --agents gemini`. After the owner moves the `latest` tag, drop `@next`.
+
+## Known limits
+
+- `gemini extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
+- `hooks/hooks.json` has no SessionStart (D-FU-GCH-1). The resume hint comes on the first BeforeAgent of a session (D-FU-GCH-2).
+- No live, logged-in Gemini session loaded the hooks in any run.
 
 ## Upgrade from v1
 
-Do the steps in this order. The v1 hooks call the global `context-mode` command, so if you remove the npm package first, they break.
-
-1. Install v2 (see above).
-2. In Gemini CLI, run `/ctx-doctor`, then `/ctx-upgrade`. They find and remove the v1 entries.
-3. Then remove the v1 package:
-
-```sh
-npm uninstall -g context-mode
-```
+Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Gemini CLI it drops the v1 hook commands (`context-mode hook ...`) from the host settings file, because the plugin or extension ships its own hooks. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
 
 ## Rollback to v1
 
-Do the Uninstall steps below. Then install v1 again:
-
-```sh
-npm install -g context-mode@1
-```
-
-Then add the v1 entry for Gemini CLI as the [Rollback table](../../README.md#upgrading-from-v1) says.
+Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Gemini CLI as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
 ```sh
+context-mode setup --remove --agents gemini
 gemini extensions uninstall context-mode
 ```
 
-If you used the older `gemini mcp add` method, also run:
-
-macOS / Linux:
-
-```sh
-gemini mcp remove -s user context-mode
-rm -rf ~/.context-mode-app
-```
-
-Windows (PowerShell), not run on Windows yet:
-
-```powershell
-gemini mcp remove -s user context-mode
-Remove-Item -Recurse -Force "$env:USERPROFILE\.context-mode-app"
-```
+`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
-Run `/ctx-doctor` first. Then open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste its output.
+Run `context-mode doctor --agents gemini`. A failed check prints a `gh issue create` command and a report file under `~/.context-mode/reports/`. Open the [v2 bug form](https://github.com/mksglu/context-mode/issues/new?template=bug.yml) and paste the report.
 
 ## Verified
 
-Tested on macOS with a temporary HOME, against the release branch, commit 05e97724.
+Tested on macOS (arm64), Node 26, a clean temporary HOME, the npm-packed build of commit 5c41eb61.
 
 | Command | Gemini CLI version | Date | Result |
 |---|---|---|---|
-| `gemini extensions install https://github.com/mksglu/context-mode --ref release --consent` | 0.65.0 | 2026-10-22 | Pass: installed; `hooks/hooks.json` registers BeforeTool, AfterTool, BeforeAgent |
-| `gemini extensions link <local copy of release-out> --consent`, `extensions list`; BeforeTool and BeforeAgent hook command run by hand | 0.65.0 | 2026-10-22 | Pass: linked and enabled; hooks exit 0. `hooks/hooks.json` has no SessionStart (D-FU-GCH-1); the resume hint now comes on the first BeforeAgent of a session (D-FU-GCH-2) |
-| `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` | 0.65.0 | 2026-10-22 | Pass: Connected, `${extensionPath}` resolved to the extension folder |
-| `tools/list` over stdio to `server.mjs --agent gemini` | 0.65.0 | 2026-10-22 | Pass: 9 tools |
-| `gemini mcp add -s user ...` (older method), `mcp list`, `mcp remove` | 0.65.0 | 2026-10-22 | Pass: real path in settings.json, Connected, removed |
-| `gemini extensions update` / `uninstall` | 0.65.0 | not run | Not run |
+| `context-mode setup --yes --agents gemini` | 0.65.0 | 2026-10-23 | Pass: `~/.gemini/extensions/context-mode/` (link), `extension-enablement.json` written |
+| `context-mode setup --yes --agents gemini` (second run) | 0.65.0 | 2026-10-23 | Pass |
+| `context-mode doctor --agents gemini` | 0.65.0 | 2026-10-23 | Pass |
+| `context-mode setup --remove --yes` | 0.65.0 | 2026-10-23 | Pass: files restored (`Restored N file(s).`) |
 
-Not run: whether a live Gemini session loads the hooks, `/ctx-doctor` and the trust prompt (needs a login). `gemini extensions update` and `uninstall`. Windows commands.
+Not run: a live, logged-in Gemini CLI session that fires the hooks. Windows commands. Evidence: [CLI report](../v2/CLI-REPORT.md), [engine tests](../../tests/v2/setup/engine.test.mjs), [DEVIATIONS](../v2/impl/DEVIATIONS.md).
 
-## Sources
-
-- https://github.com/google-gemini/gemini-cli/blob/main/docs/extensions/reference.md
-- https://github.com/google-gemini/gemini-cli
+Earlier git-route run, commit 05e97724, Gemini CLI 0.65.0, 2026-10-22: `gemini extensions install https://github.com/mksglu/context-mode --ref release --consent` Pass; `GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list` Pass: Connected; `tools/list` over stdio Pass: 9 tools. `gemini extensions update` and `uninstall` were not run.

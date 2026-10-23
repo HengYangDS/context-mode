@@ -12,7 +12,7 @@ test("gemini guide installs with the extension (method 1)", () => {
   assert.doesNotMatch(md, /It does not work yet/);
   assert.match(md, /gemini extensions update context-mode/);
   assert.match(md, /gemini extensions uninstall context-mode/);
-  assert.match(read("docs/install/README.md"), /\| Gemini CLI \| \[gemini\.md\]\(\.\/gemini\.md\) \| 1 \(/);
+  assert.match(read("docs/install/README.md"), /\| Gemini CLI \| \[gemini\.md\]\(\.\/gemini\.md\) \| `gemini extensions link/);
 });
 
 test("pi guide does not claim a missing package.json or a /ctx-doctor command in Pi", () => {
