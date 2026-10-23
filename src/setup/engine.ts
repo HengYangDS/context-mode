@@ -103,7 +103,8 @@ function p95(xs: number[]): number {
   return s[Math.min(s.length - 1, Math.ceil(s.length * P95) - 1)];
 }
 
-function parseFail(row: CheckRow, file: string): string { return `${row.id}: ${file} does not parse; left as is, fix it and re-run setup`; }
+// The agent id is not repeated here: the CLI lines already start with it (`FAIL <id>: <reason>. Fix: ...`).
+function parseFail(_row: CheckRow, file: string): string { return `${file} does not parse; left as is. Fix the file, then re-run setup`; }
 
 // ---------- plan ----------
 

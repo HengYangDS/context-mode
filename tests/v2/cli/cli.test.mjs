@@ -124,6 +124,29 @@ for (const [name, args] of [["main", ["--help"]], ["setup", ["setup", "--help"]]
   });
 }
 
+test("[M7] cli/help-word: `context-mode help <command>` prints that command's help; an unknown topic is exit 2", (t) => {
+  const s = sandbox(t);
+  for (const cmd of ["setup", "doctor", "upgrade"]) {
+    const r = run(s, ["help", cmd]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stdout, readFileSync(path.join(GOLDEN, `help-${cmd}.txt`), "utf8"));
+  }
+  const bad = run(s, ["help", "setpu"]);
+  assert.equal(bad.status, 2);
+  assert.match(bad.stderr, /Did you mean "setup"/);
+});
+
+test("[M7] cli/parse-fail-line: a broken config says the agent id once (what, why, fix)", (t) => {
+  const s = sandbox(t);
+  const f = codexHome(s, '[mcp_servers.x\ncommand = = "bad"\n');
+  const r = run(s, ["setup", "--yes", "--agents", "codex"]);
+  assert.equal(r.status, 1);
+  assert.equal(readFileSync(f, "utf8"), '[mcp_servers.x\ncommand = = "bad"\n');
+  assert.doesNotMatch(r.stderr, /codex: codex:/);
+  assert.doesNotMatch(r.stdout, /codex: codex:/);
+  assert.match(r.stderr, /FAIL codex: .*does not parse.*Fix: context-mode setup --agents codex/);
+});
+
 test("[M7] cli/help-short: -h works on every command and writes nothing", (t) => {
   const s = sandbox(t);
   for (const cmd of ["setup", "doctor", "upgrade"]) {

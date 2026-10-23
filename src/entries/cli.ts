@@ -40,6 +40,13 @@ type Route = { kind: "exit"; code: number; stdout?: string; stderr?: string } | 
 // Pure: argv (after `node cli.mjs`) -> what to do. `version` is package.json's version.
 export function route(argv: readonly string[], version: string): Route {
   const [cmd, ...rest] = argv;
+  if (cmd === "help" && rest[0] !== undefined) {
+    // clig.dev: `context-mode help <command>` is the same as `<command> --help`; a topic that is not a command is a typo.
+    if ((COMMANDS as readonly string[]).includes(rest[0])) return { kind: "cmd", cmd: rest[0] as Command, args: ["--help"] };
+    if (!ALL_COMMANDS.includes(rest[0])) {
+      return { kind: "exit", code: EXIT_USAGE, stderr: `${SERVER_KEY}: no help for ${JSON.stringify(rest[0])}.${suggest(rest[0], ALL_COMMANDS)} Run context-mode --help.\n` };
+    }
+  }
   if (cmd === undefined || cmd === "-h" || cmd === "--help" || cmd === "help") return { kind: "exit", code: EXIT_OK, stdout: HELP };
   if (cmd === "-v" || cmd === "--version") return { kind: "exit", code: EXIT_OK, stdout: version + "\n" };
   if (cmd === "server" || cmd === "mcp") return { kind: "run", file: SERVER_FILE, args: rest };
