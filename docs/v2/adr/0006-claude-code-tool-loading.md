@@ -1,6 +1,6 @@
 # ADR-0006: Claude Code tool loading: instructions carry routing; `ctx_execute` loads up front
 
-- Status: Accepted (2026-10-15), after the re-probe below. Q2 in TECH-SPEC §10
+- Status: Accepted (2026-10-15), after the re-probe below. Live probe 2026-10-23 on Opus 5.5 and Sonnet 5.5 confirmed it; no amendment. Q2 in TECH-SPEC §10
 - Related: ADR-0004 · TECH-SPEC §3.1 and §3.6
 
 ## Context
@@ -52,3 +52,18 @@ Live probe, 2026-10-14, Claude Code 2.1.283, model `claude-haiku-4-5-20251001`. 
 | Sonnet 5 | on | 0/3 | 3/3 | 6/6 |
 
 Decision: keep alwaysLoad on `ctx_execute`. It moved Opus to the sandbox on 2 of 3 large tasks, cost no over-routing on either model, and did not hurt Sonnet. It does not fix Sonnet: under-routing on Sonnet is handled by ADR-0008 enforcement (deny), not by tool loading. One run per cell; the live harness repeats this A/B before each release.
+
+## Live probe 2026-10-23 (Opus 5.5 and Sonnet 5.5, keyless harness, ADR-0012)
+
+30 real sessions, n = 5 per model per case (large, small, description quote). Raw counts: `docs/v2/spikes/adr-0006-probe.md`.
+
+| Measure | Opus 5.5 | Sonnet 5.5 |
+|---|---|---|
+| `ctx_execute` description visible at start | 5/5 | 5/5 |
+| `ctx_search` description visible at start (deferred) | 0/5 | 0/5 |
+| Large task, ctx tool first | 4/5 | 3/5 |
+| Large task, under-routed (bytes rule) | 0/5 | 0/5 |
+| Small task, over-routed | 0/5 | 0/5 |
+| Correct answers | 10/10 | 10/10 |
+
+Result: Decision 1 and 2 hold on both models. `ctx_execute` is loaded up front, the other tools stay deferred, and there was no over-routing. Status stays Accepted. Only the "on" arm ran, so the "off" comparison and the remove-the-flag check stay with GP-LIVE-ROUTING. Sonnet used the sandbox first on 3/5 large tasks here, where the 2026-10-15 re-probe saw 0/3; the sample, scoring rule and effort differ, so this is not claimed as a gain from alwaysLoad.
