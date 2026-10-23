@@ -218,7 +218,8 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
     if (manifest !== null) files.push(manifest);
     if (row.installMode === "marketplace") { // D-INST-3: setup runs `claude plugin marketplace add <package dir>`
       files.push([".claude-plugin/marketplace.json", {
-        name: SERVER_KEY, plugins: [{ name: SERVER_KEY, source: "./", description: "Context Mode for Claude Code", version }],
+        name: SERVER_KEY, owner: { name: SERVER_KEY }, // Claude Code rejects a marketplace file without an owner object
+        plugins: [{ name: SERVER_KEY, source: "./", description: "Context Mode for Claude Code", version }],
       }]);
     }
     const shape = HOOK_SHAPES[row.id];
