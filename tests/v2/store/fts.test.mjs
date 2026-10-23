@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openDb, closeDb } from "../../../src/core/store/db.ts";
-import { ftsInsert, ftsQuery, ftsQueryTimeline, highlight, rankTexts } from "../../../src/core/store/fts.ts";
+import { deleteSourceChunks, ftsInsert, ftsQuery, ftsQueryTimeline, highlight, rankTexts } from "../../../src/core/store/fts.ts";
 import { appendEvent } from "../../../src/core/journal/append.ts";
 import * as C from "../../../src/core/contracts/constants.ts";
 
@@ -494,6 +494,49 @@ test("[search-L3] ftsInsert stores the chunk title; a title match ranks before a
     assert.equal(db.raw.prepare("SELECT title FROM chunks WHERE source_id = ?").get(titled).title, "Guide > Cleanup");
     assert.equal(db.raw.prepare("SELECT title FROM chunks WHERE source_id = ?").get(body).title, "");
     assert.deepEqual(ftsQuery(db, "cleanup", "session", project, "s1", 10, 0).map((h) => h.sourceId), [titled, body]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---- Search layer 4 (D-SEARCH-4): trigram table, RRF fusion, typo correction ----
+test("[search-L4] ftsQuery: an exact code substring ranks before a chunk that only repeats its words", async () => {
+  const { db, root, project } = await freshDb("g".repeat(16));
+  try {
+    const exact = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "a.md" }), [{ ord: 0, text: "Print it with JSON.stringify(data, null, 2) and read the result back in the log viewer later on", bytes: 96 }]);
+    const words = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "b.md" }), [{ ord: 0, text: "stringify data, null data stringify data null stringify data null", bytes: 66 }]);
+    assert.deepEqual(ftsQuery(db, "JSON.stringify(data, null", "session", project, "s1", 10, 0).map((h) => h.sourceId), [exact, words]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("[search-L4] deleteSourceChunks removes the porter and trigram rows; a reused rowid finds no old text", async () => {
+  const { db, root, project } = await freshDb("h".repeat(16));
+  try {
+    const id = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "old-identifier-xyz here", bytes: 23 }]);
+    assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM chunks_tri WHERE chunks_tri MATCH ?").get('"identifier-xyz"').n, 1);
+    deleteSourceChunks(db.raw, id);
+    assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM chunks WHERE source_id = ?").get(id).n, 0);
+    assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM chunks_tri WHERE chunks_tri MATCH ?").get('"identifier-xyz"').n, 0);
+    const next = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "new text only", bytes: 13 }]);
+    assert.deepEqual(ftsQuery(db, "identifier-xyz", "session", project, "s1", 10, 0), []);
+    assert.deepEqual(ftsQuery(db, "new text", "session", project, "s1", 10, 0).map((h) => h.sourceId), [next]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("[search-L4] ftsQuery: when no word matches, typo correction from the index vocabulary finds the chunk", async () => {
+  const { db, root, project } = await freshDb("i".repeat(16));
+  try {
+    const id = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "Open a connection to the PostgreSQL database", bytes: 44 }]);
+    ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "unrelated words only", bytes: 20 }]);
+    assert.deepEqual(ftsQuery(db, "postgress conection", "session", project, "s1", 10, 0).map((h) => h.sourceId), [id]);
+    assert.deepEqual(ftsQuery(db, "zzzzzzzzqq", "session", project, "s1", 10, 0), []);
   } finally {
     closeDb(db);
     rmSync(root, { recursive: true, force: true });

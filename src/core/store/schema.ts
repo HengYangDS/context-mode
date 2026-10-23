@@ -105,11 +105,27 @@ DROP TABLE chunks;
 ALTER TABLE chunks_v3 RENAME TO chunks;
 `;
 
+// Version 4 (D-SEARCH-4): a contentless trigram table for identifiers, paths and partial words. Same
+// rowid as the chunks row it indexes; ftsInsert and deleteSourceChunks (store/fts.ts) keep the two in
+// step through the FTS5 'delete' command with the chunk's own text (a plain DELETE on a contentless_delete
+// table leaves a junk lastInsertRowid on the connection, which node:sqlite cannot convert). chunks_vocab reads the porter index's terms for typo correction.
+export const DDL_V4: string = `
+CREATE VIRTUAL TABLE chunks_tri USING fts5(
+  body,
+  title,
+  tokenize = 'trigram',
+  content = ''
+);
+INSERT INTO chunks_tri(rowid, body, title) SELECT rowid, body, title FROM chunks;
+CREATE VIRTUAL TABLE chunks_vocab USING fts5vocab(chunks, 'row');
+`;
+
 // Ascending by version; step N brings the DB from N-1 to N.
 const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 1, sql: DDL },
   { version: 2, sql: DDL_V2 },
   { version: 3, sql: DDL_V3 },
+  { version: 4, sql: DDL_V4 },
 ];
 
 export function applyMigrations(db: DatabaseSync, fromVersion: number): void {

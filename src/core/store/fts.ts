@@ -7,6 +7,7 @@
 // D-M2-3, D-M2-T3-1); rankTexts, the in-memory BM25 form selectChunksInMemory calls (impl/05 §5 step 2).
 import { CtxError } from "../contracts/errors.ts";
 import { DECISION_SOURCE, INDEX_WRITE_CHUNK, RRF_K, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
+import type { DatabaseSync } from "node:sqlite";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
 import { FTS_TOKENIZE } from "./schema.ts";
@@ -30,10 +31,11 @@ INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VAL
 // keeps every whole fence of the 7 bench scenarios; 2-10 lose one (v1 weighted headings 5x).
 const TITLE_WEIGHT = 1.0;
 
-const QUERY = `
+// D-SEARCH-4: the porter list, every match in final order (rid only; bodies load for one page).
+const PORTER_RANK = `
 WITH m AS (
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
-         chunks.worktree AS worktree, chunks.ord AS ord, s.label AS label, s.created_ts AS created_ts,
+         chunks.worktree AS worktree, chunks.ord AS ord, s.created_ts AS created_ts,
          bm25(chunks, 0, 0, 0, 0, 0, 1.0, ${TITLE_WEIGHT}) AS bm,
          (chunks.rowid IN (SELECT rowid FROM chunks WHERE chunks MATCH :all)) AS full
   FROM chunks JOIN sources s ON s.id = chunks.source_id
@@ -46,16 +48,30 @@ WITH m AS (
          ROW_NUMBER() OVER (ORDER BY full DESC, bm ASC, source_id DESC, ord ASC) AS rank_a,
          ROW_NUMBER() OVER (ORDER BY created_ts DESC, source_id DESC, ord ASC) AS rank_b
   FROM m
-), p AS (
-  SELECT rid, source_id, session_id, worktree, label, ord, full,
-         CASE WHEN :scope = 'project' THEN 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) ELSE -bm END AS score
-  FROM r
-  ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC
-  LIMIT :limit OFFSET :offset
 )
-SELECT p.source_id AS source_id, p.label AS label, p.ord AS ord, c.body AS body, p.score AS score
-FROM p JOIN chunks c ON c.rowid = p.rid
-ORDER BY (p.session_id = :session_id) DESC, (p.worktree = :worktree) DESC, p.full DESC, p.score DESC, p.source_id DESC, p.ord ASC`;
+SELECT rid, source_id, session_id, worktree, ord, full,
+       CASE WHEN :scope = 'project' THEN 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) ELSE -bm END AS score
+FROM r
+ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
+
+// D-SEARCH-4: the trigram list (substrings: identifiers, paths, partial words), same filters.
+const TRI_RANK = `
+SELECT t.rowid AS rid, c.source_id AS source_id, c.session_id AS session_id, c.worktree AS worktree, c.ord AS ord
+FROM chunks_tri t JOIN chunks c ON c.rowid = t.rowid JOIN sources s ON s.id = c.source_id
+WHERE chunks_tri MATCH :match
+  AND (:scope <> 'session' OR c.session_id = :session_id)
+  AND (:scope <> 'worktree' OR c.worktree = :worktree)
+  AND (:source IS NULL OR s.label = :source)
+ORDER BY bm25(chunks_tri, 1.0, ${TITLE_WEIGHT}) ASC, c.source_id DESC, c.ord ASC`;
+
+const PAGE_ROWS = `
+SELECT c.rowid AS rid, c.source_id AS source_id, c.ord AS ord, c.body AS body, s.label AS label
+FROM chunks c JOIN sources s ON s.id = c.source_id
+WHERE c.rowid IN (SELECT value FROM json_each(:ids))`;
+
+const INSERT_TRI = "INSERT INTO chunks_tri(rowid, body, title) VALUES (?, ?, ?)";
+// Contentless FTS5 delete: the row's own indexed text goes back in with the 'delete' command.
+export const TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title) SELECT 'delete', rowid, body, title FROM chunks";
 
 // Fixed character-escape map (#341); a format table, not a tunable value.
 const ESCAPES: Readonly<Record<string, string>> = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
@@ -98,10 +114,21 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
         id = Number(row.id);
       }
       const ins = h.raw.prepare(INSERT_CHUNK);
-      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text, c.title ?? "");
+      const tri = h.raw.prepare(INSERT_TRI);
+      for (const c of rows) {
+        const title = c.title ?? "";
+        const rid = ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text, title).lastInsertRowid;
+        tri.run(rid, c.text, title);
+      }
     });
   });
   return id;
+}
+
+// D-SEARCH-4: one source's chunks leave both tables (porter and trigram). Returns the chunk rows deleted.
+export function deleteSourceChunks(raw: DatabaseSync, sourceId: number): number {
+  raw.prepare(TRI_DELETE + " WHERE source_id = ?").run(sourceId);
+  return Number(raw.prepare("DELETE FROM chunks WHERE source_id = ?").run(sourceId).changes);
 }
 
 // D-M1-T8-1: each whitespace-separated word becomes one FTS5 string ("" doubles a quote) with a
@@ -147,6 +174,82 @@ function searchTerms(q: string): string[] {
 
 
 interface QueryRow { source_id: number; label: string; ord: number; body: string; score: number; }
+interface RankRow { rid: number; source_id: number; session_id: string; worktree: string; ord: number; full?: number; }
+interface PageRow { rid: number; source_id: number; ord: number; body: string; label: string; }
+
+// D-SEARCH-4: the trigram match: every query word (stopwords out) of 3+ characters as one quoted
+// substring, plus the whole query when it has more than one word; joined by OR.
+function trigramMatch(q: string): string {
+  const words = q.split(/\s+/).filter((w) => w !== "");
+  const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
+  const parts = new Set((kept.length > 0 ? kept : words).filter((w) => [...w].length >= 3));
+  const whole = words.join(" ");
+  if (words.length > 1 && [...whole].length >= 3) parts.add(whole);
+  return [...parts].map((w) => `"${w.replaceAll('"', '""')}"`).join(" OR ");
+}
+
+// Levenshtein distance with a cut-off: returns max + 1 when the distance is over max.
+function editDistance(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let low = i;
+    for (let j = 1; j <= b.length; j++) {
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      cur.push(v);
+      if (v < low) low = v;
+    }
+    if (low > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// The store tokenizer's terms for q (porter stems), in a private in-memory table.
+function queryStems(q: string): string[] {
+  const sqlite = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite") | undefined;
+  if (sqlite === undefined) throw new CtxError("NO_SQLITE");
+  const mem = new sqlite.DatabaseSync(":memory:");
+  try {
+    mem.exec(`CREATE VIRTUAL TABLE q USING fts5(body, ${FTS_TOKENIZE}); CREATE VIRTUAL TABLE v USING fts5vocab(q, 'row');`);
+    mem.prepare("INSERT INTO q(body) VALUES (?)").run(q);
+    return (mem.prepare("SELECT term FROM v").all() as unknown as Array<{ term: string }>).map((r) => r.term);
+  } finally {
+    mem.close();
+  }
+}
+
+// D-SEARCH-4: typo correction from the index vocabulary. Each query stem of 5+ characters that is not in
+// the index takes the nearest index term (edit distance <= 2; ties: more documents, then term order).
+// Returns the corrected quoted terms, or null when no stem changed.
+const TYPO_MIN_LEN = 5;
+const TYPO_MAX_DIST = 2;
+function typoTerms(db: DbHandle, words: string[]): string[] | null {
+  const has = db.raw.prepare("SELECT 1 AS x FROM chunks_vocab WHERE term = ?");
+  const near = db.raw.prepare("SELECT term, doc FROM chunks_vocab WHERE length(term) BETWEEN ? AND ?");
+  let changed = false;
+  const out: string[] = [];
+  for (const stem of queryStems(words.join(" "))) {
+    if (has.get(stem) !== undefined || [...stem].length < TYPO_MIN_LEN) {
+      out.push(stem);
+      continue;
+    }
+    let best: { term: string; d: number; doc: number } | null = null;
+    for (const r of near.all(stem.length - TYPO_MAX_DIST, stem.length + TYPO_MAX_DIST) as unknown as Array<{ term: string; doc: number }>) {
+      const d = editDistance(stem, r.term, TYPO_MAX_DIST);
+      if (d > TYPO_MAX_DIST) continue;
+      if (best === null || d < best.d || (d === best.d && (r.doc > best.doc || (r.doc === best.doc && r.term < best.term)))) {
+        best = { term: r.term, d, doc: Number(r.doc) };
+      }
+    }
+    if (best !== null) {
+      out.push(best.term);
+      changed = true;
+    }
+  }
+  return changed ? out.map((t) => `"${t.replaceAll('"', '""')}"*`) : null;
+}
 
 // impl/02 §9.2 + impl/05 steps 5, 7, 8 (D-M1-T8-2, D-M1-T8-4). Zero hits -> [], never throws for
 // text input.
@@ -162,28 +265,43 @@ export function ftsQuery(
 ): Hit[] {
   const terms = searchTerms(q);
   if (terms.length === 0) return [];
+  const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
   // D-SEARCH-2: AND first, then OR. The OR form matches; chunks that also match the AND form (every term)
-  // rank before partial matches inside each session/worktree tier. So the first page equals the AND result
-  // when AND has at least `limit` hits, and the OR hits fill the rest; every page reads one ordering.
-  const all = terms.join(" ");
-  const rows = db.raw.prepare(QUERY).all({
-    match: terms.join(" OR "),
-    all,
-    scope,
-    session_id: sessionId,
-    worktree: ctx.worktree,
-    source: source ?? null,
-    k: RRF_K,
-    limit,
-    offset,
-  }) as unknown as QueryRow[];
-  return rows.map((r) => ({
-    sourceId: Number(r.source_id),
-    label: r.label,
-    ord: Number(r.ord),
-    snippet: highlight(r.body, q, SNIPPET_MAX_BYTES),
-    score: r.score,
-  }));
+  // rank before partial matches inside each session/worktree tier.
+  const porter = (t: string[]): RankRow[] =>
+    db.raw.prepare(PORTER_RANK).all({ ...filter, match: t.join(" OR "), all: t.join(" "), k: RRF_K }) as unknown as RankRow[];
+  let pList = porter(terms);
+  // D-SEARCH-4: no porter hit -> typo correction from the index vocabulary, then the porter pass again.
+  if (pList.length === 0) {
+    const fixed = typoTerms(db, terms.map((t) => t.slice(1, -2).replaceAll('""', '"')));
+    if (fixed !== null) pList = porter(fixed);
+  }
+  const tm = trigramMatch(q);
+  const tList = tm === "" ? [] : (db.raw.prepare(TRI_RANK).all({ ...filter, match: tm }) as unknown as RankRow[]);
+
+  // D-SEARCH-4: Reciprocal Rank Fusion (k = RRF_K) of the porter and trigram lists, inside the
+  // session/worktree tiers; AND matches (full) stay first. Ties: better porter rank, newer source, ord.
+  const fused = new Map<number, { r: RankRow; s: number; full: number; p: number }>();
+  pList.forEach((r, i) => fused.set(Number(r.rid), { r, s: 1 / (RRF_K + i + 1), full: Number(r.full ?? 0), p: i }));
+  tList.forEach((r, i) => {
+    const e = fused.get(Number(r.rid));
+    if (e) e.s += 1 / (RRF_K + i + 1);
+    else fused.set(Number(r.rid), { r, s: 1 / (RRF_K + i + 1), full: 0, p: Number.MAX_SAFE_INTEGER });
+  });
+  const tier = (r: RankRow): number => (r.session_id === sessionId ? 2 : 0) + (r.worktree === ctx.worktree ? 1 : 0);
+  const page = [...fused.values()]
+    .sort((a, b) => tier(b.r) - tier(a.r) || b.full - a.full || b.s - a.s || a.p - b.p ||
+      Number(b.r.source_id) - Number(a.r.source_id) || Number(a.r.ord) - Number(b.r.ord))
+    .slice(offset, offset + limit);
+  if (page.length === 0) return [];
+  const rows = new Map<number, PageRow>();
+  for (const r of db.raw.prepare(PAGE_ROWS).all({ ids: JSON.stringify(page.map((e) => Number(e.r.rid))) }) as unknown as PageRow[]) {
+    rows.set(Number(r.rid), r);
+  }
+  return page.map((e) => {
+    const r = rows.get(Number(e.r.rid)) as PageRow;
+    return { sourceId: Number(r.source_id), label: r.label, ord: Number(r.ord), snippet: highlight(r.body, q, SNIPPET_MAX_BYTES), score: e.s };
+  });
 }
 
 // Every chunk of the sources labelled `source` in scope, no MATCH (ADR-0009 §8.2: empty `queries`
