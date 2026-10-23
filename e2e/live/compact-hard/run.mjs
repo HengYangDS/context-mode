@@ -86,8 +86,11 @@ async function session(bin, cred, arm, sess, q, run, root) {
   const storeNew = !existsSync(projectStore(cwd));
   const args = ["-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose", "--include-hook-events",
     "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET, "--no-session-persistence",
-    "--strict-mcp-config", "--permission-mode", "bypassPermissions", "--tools", "Bash,Read,Grep,Glob"];
-  if (arm === "v2") args.push("--plugin-dir", BUNDLE);
+    "--permission-mode", "bypassPermissions", "--tools", "Bash,Read,Grep,Glob"];
+  // --strict-mcp-config drops the plugin's own MCP server (measured: init mcp_servers = [] with --plugin-dir).
+  // The v2 arm follows e2e/live/run.mjs (ADR-0012 plugin cases): --plugin-dir, no --strict-mcp-config; the
+  // fresh CLAUDE_CONFIG_DIR and the empty temp project hold no other MCP server. The direct arm stays strict.
+  if (arm === "v2") args.push("--plugin-dir", BUNDLE); else args.push("--strict-mcp-config");
   const sends = [printTurn(sess.data), "/compact", `${q.q} ${ANSWER_RULE}`];
   const t0 = Date.now();
   const child = spawn(bin, args, { cwd, env: childEnv(cfg), stdio: ["pipe", "pipe", "pipe"] });
@@ -103,6 +106,7 @@ async function session(bin, cred, arm, sess, q, run, root) {
   const onEvent = (ev) => {
     o.raw.push(ev);
     if (ev.type === "system" && ev.subtype === "compact_boundary") o.compacted = true;
+    if (ev.type === "system" && ev.subtype === "init" && o.mcpServers === undefined) o.mcpServers = (ev.mcp_servers ?? []).map((m) => `${m.name}:${m.status}`);
     if (ev.type === "system" && ev.subtype === "hook_response") {
       const t = hookText(ev);
       if (t !== "") o.hooks.push({ turn, event: String(ev.hook_event ?? ev.hook_name ?? ""), bytes: Buffer.byteLength(t), text: t });
@@ -128,7 +132,8 @@ async function session(bin, cred, arm, sess, q, run, root) {
   if (turn < sends.length) o.isError = true;
   const qTurn = sends.length - 1;
   o.answer = parseAnswer(o.finalText);
-  o.valid = o.compacted && !o.isError;
+  const mcpOk = arm !== "v2" || (o.mcpServers ?? []).some((m) => m.includes("context-mode") && m.endsWith(":connected"));
+  o.valid = o.compacted && !o.isError && mcpOk;
   o.correct = o.valid && isCorrect(o.finalText, q.answer);
   o.retrievalCalls = o.toolCalls.filter((t) => t.turn === qTurn && RETRIEVAL.has(t.name)).length;
   o.ctxCalls = o.toolCalls.filter((t) => t.turn === qTurn && t.name.startsWith(PREFIX)).length;
