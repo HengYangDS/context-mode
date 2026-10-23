@@ -218,3 +218,34 @@ Notes:
 - Guard: `e2e/cases/GP-SEARCH-heldout.e2e.mjs` fails below recall@5 0.84 or MRR 0.70, on any fixture
   query with no hit, on a split code block (stored chunks), or on p95 over 50 ms with +1 MB.
 - Raw layer results: `docs/v2/spikes/search/results/after-L4.json`.
+
+## 7. Independent cross-check (2026-10-23, node 26, macOS)
+
+Script: `bench/search/crosscheck.mjs` (own MCP client, own hit parser and fence scan; does not reuse
+`bench/search/heldout.mjs`). Second held-out set: `bench/search/crosscheck-queries.json`, 10 natural
+queries written after the fix, labels checked as substrings of the source text by the script.
+
+- `e2e/fixtures/search/heldout.json` has one commit (`13cba162`), before the first engine change
+  (`697b13a1`), and no edit after it.
+
+| Metric | v1 (MCP) | v1 engine top 10 | v2 (release-out) |
+|---|---|---|---|
+| Held-out recall@5 | 0.84 | 1.00 | 0.86 |
+| Held-out MRR@10 | 0.76 | 0.856 | 0.720 |
+| Held-out zero-hit queries | 0 / 50 | 0 / 50 | 0 / 50 |
+| New set recall@5 (10 queries) | 0.80 | 1.00 | 0.90 |
+| New set MRR@10 | 0.75 | 0.925 | 0.836 |
+| Bench 7: scenarios with no hits | n/a | n/a | 0 / 7 |
+| Bench 7: fences whole in replies | n/a | n/a | 9 / 69 (29 / 69 if `&lt; &gt; &amp;` are undone) |
+| p50 / p95 ms, +1.19 MB, 180 unscoped calls | n/a | n/a | 4.8-6.9 / 11.1-14.7 (two runs) |
+
+- Section 6 numbers hold: recall@5, MRR@10 and zero-hit counts match to 3 places; the fence count
+  differs by one block (this scan needs a bare closing line), whole count is the same 9.
+- No sign of over-fit on recall: the new set scores higher than the frozen one (0.90 vs 0.86). v2 still
+  ranks under the v1 engine on both sets. Misses on the frozen set: q03, q13, q23, q32, q46, q50 (no
+  hit in top 10), q47 (rank 7); on the new set: x08 (rank 9).
+- p95 stays over the 10 ms target of section 5 and under the 50 ms e2e limit.
+- FTS5 operator probes (36 queries: quotes, `*`, NEAR, AND, OR, NOT, `^`, `:`, parentheses, braces,
+  SQL text, NUL), scoped and unscoped: one bug, a NUL character gave "Internal error". Fixed (D-SEARCH-6).
+- Escaping of `< > &` (D-SEARCH-5) costs 20 whole fences in replies; this is the largest single gap
+  to the v1 MCP figure of 21 / 70.

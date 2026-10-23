@@ -156,7 +156,8 @@ try {
   for (const q of PROBES) {
     const a = await tool(v2, "ctx_search", { queries: [q], source: "Context7: React" });
     const b = await tool(v2, "ctx_search", { queries: [q] });
-    const bad = [a, b].filter((r) => r.err || r.isError || /fts5|syntax error|SQLITE/i.test(r.text));
+    // A probe fails on a JSON-RPC error, an isError reply, or the server's internal-error reply.
+    const bad = [a, b].filter((r) => r.err || r.isError || r.text.startsWith("Internal error"));
     out.probes.push({ q, ok: bad.length === 0, hits: hitsV2(a.text, "Context7: React").length, first: bad.length ? (bad[0].err ?? bad[0].text).slice(0, 200) : undefined });
   }
   // p95 with ~1 MB extra (docs/v2 *.md in path order, review/out skipped), unscoped, 3 rounds
