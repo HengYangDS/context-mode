@@ -169,3 +169,17 @@ test("[M2-review] ctx_execute, ctx_batch, ctx_index schemas name the fix for an 
     assert.equal(r.error.issues[0].message, 'Unknown field "bogus". Fix: use "queries".');
   }
 });
+
+// Search layer 1 (D-SEARCH-1): inline content with a heading or a fence is chunked as markdown, so a
+// fenced block with blank lines inside is stored whole in one chunk.
+test("[search-L1] ctx_index content: a fenced block with blank lines is stored whole in one chunk", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-ixmd-"));
+  const fence = "```ts\nconst a = 1;\n\nconst b = 2;\n\n\nexport { a, b };\n```";
+  try {
+    const r = await ctxIndex.handler({ content: "## Setup\n\nIntro.\n\n" + fence + "\n\nAfter.", source: "md-inline" }, ctxFor(root));
+    assert.equal(r.isError, false);
+    assert.equal(storedChunks(root).filter((c) => c.body.includes(fence)).length, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

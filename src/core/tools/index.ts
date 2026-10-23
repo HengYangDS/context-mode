@@ -15,6 +15,7 @@ import { safeFetch } from "../sandbox/fetch.ts";
 import { unknownField } from "./search.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { indexText, storeText, type ChunkKind } from "../index/text.ts";
+import { hasMdStructure } from "../index/chunk.ts";
 
 export type { CtxIndexInput } from "../contracts/types.ts";
 export { indexText };
@@ -92,7 +93,9 @@ async function itemsOf(input: CtxIndexInput, ctx: ToolContext): Promise<{ items:
   if (input.content !== undefined) {
     const text = input.content;
     const label = input.source ?? DEFAULT_CONTENT_LABEL;
-    return { items: [{ sourceKind: "content", label, kind: "text", read: () => text }], from: label };
+    // D-SEARCH-1: inline markdown (a heading or a fence) is chunked by heading, fences kept whole.
+    const kind: ChunkKind = hasMdStructure(text) ? "md" : "text";
+    return { items: [{ sourceKind: "content", label, kind, read: () => text }], from: label };
   }
   if (input.path !== undefined) {
     const items = pathItems({ ...input, path: input.path }, ctx.project);

@@ -149,6 +149,19 @@ function lineBlocks(src: string, md: boolean): Span[] {
   return out;
 }
 
+/** D-SEARCH-1: true when some line of `text` is an ATX heading or opens a code fence (inline content is then chunked as "md"). */
+export function hasMdStructure(text: string): boolean {
+  let pos = 0;
+  while (pos <= text.length) {
+    const nl = text.indexOf("\n", pos);
+    const eol = nl < 0 ? text.length : nl;
+    const line = text.slice(pos, eol).replace("\r", "");
+    if (fenceOf(line) !== "" || headingOf(line) !== undefined) return true;
+    pos = eol + 1;
+  }
+  return false;
+}
+
 // An ATX heading: up to 3 spaces, 1-6 "#", then a space, a tab or the end of the line. The text drops
 // a closing run of "#" that follows a space.
 function headingOf(line: string): Heading | undefined {
