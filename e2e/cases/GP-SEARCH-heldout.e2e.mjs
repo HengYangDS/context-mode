@@ -19,9 +19,10 @@ import { spawnBundle } from "../harness/mcp-client.mjs";
 import { dumpDb } from "../harness/db-dump.mjs";
 
 const MAX_CHUNK_BYTES = 4096;
-// Measured 2026-10-23 after search layer 4 (DIAGNOSIS.md "After"): recall@5 0.86, MRR@10 0.720.
-const RECALL5_FLOOR = 0.86 - 0.02;
-const MRR10_FLOOR = 0.72 - 0.02;
+// Measured 2026-10-23 after D-SEARCH-7 snippets (DIAGNOSIS.md section 8): recall@5 0.98, MRR@10 0.827.
+// Was 0.86 / 0.720 after search layer 4.
+const RECALL5_FLOOR = 0.98 - 0.02;
+const MRR10_FLOOR = 0.827 - 0.02;
 const P95_MAX_MS = 50;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
