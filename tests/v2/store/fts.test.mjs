@@ -473,3 +473,29 @@ test("[search-L2] ftsQuery: under the OR fallback, chunks that match every term 
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---- Search layer 3 (D-SEARCH-3): porter stemming over unicode61, a title column weighted over body ----
+test("[search-L3] ftsQuery: porter stemming matches other forms of a word", async () => {
+  const { db, root, project } = await freshDb("e".repeat(16));
+  try {
+    const id = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree }), [{ ord: 0, text: "Open a connection to the database", bytes: 33 }]);
+    assert.deepEqual(ftsQuery(db, "connecting databases", "session", project, "s1", 10, 0).map((h) => h.sourceId), [id]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("[search-L3] ftsInsert stores the chunk title; a title match ranks before a body-only match", async () => {
+  const { db, root, project } = await freshDb("f".repeat(16));
+  try {
+    const body = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "body.md" }), [{ ord: 0, text: "Some text. The cleanup runs here. More text about other things.", bytes: 64 }]);
+    const titled = ftsInsert(db, src({ sessionId: "s1", worktree: project.worktree, label: "title.md" }), [{ ord: 0, text: "## Cleanup\n\nIt runs once, on close of the store and its files.", bytes: 62, title: "Guide > Cleanup" }]);
+    assert.equal(db.raw.prepare("SELECT title FROM chunks WHERE source_id = ?").get(titled).title, "Guide > Cleanup");
+    assert.equal(db.raw.prepare("SELECT title FROM chunks WHERE source_id = ?").get(body).title, "");
+    assert.deepEqual(ftsQuery(db, "cleanup", "session", project, "s1", 10, 0).map((h) => h.sourceId), [titled, body]);
+  } finally {
+    closeDb(db);
+    rmSync(root, { recursive: true, force: true });
+  }
+});

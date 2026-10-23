@@ -16,7 +16,12 @@ PRAGMA journal_mode = WAL;
 
 // The one tokenizer literal (DECISIONS-r9 V24): the chunks table below and rankTexts' scratch table
 // (store/fts.ts) both use it, so the in-memory BM25 tokenizes exactly as the store does.
-export const FTS_TOKENIZE = "tokenize = 'unicode61 remove_diacritics 2'";
+// D-SEARCH-3: porter stemming over unicode61 (V24 Cyrillic and diacritics support kept; porter only
+// stems ASCII English words and passes other tokens through unchanged).
+export const FTS_TOKENIZE = "tokenize = 'porter unicode61 remove_diacritics 2'";
+
+// The version-1 tokenizer, frozen: the version-1 DDL below must never change (step 3 replaces the table).
+const FTS_TOKENIZE_V1 = "tokenize = 'unicode61 remove_diacritics 2'";
 
 // Version 1. Future versions append their own step to MIGRATIONS; never edit this block.
 // "SessionDB" = events; "ContentStore" = sources + chunks (DECISIONS-r9 M14).
@@ -65,7 +70,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
   agent UNINDEXED,
   ord UNINDEXED,
   body,
-  ${FTS_TOKENIZE}
+  ${FTS_TOKENIZE_V1}
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -81,10 +86,30 @@ export const DDL_V2: string = `
 CREATE UNIQUE INDEX IF NOT EXISTS idx_events_cost_session_turn ON events(session_id, turn) WHERE kind = 'cost';
 `;
 
+// Version 3 (D-SEARCH-3): chunks gets a `title` column (the md heading path, "" when none) and the
+// porter tokenizer. FTS5 has no ALTER for either, so the table is rebuilt; every row is copied.
+export const DDL_V3: string = `
+CREATE VIRTUAL TABLE chunks_v3 USING fts5(
+  source_id UNINDEXED,
+  session_id UNINDEXED,
+  worktree UNINDEXED,
+  agent UNINDEXED,
+  ord UNINDEXED,
+  body,
+  title,
+  ${FTS_TOKENIZE}
+);
+INSERT INTO chunks_v3(rowid, source_id, session_id, worktree, agent, ord, body, title)
+  SELECT rowid, source_id, session_id, worktree, agent, ord, body, '' FROM chunks;
+DROP TABLE chunks;
+ALTER TABLE chunks_v3 RENAME TO chunks;
+`;
+
 // Ascending by version; step N brings the DB from N-1 to N.
 const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 1, sql: DDL },
   { version: 2, sql: DDL_V2 },
+  { version: 3, sql: DDL_V3 },
 ];
 
 export function applyMigrations(db: DatabaseSync, fromVersion: number): void {

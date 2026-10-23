@@ -18,7 +18,7 @@ VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_coun
 RETURNING id`;
 
 const INSERT_CHUNK = `
-INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?, ?, ?, ?, ?, ?)`;
+INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
 // One statement for every scope (one path). Candidates = every MATCH row inside the scope and
 // source filter; both RRF rank lists run over that full set before LIMIT/OFFSET (ADR-0009 §8.3).
@@ -26,10 +26,15 @@ INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?,
 // newest source first, ord asc. The worktree tier only changes the order for scope "project".
 // Ranking reads only the narrow columns; the chunk body is fetched by rowid for the page rows alone,
 // so a broad query never moves every matched body through the window sorts (review-M1 perf carry).
+// D-SEARCH-3: BM25 weight of the title column against body 1.0. Measured 1/2/5/10 on the held-out set: 1.0
+// keeps every whole fence of the 7 bench scenarios; 2-10 lose one (v1 weighted headings 5x).
+const TITLE_WEIGHT = 1.0;
+
 const QUERY = `
 WITH m AS (
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
-         chunks.worktree AS worktree, chunks.ord AS ord, s.label AS label, s.created_ts AS created_ts, bm25(chunks) AS bm,
+         chunks.worktree AS worktree, chunks.ord AS ord, s.label AS label, s.created_ts AS created_ts,
+         bm25(chunks, 0, 0, 0, 0, 0, 1.0, ${TITLE_WEIGHT}) AS bm,
          (chunks.rowid IN (SELECT rowid FROM chunks WHERE chunks MATCH :all)) AS full
   FROM chunks JOIN sources s ON s.id = chunks.source_id
   WHERE chunks MATCH :match
@@ -93,7 +98,7 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
         id = Number(row.id);
       }
       const ins = h.raw.prepare(INSERT_CHUNK);
-      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text);
+      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text, c.title ?? "");
     });
   });
   return id;

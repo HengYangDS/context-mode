@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { SCHEMA_VERSION, applyMigrations, DDL } from "../../../src/core/store/schema.ts";
+import { SCHEMA_VERSION, applyMigrations, DDL, DDL_V2 } from "../../../src/core/store/schema.ts";
 import { CtxError } from "../../../src/core/contracts/errors.ts";
 import * as C from "../../../src/core/contracts/constants.ts";
 
@@ -18,7 +18,7 @@ function freshDb(dir) {
 
 test("SCHEMA_VERSION equals the constants.ts SCHEMA_VERSION", () => {
   assert.equal(SCHEMA_VERSION, C.SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 2); // D-M5-arch-2: v2 adds the cost dedup index
+  assert.equal(SCHEMA_VERSION, 3); // D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter
 });
 
 test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_id, turn) WHERE kind = 'cost'", () => {
@@ -41,7 +41,7 @@ test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_i
   }
 });
 
-test("v2 (D-M5-arch-2): a version-1 DB migrates to 2 without losing rows", () => {
+test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, then 3) without losing rows", () => {
   const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
   try {
     const db = freshDb(dir);
@@ -49,7 +49,7 @@ test("v2 (D-M5-arch-2): a version-1 DB migrates to 2 without losing rows", () =>
     db.exec("PRAGMA user_version = 1");
     db.exec("INSERT INTO events(session_id, worktree, agent, kind, turn, created_at, accessed_at) VALUES ('s','w','claude-code','prompt',1,0,0)");
     applyMigrations(db, 1);
-    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 2);
+    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 3);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events").get().n, 1);
     assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'idx_events_cost_session_turn'").get());
     db.close();
@@ -161,4 +161,29 @@ test("applyMigrations throws SCHEMA_STALE when fromVersion is newer than SCHEMA_
 test("applyMigrations rolls back on a mid-migration failure and leaves user_version at fromVersion", () => {
   // DDL is exported so this is a sanity check that it is non-empty SQL, not a stub.
   assert.ok(typeof DDL === "string" && DDL.includes("CREATE TABLE"));
+});
+
+test("[search-L3] v3 (D-SEARCH-3): a version-2 DB migrates to 3, keeps every chunk, adds title, stems with porter", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
+  try {
+    const db = freshDb(dir);
+    applyMigrations(db, 0);
+    db.exec("PRAGMA user_version = 3");
+    const v2 = new DatabaseSync(join(dir, "v2.db"));
+    v2.exec(DDL);
+    v2.exec(DDL_V2);
+    v2.exec("PRAGMA user_version = 2");
+    const ins = v2.prepare("INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?, 's', 'w', 'claude-code', ?, ?)");
+    ins.run(1, 0, "connection pooling");
+    ins.run(1, 1, "Привет café");
+    applyMigrations(v2, 2);
+    assert.equal(v2.prepare("PRAGMA user_version").get().user_version, 3);
+    assert.equal(v2.prepare("SELECT COUNT(*) AS n FROM chunks").get().n, 2);
+    assert.deepEqual(v2.prepare("SELECT ord, title FROM chunks WHERE chunks MATCH 'connecting'").all().map((r) => ({ ...r })), [{ ord: 0, title: "" }]);
+    assert.equal(v2.prepare("SELECT COUNT(*) AS n FROM chunks WHERE chunks MATCH 'cafe'").get().n, 1);
+    v2.close();
+    db.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
