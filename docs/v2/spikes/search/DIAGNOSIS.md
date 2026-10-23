@@ -185,3 +185,36 @@ re-run the held-out set. A step stays only if recall@5 and MRR@10 do not drop an
 
 Targets for the fix: 0 / 7 no-hit scenarios, held-out recall@5 >= 0.84 (v1 over MCP) and MRR@10
 >= 0.76, fences whole >= 21 / 70 (and all fences under 4096 B after step 6), p95 <= 10 ms.
+
+## 6. Results after the fix (2026-10-23, node 26, macOS)
+
+Each layer was measured on its own with `node bench/search/heldout.mjs` and kept only when held-out
+recall@5 or MRR rose and nothing else fell (p95 latency rose; see notes).
+
+| Metric | v1 (MCP) | v2 before | L1 md chunks | L2 stopwords + OR | L2b AND tier first | L3 porter + title | L4 trigram + RRF + typo |
+|---|---|---|---|---|---|---|---|
+| Bench 7: scenarios with no hits | 0 / 7 | 3 / 7 | 3 / 7 | 0 / 7 | 0 / 7 | 0 / 7 | 0 / 7 |
+| Bench 7: fences whole in replies | 21 / 70 | 0 / 70 | 1 / 70 | 9 / 70 | 9 / 70 | 9 / 70 | 9 / 70 |
+| Held-out recall@5 | 0.84 | 0.38 | 0.40 | 0.76 | 0.78 | 0.80 | **0.86** |
+| Held-out MRR@10 | 0.76 | 0.324 | 0.347 | 0.661 | 0.678 | 0.697 | **0.720** |
+| Held-out zero-hit queries | 0 / 50 | 25 / 50 | 25 / 50 | 1 / 50 | 1 / 50 | 1 / 50 | **0 / 50** |
+| Search p50 / p95 ms, +1 MB | 3.0 / 7.7 | 1.3 / 3.2 | 1.3 / 3.1 | 2.7 / 5.3 | 2.5 / 5.1 | 2.9 / 5.7 | 4.7 / 12.1 |
+
+v2 after, recall@5 by kind: identifier 7/8, natural 11/14, code 4/7, typo 8/8, morph 6/6, phrase 5/5,
+flag 2/2 (before: 6/8, 0/14, 7/7, 0/8, 0/6, 4/5, 2/2).
+
+Notes:
+
+- v2 now passes v1 over MCP on recall@5 (0.86 vs 0.84) but not on MRR (0.720 vs 0.76), and stays
+  under the v1 engine (1.00 / 0.856). Code queries fell from 7/7 to 4/7: OR lets longer chunks with
+  the same words rank above the exact one. The p95 target of 10 ms from section 5 is missed
+  (12.1 ms); the e2e limit is 50 ms.
+- Measured and dropped: `tokenchars '_-'` (recall@5 0.78 -> 0.76, fences 9 -> 7) and title weights
+  2, 5, 10 (fences fell). Proximity rerank was not added.
+- Step 6 (reply text for code) is not done: the 800 B clip (M21) and `< > &` escaping (#341) need an
+  owner decision (DEVIATIONS D-SEARCH-5). That is why fences whole stays at 9 / 70.
+- These numbers are tuned on this held-out set. A second held-out set, written after the fix by
+  someone who has not seen the engine output, is still needed to check for over-fit.
+- Guard: `e2e/cases/GP-SEARCH-heldout.e2e.mjs` fails below recall@5 0.84 or MRR 0.70, on any fixture
+  query with no hit, on a split code block (stored chunks), or on p95 over 50 ms with +1 MB.
+- Raw layer results: `docs/v2/spikes/search/results/after-L4.json`.
