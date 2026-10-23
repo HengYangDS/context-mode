@@ -114,6 +114,7 @@ const CI_CHECKS = [
   ["scripts/ci-gs4-lint.mjs"],
   ["build/check-readme.mjs"],
   ["build/check-install-docs.mjs"],
+  ["build/check-secrets.mjs"],
 ];
 function ciChecks() {
   const gone = missing(CI_CHECKS.map((c) => c[0]));
