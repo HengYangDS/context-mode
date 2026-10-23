@@ -101,6 +101,7 @@ Exports every row of the table below, by the exact name in column 1. No other mo
 | `SEARCH_PAGE_SIZE` | `number` | `20` | ADR-0009 §8.1 rule 3; DECISIONS-r9 M15 |
 | `MAX_CHUNK_BYTES` | `number` | `4096` | DECISIONS-r9 §C |
 | `SNIPPET_MAX_BYTES` | `number` | `800` | DECISIONS-r9 M21 |
+| `SNIPPET_CODE_MAX_BYTES` | `number` | `2048` | D-SEARCH-7 (a window with a fenced block) |
 | `REQUIRE_SECURITY_ENV` | `string` | `"CONTEXT_MODE_REQUIRE_SECURITY"` | v1 `a4ab72eb` #468; DECISIONS-r9 E2 |
 
 ### `DECAY_X1000` build steps

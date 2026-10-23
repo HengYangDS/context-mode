@@ -274,6 +274,7 @@ export interface AdapterRow {
 | `SEARCH_PAGE_SIZE` | `20` per source, before merge | ADR-0009 §8.1 rule 3; DECISIONS-r9 M15 |
 | `MAX_CHUNK_BYTES` | `4096` B | DECISIONS-r9 §C |
 | `SNIPPET_MAX_BYTES` | `800` B; ⌊`OUTPUT_CAP` / `SEARCH_PAGE_SIZE`⌋ = 819, minus room for the label | DECISIONS-r9 M21 |
+| `SNIPPET_CODE_MAX_BYTES` | `2048` B; a window that holds a fenced block | D-SEARCH-7 |
 | `REQUIRE_SECURITY_ENV` | `"CONTEXT_MODE_REQUIRE_SECURITY"` | v1 `a4ab72eb` #468; DECISIONS-r9 E2 |
 | `MCP_HINT_EVERY` | `10` (env `CTX_MCP_HINT_EVERY`) | Q1 |
 | `EXIT_SIGTERM_MS` | `2000`; `EXIT_SIGKILL_MS` `5000` | GP9, #862 |

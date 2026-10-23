@@ -159,7 +159,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
   agent UNINDEXED,
   seq UNINDEXED,      -- order within the source
   body,
-  tokenize = 'unicode61 remove_diacritics 2'  -- DECISIONS-r9 V24 (Q10 #1295): folds Cyrillic and accented Latin to base form; CJK has no word breaks under unicode61 and stays open, see Notes below
+  tokenize = 'porter unicode61 remove_diacritics 2'  -- DECISIONS-r9 V24 (Q10 #1295); porter added by D-SEARCH-3 (schema v3, `title` column too); schema v4 adds `chunks_tri` (trigram) and `chunks_vocab` (D-SEARCH-4); see `src/core/store/schema.ts`: folds Cyrillic and accented Latin to base form; CJK has no word breaks under unicode61 and stays open, see Notes below
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -330,9 +330,9 @@ export function highlight(row: string, terms: string, maxBytes: number): string;
 5. Return the mapped array.
 
 ### 9.3 `highlight(row, terms, maxBytes)`
-1. Clip `row` to `maxBytes` UTF-8 bytes first, at a code-point boundary (never mid multi-byte char) — this clip happens before any further processing (#963, "clips a large FTS row before rendering").
-2. HTML-sanitize the clipped text (escape `<`, `>`, `&`) — this sanitize step runs on top of the clip, both must hold (#341, `ceb49688` precedent).
-3. Return the sanitized, clipped string. No regex-based tag stripping; sanitize is a fixed character-escape map, not pattern matching.
+1. Split the stored text into blocks (fenced code, paragraphs), score each block against the query terms (BM25-style, identifiers count as whole symbol and as parts), take the best block as the window and add whole neighbour blocks while they fit `maxBytes` (800 B for prose; 2048 B when the window holds a fence, `SNIPPET_CODE_MAX_BYTES`). Cuts fall on code-point boundaries (D-SEARCH-7; was clip-first, #963).
+2. No entity encoding: the text is returned as stored (D-SEARCH-7; was `< > &` escape, #341). A fence over the code budget returns its best whole lines with the fence lines and `[lines a-b of N]`.
+3. Return the slice. No regex-based tag stripping; no escape map.
 
 Error cases: none thrown — a query that matches nothing returns `[]`; the caller (`tools-index`'s `ctx_search`) is responsible for the "zero-hit reply states scope and source count" text.
 
