@@ -7,7 +7,7 @@
 // D-M2-3, D-M2-T3-1); rankTexts, the in-memory BM25 form selectChunksInMemory calls (impl/05 §5 step 2).
 import { CtxError } from "../contracts/errors.ts";
 import { DECISION_SOURCE, INDEX_WRITE_CHUNK, RRF_K, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, StatementSync } from "node:sqlite";
 import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
 import { FTS_TOKENIZE } from "./schema.ts";
@@ -206,6 +206,23 @@ function editDistance(a: string, b: string, max: number): number {
   return prev[b.length];
 }
 
+// Prepared statements of the search path, cached per connection: one prepare per SQL text per db,
+// not one per call. The WeakMap drops the cache when the connection object goes.
+const STMTS = new WeakMap<DatabaseSync, Map<string, StatementSync>>();
+function stmt(raw: DatabaseSync, sql: string): StatementSync {
+  let m = STMTS.get(raw);
+  if (m === undefined) {
+    m = new Map();
+    STMTS.set(raw, m);
+  }
+  let st = m.get(sql);
+  if (st === undefined) {
+    st = raw.prepare(sql);
+    m.set(sql, st);
+  }
+  return st;
+}
+
 // The store tokenizer's terms for q (porter stems), in a private in-memory table.
 function queryStems(q: string): string[] {
   const sqlite = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite") | undefined;
@@ -226,8 +243,8 @@ function queryStems(q: string): string[] {
 const TYPO_MIN_LEN = 5;
 const TYPO_MAX_DIST = 2;
 function typoTerms(db: DbHandle, words: string[]): string[] | null {
-  const has = db.raw.prepare("SELECT 1 AS x FROM chunks_vocab WHERE term = ?");
-  const near = db.raw.prepare("SELECT term, doc FROM chunks_vocab WHERE length(term) BETWEEN ? AND ?");
+  const has = stmt(db.raw, "SELECT 1 AS x FROM chunks_vocab WHERE term = ?");
+  const near = stmt(db.raw, "SELECT term, doc FROM chunks_vocab WHERE length(term) BETWEEN ? AND ?");
   let changed = false;
   const out: string[] = [];
   for (const stem of queryStems(words.join(" "))) {
@@ -269,7 +286,7 @@ export function ftsQuery(
   // D-SEARCH-2: AND first, then OR. The OR form matches; chunks that also match the AND form (every term)
   // rank before partial matches inside each session/worktree tier.
   const porter = (t: string[]): RankRow[] =>
-    db.raw.prepare(PORTER_RANK).all({ ...filter, match: t.join(" OR "), all: t.join(" "), k: RRF_K }) as unknown as RankRow[];
+    stmt(db.raw, PORTER_RANK).all({ ...filter, match: t.join(" OR "), all: t.join(" "), k: RRF_K }) as unknown as RankRow[];
   let pList = porter(terms);
   // D-SEARCH-4: no porter hit -> typo correction from the index vocabulary, then the porter pass again.
   if (pList.length === 0) {
@@ -277,7 +294,7 @@ export function ftsQuery(
     if (fixed !== null) pList = porter(fixed);
   }
   const tm = trigramMatch(q);
-  const tList = tm === "" ? [] : (db.raw.prepare(TRI_RANK).all({ ...filter, match: tm }) as unknown as RankRow[]);
+  const tList = tm === "" ? [] : (stmt(db.raw, TRI_RANK).all({ ...filter, match: tm }) as unknown as RankRow[]);
 
   // D-SEARCH-4: Reciprocal Rank Fusion (k = RRF_K) of the porter and trigram lists, inside the
   // session/worktree tiers; AND matches (full) stay first. Ties: better porter rank, newer source, ord.
@@ -295,7 +312,7 @@ export function ftsQuery(
     .slice(offset, offset + limit);
   if (page.length === 0) return [];
   const rows = new Map<number, PageRow>();
-  for (const r of db.raw.prepare(PAGE_ROWS).all({ ids: JSON.stringify(page.map((e) => Number(e.r.rid))) }) as unknown as PageRow[]) {
+  for (const r of stmt(db.raw, PAGE_ROWS).all({ ids: JSON.stringify(page.map((e) => Number(e.r.rid))) }) as unknown as PageRow[]) {
     rows.set(Number(r.rid), r);
   }
   return page.map((e) => {
