@@ -311,7 +311,8 @@ test("[M2] GP5/fts-highlight-bytecap", async () => {
   const prefix = line.slice(0, line.indexOf(": ") + 2);
   const snippet = line.slice(prefix.length);
   assert.ok(Buffer.byteLength(snippet, "utf8") <= SNIPPET_MAX_BYTES);
-  assert.ok(!snippet.includes("<b>"));
+  assert.ok(snippet.includes("needle <b>&</b> 😀"), "D-SEARCH-7: stored text, no entity encoding");
+  assert.ok(row.includes(snippet), "one contiguous slice of the stored row");
   assert.ok(snippet.isWellFormed());
   golden("fts-highlight-bytecap", { isError: reply.isError, snippetBytes: Buffer.byteLength(snippet, "utf8") });
 });

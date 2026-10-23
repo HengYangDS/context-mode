@@ -3,7 +3,7 @@
 // ftsQuery(db, q, scope, ctx, sessionId, limit, offset, source?): Hit[].
 // ftsQueryTimeline(db, scope, ctx, sessionId, limit, after, source, memory): { rows, next } (D-M2-3).
 // rankTexts(texts, q): number[] — FTS5 BM25 over an in-memory text set (impl/05 §5 step 2).
-// highlight(row, terms, maxBytes = SNIPPET_MAX_BYTES): clip at maxBytes BEFORE sanitizing (#963), code-point safe.
+// highlight(row, terms, maxBytes = SNIPPET_MAX_BYTES): a verbatim slice of the stored text (D-SEARCH-7), code-point safe (#963).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
@@ -110,10 +110,9 @@ test("highlight clips to maxBytes at a code-point boundary before sanitizing (#9
   assert.ok(!out.includes("�"));
 });
 
-test("highlight HTML-escapes <, > and & after clipping (#341)", () => {
-  const out = highlight("<script>alert(1)&amp;</script>", "script", 4096);
-  assert.ok(!out.includes("<script>"));
-  assert.ok(out.includes("&lt;") || out.includes("&amp;lt;") === false);
+test("highlight returns < > & as stored, no entity encoding (D-SEARCH-7; #341 guarded an innerHTML path v2 has none of)", () => {
+  const row = "<script>alert(1)&amp;</script>";
+  assert.equal(highlight(row, "script", 4096), row);
 });
 
 test("highlight default maxBytes is SNIPPET_MAX_BYTES, not MAX_CHUNK_BYTES (D-M1-9, r9 M21 wins)", () => {
@@ -177,7 +176,7 @@ test("ftsQuery hit carries label, ord and an escaped snippet; scope worktree fil
     assert.equal(wt.length, 1);
     assert.equal(wt[0].label, "a.txt");
     assert.equal(wt[0].ord, 1);
-    assert.equal(wt[0].snippet, "&lt;b&gt;needle&lt;/b&gt;");
+    assert.equal(wt[0].snippet, "<b>needle</b>"); // D-SEARCH-7: verbatim
     assert.equal(ftsQuery(db, "needle", "project", project, "s1", 10, 0).length, 2);
   } finally {
     closeDb(db);
@@ -223,10 +222,9 @@ test("ftsInsert upserts the sources row (bytes_total, chunk_count) and batches l
   }
 });
 
-test("highlight output never exceeds maxBytes even when escaping grows the text (D-M1-T8-3)", () => {
+test("highlight output never exceeds maxBytes on a line with no break (D-M1-T8-3, D-SEARCH-7 verbatim)", () => {
   const out = highlight("&".repeat(500) + "<>".repeat(500), "x", 100);
-  assert.ok(Buffer.byteLength(out, "utf8") <= 100);
-  assert.ok(out.endsWith("&amp;")); // never cut inside an entity
+  assert.equal(out, "&".repeat(100)); // stored characters, one byte each, no entity
   const emoji = highlight("😀".repeat(100), "x", 10); // 4-byte code points
   assert.equal(emoji, "😀😀");
 });
@@ -413,9 +411,9 @@ test("[M2] GP5/snippet-code-point-safe", () => {
     assert.ok(Buffer.byteLength(out, "utf8") <= C.SNIPPET_MAX_BYTES);
     assert.ok(out === row.slice(0, out.length), "clip is a prefix of whole code points");
   }
-  // Escaping next to the edge never leaves half an entity.
+  // D-SEARCH-7: "&" stays one stored byte; the 4-byte emoji past the edge is left out whole.
   const amp = highlight("a".repeat(C.SNIPPET_MAX_BYTES - 3) + "&😀", "a", C.SNIPPET_MAX_BYTES);
-  assert.ok(amp.endsWith("a"));
+  assert.equal(amp, "a".repeat(C.SNIPPET_MAX_BYTES - 3) + "&");
 });
 
 // ---- Search layer 2 (D-SEARCH-2): AND first, OR fallback when AND has fewer than `limit` hits, stopwords dropped ----

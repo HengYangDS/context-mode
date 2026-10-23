@@ -195,7 +195,8 @@ test("[M2] GP5/fts-highlight-bytecap", async () => {
     const line = out.text.split("\n").find((l) => l.startsWith("big #0: "));
     const snippet = line.slice("big #0: ".length);
     assert.ok(Buffer.byteLength(snippet, "utf8") <= C.SNIPPET_MAX_BYTES);
-    assert.ok(!snippet.includes("<b>"));
+    assert.ok(snippet.includes("needle <b>&</b> 😀"), "D-SEARCH-7: stored text, no entity encoding");
+    assert.ok(row.includes(snippet), "one contiguous slice of the stored row");
     assert.ok(snippet.isWellFormed());
     assert.equal(snippet, highlight(row, "needle", C.SNIPPET_MAX_BYTES));
   } finally {
