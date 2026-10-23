@@ -167,10 +167,14 @@ function listCheck(row: CheckRow, env: SetupContext["env"]): Check | undefined {
 
 function mcpCheck(cmd: string[], env: SetupContext["env"]): Promise<Check> {
   return new Promise((resolve) => {
-    const child = spawn(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"] });
+    // Own process group on POSIX: a terminal Ctrl-C then reaches only the CLI, whose SIGINT handler rolls back and
+    // exits 130. Otherwise the server dies first and this check reports a FAIL before the handler runs.
+    const child = spawn(cmd[0], cmd.slice(1), { env, stdio: ["pipe", "pipe", "ignore"], detached: process.platform !== "win32" });
+    const reap = (): void => { child.kill(); };
+    process.once("exit", reap);
     let buf = "";
     let init = false;
-    const done = (ok: boolean, detail?: string): void => { clearTimeout(timer); child.kill(); resolve({ name: "mcp", ok, detail }); };
+    const done = (ok: boolean, detail?: string): void => { clearTimeout(timer); process.off("exit", reap); child.kill(); resolve({ name: "mcp", ok, detail }); };
     const timer = setTimeout(() => done(false, "no MCP answer before timeout"), VERIFY_TIMEOUT_MS);
     child.on("error", (e) => done(false, e.message));
     child.on("exit", (code) => done(false, `server exited (${code}) before tools/list`));

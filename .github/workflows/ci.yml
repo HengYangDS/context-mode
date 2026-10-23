@@ -50,7 +50,7 @@ jobs:
       - run: node e2e/checks/windows-grandchild-kill.mjs
         name: T-F5 Windows grandchild kill (0 alive after KILL_GRACE_MS)
         if: runner.os == 'Windows'
-      # ADR-0019 D3: the one hook overhead gate (median of 3 batch p95 values), ubuntu only (DEVIATIONS D-CI-PERF-1).
+      # ADR-0019 D3: the one hook overhead gate (lowest of 5 batch p95 values), ubuntu only (DEVIATIONS D-CI-PERF-1).
       - run: node e2e/checks/setup-hook-overhead.mjs
         name: D3 hook overhead p95 <= 15 ms (perf check)
         if: runner.os == 'Linux'
