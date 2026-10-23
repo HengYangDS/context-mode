@@ -51,7 +51,9 @@ function sandbox(t) {
   mkdirSync(home, { recursive: true });
   const bin = path.join(root, "bin");
   mkdirSync(bin, { recursive: true });
-  return { root, home, bin, pkgDir: fakePkg(root), env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home } };
+  // The D3 timing budget is gated by e2e/checks/setup-hook-overhead.mjs; shared runners jitter past 15 ms here.
+  return { root, home, bin, pkgDir: fakePkg(root),
+    env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
 }
 
 function put(file, text) {
@@ -241,8 +243,11 @@ test("whichBin: on Windows only PATHEXT names match (npm's <bin>.cmd shim), PATH
   chmodSync(path.join(s.bin, "claude.cmd"), 0o755);
   assert.equal(whichBin("claude", { Path: s.bin, PATHEXT: ".EXE;.CMD" }, "win32"), path.join(s.bin, "claude.cmd"));
   assert.equal(whichBin("claude", { PATH: s.bin }, "win32"), path.join(s.bin, "claude.cmd"), "default PATHEXT has .CMD");
-  assert.equal(whichBin("claude", { PATH: s.bin }, "linux"), path.join(s.bin, "claude"));
-  assert.equal(whichBin("nope", { PATH: s.bin }, "linux"), undefined);
+  // A POSIX PATH splits on ":", which cannot hold a Windows drive path (C:\\...), so these two run on POSIX hosts only.
+  if (process.platform !== "win32") {
+    assert.equal(whichBin("claude", { PATH: s.bin }, "linux"), path.join(s.bin, "claude"));
+    assert.equal(whichBin("nope", { PATH: s.bin }, "linux"), undefined);
+  }
   mkdirSync(path.join(s.bin, "dir.cmd"));
   assert.equal(whichBin("dir", { PATH: s.bin }, "win32"), undefined, "a directory is not a command");
 });
