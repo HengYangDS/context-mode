@@ -1,6 +1,7 @@
 // impl/09 §4 (handleHook), ADR-0009 §1, §6 and §8.2, ADR-0016; DEVIATIONS D-M3-arch-3 (case-B wrapper
 // next to the hook bundle), D-M3-H2-1..7, D-M4-arch-5 and D-M4-H2-1..3 (compact "none" branches, decision rows).
 // One path per event. Every failure fails open: allow, one stderr line. Never block the host.
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
@@ -12,7 +13,7 @@ import {
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
 import type {
-  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall,
+  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall, ToolResultInfo,
 } from "../contracts/types.ts";
 import { getAdapter, hasRecall, hasReplace } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
@@ -353,7 +354,8 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const tool = ev.tool;
   if (tool === undefined || tool.canonicalName.startsWith(OWN_TOOL_PREFIX)) return ALLOW; // step 1 (ADR-0009 §0)
   const result = ev.result ?? { isError: false, bytes: 0 };
-  const text = result.text ?? "";
+  const text = wholeOutput(result);
+  if (result.persistedPath !== undefined) result.bytes = Buffer.byteLength(text);
   if (tool.canonicalName === DECISION_TOOL) askDetached(ev, project, tool, text); // ADR-0009 §8.2
   const kind = journalKind(tool, row, result.isError); // step 2
   if (kind !== null) {
@@ -399,6 +401,17 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   if (digest !== null) return { kind: "replace", output: digest + "\n" + moreLine(intent, label) };
   const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
   return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
+}
+
+// D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
+function wholeOutput(result: ToolResultInfo): string {
+  const head = result.text ?? "";
+  if (result.persistedPath === undefined) return head;
+  try {
+    return readFileSync(result.persistedPath, "utf8");
+  } catch {
+    return head;
+  }
 }
 
 // D-M7-SV-5: best effort; a store that cannot open gives "" and the selection uses the intent alone.
