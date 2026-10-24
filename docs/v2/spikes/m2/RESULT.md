@@ -89,3 +89,14 @@ Opus check, main, claude-opus-5-5: 92.53 (json-1 125 -> 147 -17.6, multi-1 93.26
 Guards: unit 1421 pass, 0 fail; `gate.mjs --all` layers v2-unit, ci-checks, gp-cases, prompt-lint,
 check-removed PASS (GP1 and GP3 goldens updated for the PostToolUse matcher, D-M2-MCP-1). The live layer
 and GP-LIVE-ROUTING, D3 and Edit-after-Read are in the section "Live guards" below.
+
+## Live guards (v2-design 18e4a6cd)
+
+- GP-LIVE-ROUTING (sonnet-5-5, 58 rows): under 0, over 0, correct 40/40 on the scored runs, pass true.
+- D3 hook overhead (`e2e/checks/setup-hook-overhead.mjs`): ok, claude-code 11 ms, budget 15 ms.
+- Live T-GS6 (`node e2e/live/run.mjs --all --only T-GS6`): PASS on this run (host load varies; see the A/B above).
+- `gate.mjs --all`: v2-unit, ci-checks, gp-cases, prompt-lint, check-removed PASS. The full live layer was
+  started and stopped by hand after 48 minutes in the compact case (`e2e/live/compact`), which this change
+  does not touch; the cases that cover this change (routing, T-GS6) were run alone.
+- Edit-after-Read was not re-run in round 2. The Read path was not changed in round 2 (only the MCP and Grep
+  replace, and the shape detector); the round 1 result 3/3 stands.
