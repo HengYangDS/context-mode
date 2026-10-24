@@ -608,8 +608,10 @@ test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short i
   assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
   const chunks = await waitRows("SELECT ord FROM chunks WHERE source_id = ?", [src[0].id], 1);
   assert.ok(chunks.length > 0, "the detached write stores the chunks under the reserved id");
-  const units = await waitRows("SELECT ord FROM line_units WHERE source_id = ?", [src[0].id], 1);
-  assert.ok(units.length > 0, "the detached write stores the line units under the reserved id");
+  const built = query("SELECT units_built, chunk_count FROM sources WHERE id = ?", src[0].id);
+  assert.equal(Number(built[0].units_built), 0, "du-units: the source waits for its line units");
+  await waitRows("SELECT ord FROM chunks WHERE source_id = ?", [src[0].id], Number(built[0].chunk_count));
+  assert.equal(query("SELECT ord FROM line_units WHERE source_id = ?", src[0].id).length, 0, "du-units: PostToolUse writes no line units");
 });
 
 // D-M2-JSON-1: a JSON output above the sync-index limit has the full label as its handle (a long line). The

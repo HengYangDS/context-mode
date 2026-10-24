@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openDb, closeDb } from "../../../src/core/store/db.ts";
-import { reserveSource, finishReserved } from "../../../src/core/store/fts.ts";
+import { reserveSource, finishReserved, ensureUnits } from "../../../src/core/store/fts.ts";
 
 function project(root) {
   return {
@@ -46,9 +46,11 @@ test("D-R4-RESERVE-1: a successful finishReserved stores the chunks under the re
     const db = await openDb(project(root));
     const chunks = [{ ord: 0, text: "alpha beta", bytes: 10 }];
     const id = reserveSource(db, src(root), chunks);
-    finishReserved(db, id, src(root), chunks, [{ ord: 0, body: "alpha beta" }]);
+    finishReserved(db, id, src(root), chunks);
     assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM chunks WHERE source_id = ?").get(id).n, 1);
-    assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM line_units WHERE source_id = ?").get(id).n, 1);
+    assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM line_units WHERE source_id = ?").get(id).n, 0, "du-units: no units at write time");
+    ensureUnits(db, "s1");
+    assert.equal(db.raw.prepare("SELECT COUNT(*) AS n FROM line_units WHERE source_id = ?").get(id).n, 1, "du-units: the first need builds them");
     closeDb(db);
   } finally {
     rmSync(root, { recursive: true, force: true });
