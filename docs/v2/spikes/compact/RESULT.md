@@ -210,3 +210,19 @@ The common hook path did not get slower on darwin. The bundle grew 101,141 B -> 
 `splitting: false`, so a lazy `import()` would stay in the same file and save no parse time. Windows CI runs
 40103915339 and 40104728664 failed the 15 ms gate with batches of 13-25 ms; in 40104728664 the Node 26 Windows job
 passed on the same head. The budget stays 15 ms.
+
+### Round 4g re-check (darwin, Node v26.8.1, PRE = 5a79496d, HEAD = 312dee8f)
+
+| Measure | PRE | HEAD |
+|---|---|---|
+| 222 KB PostToolUse, interleaved n=20, median / p95 ms | 120.7 / 132.0 | 129.4 / 152.8 (paired +10.0) |
+| Hook with no agent (module load only), n=140, median / p95 ms | 36.06 / 38.40 | 35.72 / 37.85 |
+| PreToolUse `true`, codex, n=140, median / p95 ms | 36.38 / 39.01 | 35.06 / 37.22 |
+| Hook write, 222 KB, units insert only (6 runs) | n/a | 8.0-12.4 ms (chunks 36-69 ms) |
+
+The small-event path is not slower than PRE: module load and the codex PreToolUse run match PRE within noise,
+and a compile cache does not change them. So the Windows D3 failures (13-16 ms against 15) are not a code
+regression we can find on darwin; runs 40103915339 and 40104728664 differ on the same head, which points to
+runner noise. The budget stays 15 ms. The 222 KB gap is +10 ms, all from the second FTS5 tokenization in
+`insertUnits`. Moving it out of the hook process needs a design change (build units from stored chunks on the
+first recall), not done in this round.
