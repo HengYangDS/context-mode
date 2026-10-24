@@ -493,3 +493,32 @@ test("D-M7-SV-5: the replace selection also ranks by the last user prompt; budge
   const alone = replacedText(parsed(await handleHook("claude-code", q, env)).updatedToolOutput);
   assert.equal(alone.includes("SECRET-1 value=qz7k2m9x"), false, "without a prompt the newest chunks win, as before");
 });
+
+// D-M2-SHAPE-2: the host persisted the whole output; the hook gets a head only. Dispatch reads the whole file.
+test("D-M2-SHAPE-2: a persisted Bash output is indexed and shaped whole; an unreadable file keeps the head", async () => {
+  const lines = Array.from({ length: 1500 }, (_, i) => (i === 900 ? "SECRET-2 value=late9x7q" : "row " + i + " a" + i + " b" + i));
+  const full = lines.join("\n") + "\n";
+  const head = lines.slice(0, 600).join("\n") + "\n";
+  const dir = mkdtempSync(join(tmpdir(), "persist-"));
+  try {
+    const file = join(dir, "out.txt");
+    writeFileSync(file, full);
+    const u = cc({ hook_event_name: "UserPromptSubmit", prompt: "Run cat on data/part2.txt. Find the line starting with SECRET-2." });
+    await handleHook("claude-code", u, env);
+    await waitRows("SELECT 1 FROM events WHERE session_id = ? AND kind = 'prompt'", [u.session_id], 1);
+    const p = { ...mainBashPost(head, ""), session_id: u.session_id };
+    p.tool_input = { command: "cat data/part2.txt" };
+    p.tool_response = { stdout: head, stderr: "", interrupted: false, persistedOutputPath: file, persistedOutputSize: Buffer.byteLength(full) };
+    const replaced = replacedText(parsed(await handleHook("claude-code", p, env)).updatedToolOutput);
+    assert.ok(replaced.includes("SECRET-2 value=late9x7q"), "the line past the head comes back: " + replaced);
+    const src = await waitRows("SELECT bytes_total FROM sources WHERE session_id = ?", [p.session_id], 1);
+    assert.ok(src[0].bytes_total >= Buffer.byteLength(full) - 1, "the whole file is indexed");
+    const q = mainBashPost(head, "");
+    q.tool_input = { command: "cat data/part2.txt" };
+    q.tool_response = { stdout: head, stderr: "", interrupted: false, persistedOutputPath: join(dir, "none.txt"), persistedOutputSize: Buffer.byteLength(full) };
+    const out = replacedText(parsed(await handleHook("claude-code", q, env)).updatedToolOutput);
+    assert.equal(out.includes("late9x7q"), false, "unreadable file: the head only");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

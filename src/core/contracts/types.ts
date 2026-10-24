@@ -27,7 +27,8 @@ export interface ToolCall {
   callId?: string;
 }
 
-export interface ToolResultInfo { isError: boolean; bytes: number; text?: string; exitCode?: number; }
+// persistedPath (D-M2-SHAPE-2): the host kept the whole output in this file and `text` is only its head.
+export interface ToolResultInfo { isError: boolean; bytes: number; text?: string; exitCode?: number; persistedPath?: string; }
 
 export type Decision =
   | { kind: "allow" }

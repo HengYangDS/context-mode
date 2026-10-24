@@ -291,3 +291,17 @@ test("hook path imports contracts + adapters only: no DB, no network, no spawn (
     }
   }
 });
+
+// D-M2-SHAPE-2: a Bash result over the host's inline limit carries persistedOutputPath; decode names the file.
+test("D-M2-SHAPE-2: decode keeps persistedOutputPath only when the inline text is a head of a larger output", async () => {
+  const { decode } = await import("../../../src/adapters/claude-code.ts");
+  const base = { hook_event_name: "PostToolUse", session_id: "s", cwd: "/x", tool_name: "Bash", tool_input: { command: "cat x" }, tool_use_id: "toolu_p" };
+  const head = "row 0\nrow 1\n";
+  const big = decode({ ...base, tool_response: { stdout: head, stderr: "", interrupted: false, persistedOutputPath: "/x/out.txt", persistedOutputSize: 66370 } });
+  assert.equal(big.result.persistedPath, "/x/out.txt");
+  assert.equal(big.result.text, head);
+  const same = decode({ ...base, tool_response: { stdout: head, stderr: "", interrupted: false, persistedOutputPath: "/x/out.txt", persistedOutputSize: Buffer.byteLength(head) } });
+  assert.equal(same.result.persistedPath, undefined);
+  const plain = decode({ ...base, tool_response: { stdout: head, stderr: "", interrupted: false } });
+  assert.equal(plain.result.persistedPath, undefined);
+});

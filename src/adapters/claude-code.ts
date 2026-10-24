@@ -42,7 +42,16 @@ function outputOf(resp: unknown): string {
 function readResult(resp: unknown): ToolResultInfo {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && (resp as { is_error?: unknown }).is_error === true;
-  return { isError, bytes: Buffer.byteLength(text), text };
+  const info: ToolResultInfo = { isError, bytes: Buffer.byteLength(text), text };
+  // D-M2-SHAPE-2: above its inline limit Claude Code gives the hook only the head of stdout and keeps the
+  // whole output in persistedOutputPath (persistedOutputSize bytes). The adapter names the file; dispatch reads it.
+  if (typeof resp === "object" && resp !== null) {
+    const r = resp as { persistedOutputPath?: unknown; persistedOutputSize?: unknown };
+    if (typeof r.persistedOutputPath === "string" && r.persistedOutputPath !== "" && typeof r.persistedOutputSize === "number" && r.persistedOutputSize > info.bytes) {
+      info.persistedPath = r.persistedOutputPath;
+    }
+  }
+  return info;
 }
 
 export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: string, sources: Readonly<Record<string, Source>>): CanonicalHookEvent {

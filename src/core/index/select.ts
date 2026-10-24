@@ -59,7 +59,7 @@ function select(chunks: Chunk[], intent: string, budget: number, label: string |
   return { text, more: skipped ? moreLine(intent, label) : null };
 }
 
-function moreLine(intent: string, label: string | undefined): string {
+export function moreLine(intent: string, label: string | undefined): string {
   const source = label === undefined ? "" : ", source:" + JSON.stringify(label);
   return "ctx_search({queries:[" + JSON.stringify(intent) + "]" + source + "})";
 }
