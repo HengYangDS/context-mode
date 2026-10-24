@@ -244,3 +244,33 @@ test("[M2] GP7/worktree-label-session-first", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// D-CR3-HANDLE-1: source resolves as a short id, then a full label, then a label without its "#" suffix.
+test("D-CR3-HANDLE-1: ctx_search source accepts the short id, the full label and the label without #suffix", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-se-h-"));
+  try {
+    const { openDb, closeDb } = await import("../../../src/core/store/db.ts");
+    const { indexText } = await import("../../../src/core/index/text.ts");
+    const { sourceHandle, parseSourceHandle } = await import("../../../src/core/store/fts.ts");
+    const c = ctxFor(root);
+    const db = await openDb(c.project);
+    const label = "Bash:cat config/deploy.json#toolu_01ABCdef";
+    const { sourceId } = indexText(db, c.project, "s1", label, "region eu-west-3 replicas 7 canary", "text");
+    indexText(db, c.project, "s1", "Bash:cat other.json#toolu_02", "region us-east-1 replicas 2", "text");
+    closeDb(db);
+    assert.equal(parseSourceHandle(sourceHandle(sourceId)), sourceId);
+    assert.equal(parseSourceHandle("s"), null);
+    assert.equal(parseSourceHandle("s0"), null);
+    assert.equal(parseSourceHandle("sZ"), null);
+    for (const source of [sourceHandle(sourceId), label, "Bash:cat config/deploy.json"]) {
+      const out = await ctxSearch.handler({ queries: ["region"], source }, c);
+      assert.equal(out.isError, false);
+      assert.ok(out.text.includes("eu-west-3"), source + ": " + out.text);
+      assert.equal(out.text.includes("us-east-1"), false, source + ": " + out.text);
+    }
+    const none = await ctxSearch.handler({ queries: ["region"], source: "Bash:cat config" }, c);
+    assert.ok(none.text.includes("across 0 source(s)"), none.text);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

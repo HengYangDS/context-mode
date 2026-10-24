@@ -8,7 +8,7 @@ import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
-import { ftsListSource, ftsQuery, ftsQueryTimeline } from "../store/fts.ts";
+import { ftsListSource, ftsQuery, ftsQueryTimeline, resolveSourceLabel } from "../store/fts.ts";
 import { readAutoMemory } from "../index/auto-memory.ts";
 
 // DECISIONS-r9 V23, M23: six keys, strict (unknown key -> the SDK's isError); offset/after are
@@ -196,6 +196,8 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
   const scope: SearchScope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
   try {
+    // D-CR3-HANDLE-1: a short id, a full label or a label without its "#" suffix all name one source.
+    if (input.source !== undefined && input.source !== DECISION_SOURCE) input = { ...input, source: resolveSourceLabel(db, input.source) };
     return sort === "timeline" ? timeline(db, input, scope, ctx) : relevance(db, input, scope, ctx);
   } finally {
     closeDb(db);

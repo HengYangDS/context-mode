@@ -19,10 +19,11 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 export const REPLACE_TRIGGER_BYTES = 4096;
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
-// D-CR2-HANDLE-1: the line after the more line of every replacement. It names the stored source and the
-// full size, so a compact summary written from the replaced text keeps the handle (compact round 2 step 3).
-export function REPLACE_HANDLE_LINE(bytes: number, label: string): string {
-  return "context-mode: the whole output (" + bytes + " B) is stored as source " + JSON.stringify(label) + "; the call above searches it.";
+// D-CR3-HANDLE-1: the last line of every replacement (it replaces the more line and the D-CR2-HANDLE-1 line).
+// One short line: the exact call over the stored source by its short id, then the full size.
+// The label stays in the line as text (the model and tests read it); the call uses the short id.
+export function REPLACE_HANDLE_LINE(intent: string, handle: string, label: string, bytes: number): string {
+  return "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output of " + label + " (" + bytes + " B).";
 }
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
