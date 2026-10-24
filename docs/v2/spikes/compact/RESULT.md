@@ -32,3 +32,9 @@ Losses and gap:
   (`spawnGroup` + `watchdog`: SIGKILL to the whole process group, D-CR3-WATCHDOG-1).
 
 Details: `r2.md`, `a-ledger.md`, `a-push.md`. Guards: `r2.md` "Guards".
+
+## r4 finish smoke (exp/r3-combined after D-CR3-HANDLE-2, D-CR3-RESUME-1, D-CR3-WATCHDOG-1)
+
+compact-hard main, v2 arm, n=1, claude-sonnet-5-5, Claude Code 2.1.303: 12/12 valid, 12/12 correct (100%),
+retrieval call rate 0.5, ctx call rate 0.167, tokens after compaction median 22,185, hook bytes after median
+1,350 B, cost $1.00. No hang. node --test tests/v2/: 1437 pass, 0 fail, 2 skip. gate --all --quick: exit 0.
