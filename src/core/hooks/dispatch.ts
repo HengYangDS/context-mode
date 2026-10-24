@@ -23,7 +23,7 @@ import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { hasAgentRows, hasSessionRows, readFirstPrompt, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
-import { insertChunks, insertUnits, queryUnits, reserveSource, sourceHandle } from "../store/fts.ts";
+import { finishReserved, insertChunks, insertUnits, queryUnits, reserveSource, sourceHandle } from "../store/fts.ts";
 import { buildUnits } from "../index/units.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
@@ -474,8 +474,7 @@ function mainLabel(tool: ToolCall, ev: CanonicalHookEvent): string {
 function indexDetached(project: ProjectContext, sessionId: string, sourceId: number, label: string, text: string, chunks: Chunk[]): void {
   void openDb(project)
     .then((db) => {
-      insertChunks(db, sourceId, sourceRowOf(project, sessionId, label), chunks);
-      insertUnits(db, sourceId, sessionId, buildUnits(text)); // r3-ledger
+      finishReserved(db, sourceId, sourceRowOf(project, sessionId, label), chunks, buildUnits(text)); // r3-ledger, D-R4-RESERVE-1
     })
     .catch((err: unknown) => {
       process.stderr.write("hooks: index write failed: " + message(err) + "\n");

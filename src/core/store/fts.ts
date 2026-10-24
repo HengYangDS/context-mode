@@ -108,6 +108,21 @@ export function reserveSource(db: DbHandle, src: Omit<SourceRow, "id">, chunks: 
   });
 }
 
+// D-R4-RESERVE-1: the detached write of a reserved source. When the chunk or unit write throws, the reserved
+// row and whatever part of it landed are deleted, so no 0-chunk orphan stays in sources; the error is rethrown.
+export function finishReserved(db: DbHandle, id: number, src: Omit<SourceRow, "id">, chunks: Chunk[], units: ReadonlyArray<{ ord: number; body: string }>): void {
+  try {
+    insertChunks(db, id, src, chunks);
+    insertUnits(db, id, src.sessionId, units);
+  } catch (err) {
+    withWrite(db, (h) => {
+      deleteSourceChunks(h.raw, id);
+      h.raw.prepare("DELETE FROM sources WHERE id = ?").run(id);
+    });
+    throw err;
+  }
+}
+
 /** The chunks of a reserved source, batched at INDEX_WRITE_CHUNK bytes per withWrite (porter + trigram). */
 export function insertChunks(db: DbHandle, id: number, src: Omit<SourceRow, "id">, chunks: Chunk[]): void {
   const batches: Chunk[][] = [];
