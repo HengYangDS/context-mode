@@ -155,7 +155,10 @@ test("[M3] GP3/unrelated-mcp-tool-no-hook", () => {
   const summary = {};
   for (const id of REGEX_MATCHER_AGENTS) {
     for (const { event, matcher } of hostEntries(id).filter((x) => x.matcher !== undefined)) {
-      for (const name of foreign) assert.ok(!new RegExp(matcher).test(name), `${id} ${event}: ${name} would spawn a hook`);
+      // D-M2-MCP-1: the one row with a replace channel names every MCP tool on PostToolUse, so a large non-ctx MCP
+      // result reaches the replace path. There a foreign tool must hit the hook; every other entry stays narrow.
+      const mcpPost = id === "claude-code" && event === "PostToolUse";
+      for (const name of foreign) assert.equal(new RegExp(matcher).test(name), mcpPost, `${id} ${event}: ${name} ${mcpPost ? "must reach the replace hook" : "would spawn a hook"}`);
     }
     summary[id] = foreign.map(() => "no-hook");
   }
