@@ -1,7 +1,8 @@
 // impl/09 §4 (handleHook), ADR-0009 §1, §6 and §8.2, ADR-0016; DEVIATIONS D-M3-arch-3 (case-B wrapper
 // next to the hook bundle), D-M3-H2-1..7, D-M4-arch-5 and D-M4-H2-1..3 (compact "none" branches, decision rows).
 // One path per event. Every failure fails open: allow, one stderr line. Never block the host.
-import { readFileSync } from "node:fs";
+// D-CI-PERF-7: node:fs through getBuiltinModule; a static ESM import of node:fs also loads fs/promises, readline and streams.
+const { readFileSync } = process.getBuiltinModule("node:fs") as typeof import("node:fs");
 import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
