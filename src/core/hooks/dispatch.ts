@@ -6,14 +6,14 @@ import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
-  OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
-  PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
+  OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
 import type {
-  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall, ToolResultInfo,
+  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, SourceRow, ToolCall, ToolResultInfo,
 } from "../contracts/types.ts";
 import { getAdapter, hasRecall, hasReplace } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
@@ -22,7 +22,9 @@ import { readUserDeny } from "../policy/user-deny.ts";
 import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
-import { hasAgentRows, hasSessionRows, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
+import { hasAgentRows, hasSessionRows, readFirstPrompt, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
+import { insertChunks, insertUnits, queryUnits, reserveSource, sourceHandle } from "../store/fts.ts";
+import { buildUnits } from "../index/units.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
 import { chunkText } from "../index/chunk.ts";
@@ -188,15 +190,31 @@ function seenSeqs(value: string | null): number[] {
 // No compaction in this session (or a row without UserPromptSubmit additionalContext): ALLOW, zero added
 // bytes. After one: BM25 of this session's rows and the same worktree's prior-session rows against the
 // prompt; whole rows over RECALL_MIN_SCORE, within RECALL_BUDGET_BYTES; a row goes out once per session.
+function seenUnitKeys(value: string | null): string[] {
+  if (value === null) return [];
+  try {
+    const v = JSON.parse(value) as unknown;
+    return Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, prompt: string): Promise<Decision> {
   if (!hasRecall(row) || ev.sessionId === "") return ALLOW;
   const db = await openDb(project);
   if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW;
   const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
   const seen = seenSeqs(metaGet(db, seenKey));
-  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen));
+  // r3-ledger: one ranked query over this session's line units, by the prompt and the session goal.
+  const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
+  const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
+  const goal = readFirstPrompt(db, ev.sessionId);
+  const units = queryUnits(db, ev.sessionId, goal === prompt ? prompt : prompt + " " + goal, RECALL_UNIT_CANDIDATES);
+  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW;
-  metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  if (picked.seqs.length > 0) metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  if (picked.units !== undefined) metaSet(db, unitsKey, JSON.stringify([...seenUnits, ...picked.units]));
   return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
 }
 
@@ -386,24 +404,34 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
   const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES); // D-M7-SV-1: small chunks, line-aligned cuts
+  // D-CR3-HANDLE-1: the handle is the short id of the stored row. Up to SYNC_INDEX_MAX_BYTES the whole write
+  // is sync; above it (F1) only the source row is written now (one small row, D-CR3-HANDLE-2) and the
+  // chunks and line units follow detached under that id, so the handle never falls back to the long label.
+  const db = await openDb(project);
+  let sourceId: number;
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
-    const db = await openDb(project);
-    indexText(db, project, ev.sessionId, label, text, "text", chunks);
+    sourceId = indexText(db, project, ev.sessionId, label, text, "text", chunks).sourceId;
+    insertUnits(db, sourceId, ev.sessionId, buildUnits(text)); // r3-ledger
   } else {
-    indexDetached(project, ev.sessionId, label, text, chunks);
+    sourceId = reserveSource(db, sourceRowOf(project, ev.sessionId, label), chunks);
+    indexDetached(project, ev.sessionId, sourceId, label, text, chunks);
   }
+  const handle = sourceHandle(sourceId);
   // D-M7-SV-5: rank by the intent and the session's last user prompt (any word), so a bare cat still
   // returns the line the user asked for. The more line keeps the intent. No prompt -> intent alone.
   const prompt = await lastPrompt(project, ev.sessionId);
   const rankQuery = prompt.trim() === "" ? undefined : intent + " " + prompt;
   // D-M2-SHAPE-1: a parser-found shape (JSON rows, a line log) gives its rare units the query names, whole,
   // within the same budget, plus the handle. No shape or no named rare unit -> the BM25 pick below, unchanged.
-  const digest = shapeDigest(text, rankQuery ?? intent, REPLACE_RETURN_BYTES);
-  // D-CR2-HANDLE-1: the handle line follows the more line, outside the selection budget.
-  const handle = "\n" + REPLACE_HANDLE_LINE(result.bytes, label);
-  if (digest !== null) return { kind: "replace", output: digest + "\n" + moreLine(intent, label) + handle };
-  const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
-  return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more + handle : "") };
+  // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
+  // replace is the 18e4a6cd size bound (REPLACE_RETURN_BYTES of selection + the more line with the full
+  // label); the selection gets that budget minus the handle line, so a replace never grows.
+  const handleLine = "\n" + REPLACE_HANDLE_LINE(intent, handle, label, result.bytes);
+  const budget = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, label)) - Buffer.byteLength(handleLine);
+  const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES); // D-M2-JSON-1
+  if (digest !== null) return { kind: "replace", output: digest + handleLine };
+  const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
+  return { kind: "replace", output: selected.text + (selected.more !== null ? handleLine : "") };
 }
 
 // D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
@@ -435,15 +463,22 @@ function mainLabel(tool: ToolCall, ev: CanonicalHookEvent): string {
   return head + "#" + (tool.callId ?? String(ev.turn ?? 0));
 }
 
-// F1: above SYNC_INDEX_MAX_BYTES the FTS5 write never blocks the decision; same rules as appendDetached.
-function indexDetached(project: ProjectContext, sessionId: string, label: string, text: string, chunks: Chunk[]): void {
+// F1: above SYNC_INDEX_MAX_BYTES the FTS5 chunk write never blocks the decision; same rules as appendDetached.
+// The source row is already reserved (D-CR3-HANDLE-2); chunks and line units land under its id.
+function indexDetached(project: ProjectContext, sessionId: string, sourceId: number, label: string, text: string, chunks: Chunk[]): void {
   void openDb(project)
     .then((db) => {
-      indexText(db, project, sessionId, label, text, "text", chunks);
+      insertChunks(db, sourceId, sourceRowOf(project, sessionId, label), chunks);
+      insertUnits(db, sourceId, sessionId, buildUnits(text)); // r3-ledger
     })
     .catch((err: unknown) => {
       process.stderr.write("hooks: index write failed: " + message(err) + "\n");
     });
+}
+
+// The source row fields indexText stores for a hook output (kind "content").
+function sourceRowOf(project: ProjectContext, sessionId: string, label: string): Omit<SourceRow, "id"> {
+  return { projectKey: project.projectKey, sessionId, worktree: project.worktree, agent: project.agent, kind: "content", label, bytes: 0, chunkCount: 0, createdAt: Date.now() };
 }
 
 // ---------- §4.7 PreCompact ----------

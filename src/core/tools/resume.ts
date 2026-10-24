@@ -4,6 +4,8 @@
 // project's own context.db; it writes nothing (the server writes the one journal row per call).
 import { z } from "zod/v4";
 import {
+  MAX_CANDIDATES,
+  RECALL_UNIT_CANDIDATES,
   RESUME_CAP,
   RESUME_EMPTY_LINE,
   RESUME_NO_ROW_LINE,
@@ -12,7 +14,8 @@ import {
 } from "../contracts/constants.ts";
 import type { CtxResumeInput, ToolContext, ToolReply } from "../contracts/types.ts";
 import { renderState } from "../compaction/render.ts";
-import { readEventBySeq, readSessionEvents } from "../journal/read.ts";
+import { readEventBySeq, readFirstPrompt, readLastPrompt, readSessionEvents } from "../journal/read.ts";
+import { listSessionSources, queryUnits, sourceHandle } from "../store/fts.ts";
 import { closeDb, openDb } from "../store/db.ts";
 
 export type { CtxResumeInput } from "../contracts/types.ts";
@@ -48,7 +51,15 @@ async function handler(input: CtxResumeInput, ctx: ToolContext): Promise<ToolRep
     const rows = readSessionEvents(db, sessionId);
     const newest = rows.at(-1);
     if (newest === undefined) return reply(RESUME_EMPTY_LINE, false);
-    const block = renderState(rows, newest.turn);
+    // D-CR3-RESUME-1: stored sources by short id, and the line units the post-compact recall query ranks
+    // (last prompt + session goal, one ranked query), labelled by short id.
+    const sources = listSessionSources(db, sessionId, MAX_CANDIDATES)
+      .map((r) => "source " + sourceHandle(r.id) + ": " + r.label + " (" + r.bytes + " B)");
+    const goal = readFirstPrompt(db, sessionId);
+    const last = readLastPrompt(db, sessionId);
+    const units = queryUnits(db, sessionId, goal === last ? goal : last + " " + goal, RECALL_UNIT_CANDIDATES)
+      .map((u) => ({ ...u, label: sourceHandle(u.sourceId) }));
+    const block = renderState(rows, newest.turn, { sources, units });
     // V21: renderState selects whole lines within STATE_BUDGET (= RESUME_CAP), so this never cuts;
     // a block over the cap is a render bug, surfaced, not hidden.
     if (Buffer.byteLength(block, "utf8") > RESUME_CAP) throw new Error("ctx_resume: state block over RESUME_CAP (render bug).");

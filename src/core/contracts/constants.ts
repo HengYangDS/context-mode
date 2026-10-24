@@ -18,11 +18,14 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 // whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
 export const REPLACE_TRIGGER_BYTES = 4096;
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
+// D-M2-JSON-1: a parser-found shape digest (schema, counts, whole rows) has its own budget, independent of the handle line.
+export const SHAPE_RETURN_BYTES = 256;
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
-// D-CR2-HANDLE-1: the line after the more line of every replacement. It names the stored source and the
-// full size, so a compact summary written from the replaced text keeps the handle (compact round 2 step 3).
-export function REPLACE_HANDLE_LINE(bytes: number, label: string): string {
-  return "context-mode: the whole output (" + bytes + " B) is stored as source " + JSON.stringify(label) + "; the call above searches it.";
+// D-CR3-HANDLE-1: the last line of every replacement (it replaces the more line and the D-CR2-HANDLE-1 line).
+// One short line: the exact call over the stored source by its short id, then the full size.
+// The label stays in the line as text (the model and tests read it); the call uses the short id.
+export function REPLACE_HANDLE_LINE(intent: string, handle: string, label: string, bytes: number): string {
+  return "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output of " + label + " (" + bytes + " B).";
 }
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
@@ -83,7 +86,7 @@ export const MS_PER_DAY = 86400000; // DEVIATIONS D-M1-3: day-to-ms factor for t
 
 // Store (impl/02 §0; DEVIATIONS D-M1-3: impl/00 names NODE_MIN and INDEX_WRITE_CHUNK cover the rest)
 export const PROJECT_KEY_HEX_LEN = 16; // impl/00 A5: first 16 hex chars of sha256(git common dir realpath)
-export const SCHEMA_VERSION = 4; // ADR-0002 decision 2: PRAGMA user_version; 2 = cost dedup index (D-M5-arch-2); 3 = chunks title + porter (D-SEARCH-3); 4 = trigram table + vocab (D-SEARCH-4)
+export const SCHEMA_VERSION = 5; // ADR-0002 decision 2: PRAGMA user_version; 2 = cost dedup index (D-M5-arch-2); 3 = chunks title + porter (D-SEARCH-3); 4 = trigram table + vocab (D-SEARCH-4); 5 = line_units (r3-ledger)
 export const RETENTION_IDLE_DAYS = 30; // impl/02 A-S1: row-level, age since last access
 export const RETENTION_SIZE_CAP_BYTES = 524288000; // impl/02 A-S2 (Q7b): 500 MB per project
 export const PROJECT_DEAD_IDLE_DAYS = 14; // DECISIONS-r9 V22 (#1024): project-level sweep, dead owner
@@ -260,6 +263,8 @@ export const RECALL_BUDGET_BYTES = 2048; // whole recall block, wrapper included
 export const RECALL_MIN_SCORE = 5;
 export const RECALL_MAX_ROWS = 340; // newest rows read per prompt (= MAX_CANDIDATES_TOTAL)
 export const COMPACTED_META_PREFIX = "compacted:"; // meta key + session id: a compaction happened in this session
+export const RECALL_UNITS_SEEN_META_PREFIX = "recall_units_seen:"; // r3-ledger: JSON "source:ord" list of line units already injected
+export const RECALL_UNIT_CANDIDATES = 64; // r3-ledger: line units read per recall query (one ranked FTS query)
 export const RECALL_SEEN_META_PREFIX = "recall_seen:"; // meta key + session id: JSON seq list already injected
 export const RECALL_OPEN_TAG = "<context_mode_recall>";
 export const RECALL_CLOSE_TAG = "</context_mode_recall>";

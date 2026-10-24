@@ -76,31 +76,33 @@ Read this part with care. Search layers 1-4 (DEVIATIONS D-SEARCH-1..4) changed t
 
 ## Part 3: v2 hook path (PostToolUse replace)
 
-v1 Part 3 described the >100 KB pointer for `ctx_execute`. v2 has a different path: a native Claude Code Bash output over 4096 B is indexed whole and replaced with at most 96 B of BM25-picked chunks plus a `ctx_search` line. The model never has to call a context-mode tool for this.
+v1 Part 3 described the >100 KB pointer for `ctx_execute`. v2 has a different path: a native Claude Code Bash output over 4096 B is indexed whole and replaced with BM25-picked chunks plus one handle line. The model never has to call a context-mode tool for this.
+
+The handle line (D-CR3-HANDLE-1) is one `ctx_search` call that names the stored source by its short id (`s` + base-36 row id), the source label and the full size. It counts inside the replace budget: the budget is REPLACE_RETURN_BYTES (96 B) of chunks plus the old more line, and the chunks get that budget minus the handle line, so a replacement is never larger than before the handle line. Why: after compaction the model must still find the stored output by name; a short id it can copy exactly, where a long label it shortened and then got 0 hits. Effect on these rows: round 2 (D-CR2-HANDLE-1) put the handle line outside the budget and raised the hook totals to 4,817 B (part 1) and 8,293 B (part 2); with the line inside the budget they are back to 3,012 B and 7,573 B. Outputs above 64 KB (Analytics CSV) also name the short id (D-CR3-HANDLE-2). `bench/fixtures/results.json` was regenerated with `node bench/fixtures/run.mjs`; the 5% `--check` rule is unchanged.
 
 | Scenario | Raw Size | Model sees (hook) | Replaced | Savings | Hook time |
 |----------|----------|------------------|----------|---------|-----------|
-| p1 React useEffect docs | 5.9 KB | 216 B | yes | 96% | 47ms |
-| p1 Next.js App Router docs | 6.5 KB | 218 B | yes | 97% | 47ms |
-| p1 Tailwind CSS docs | 4.0 KB | 221 B | yes | 95% | 49ms |
-| p1 Page snapshot (HN) | 56.2 KB | 215 B | yes | 100% | 56ms |
-| p1 Network requests | 0.4 KB | 400 B | no (≤ 4096 B, passes through) | 0% | 42ms |
-| p1 PR list (Next.js) | 6.4 KB | 188 B | yes | 97% | 46ms |
-| p1 Issues (React) | 58.9 KB | 183 B | yes | 100% | 81ms |
-| p1 Test output (30 suites) | 6.0 KB | 197 B | yes | 97% | 49ms |
-| p1 TypeScript errors (50) | 4.9 KB | 200 B | yes | 96% | 48ms |
-| p1 Build output (100+ lines) | 6.4 KB | 204 B | yes | 97% | 50ms |
-| p1 MCP tools (40 tools) | 17.0 KB | 195 B | yes | 99% | 52ms |
-| p1 Access log (500 req) | 45.1 KB | 191 B | yes | 100% | 93ms |
-| p1 Git log (150+ commits) | 11.6 KB | 193 B | yes | 98% | 47ms |
-| p1 Analytics CSV (500 rows) | 85.5 KB | 198 B | yes | 100% | 58ms |
-| p2 Supabase Edge Functions (5 examples) | 3.9 KB | 3,988 B | no (≤ 4096 B, passes through) | 0% | 45ms |
-| p2 React useEffect docs | 5.9 KB | 216 B | yes | 96% | 47ms |
-| p2 Next.js App Router docs | 6.5 KB | 218 B | yes | 97% | 48ms |
-| p2 Tailwind CSS docs | 4.0 KB | 221 B | yes | 95% | 49ms |
-| p2 Skill: context-mode (main prompt) | 16.3 KB | 202 B | yes | 99% | 48ms |
-| p2 Skill references (4 files combined) | 35.2 KB | 212 B | yes | 99% | 51ms |
-| p2 MCP tools/list (40 tools) | 2.5 KB | 2,509 B | no (≤ 4096 B, passes through) | 0% | 54ms |
+| p1 React useEffect docs | 5.9 KB | 213 B | yes | 96% | 62ms |
+| p1 Next.js App Router docs | 6.5 KB | 218 B | yes | 97% | 56ms |
+| p1 Tailwind CSS docs | 4.0 KB | 221 B | yes | 95% | 79ms |
+| p1 Page snapshot (HN) | 56.2 KB | 217 B | yes | 100% | 199ms |
+| p1 Network requests | 0.4 KB | 400 B | no (≤ 4096 B, passes through) | 0% | 61ms |
+| p1 PR list (Next.js) | 6.4 KB | 181 B | yes | 97% | 97ms |
+| p1 Issues (React) | 58.9 KB | 177 B | yes | 100% | 138ms |
+| p1 Test output (30 suites) | 6.0 KB | 202 B | yes | 97% | 75ms |
+| p1 TypeScript errors (50) | 4.9 KB | 199 B | yes | 96% | 111ms |
+| p1 Build output (100+ lines) | 6.4 KB | 202 B | yes | 97% | 79ms |
+| p1 MCP tools (40 tools) | 17.0 KB | 200 B | yes | 99% | 67ms |
+| p1 Access log (500 req) | 45.1 KB | 192 B | yes | 100% | 143ms |
+| p1 Git log (150+ commits) | 11.6 KB | 194 B | yes | 98% | 111ms |
+| p1 Analytics CSV (500 rows) | 85.5 KB | 196 B | yes | 100% | 121ms |
+| p2 Supabase Edge Functions (5 examples) | 3.9 KB | 3,988 B | no (≤ 4096 B, passes through) | 0% | 109ms |
+| p2 React useEffect docs | 5.9 KB | 213 B | yes | 96% | 79ms |
+| p2 Next.js App Router docs | 6.5 KB | 218 B | yes | 97% | 91ms |
+| p2 Tailwind CSS docs | 4.0 KB | 221 B | yes | 95% | 153ms |
+| p2 Skill: context-mode (main prompt) | 16.3 KB | 212 B | yes | 99% | 237ms |
+| p2 Skill references (4 files combined) | 35.2 KB | 212 B | yes | 99% | 103ms |
+| p2 MCP tools/list (40 tools) | 2.5 KB | 2,509 B | no (≤ 4096 B, passes through) | 0% | 161ms |
 
 **Total: 389.2 KB raw → 10.3 KB (97%)**. Rows under 4096 B pass through unchanged (0% savings).
 Part 2 hook rows feed the same text as Part 2 tool rows, so the 21 hook rows count three docs twice; the Part 2 sources are not a Bash output in real use.
@@ -109,8 +111,8 @@ Part 2 hook rows feed the same text as Part 2 tool rows, so the 21 hook rows cou
 
 | Part | Raw | v1 | v2 tool | v2 hook |
 |------|-----|----|---------|---------|
-| Part 1 (14) | 314.9 KB | 5,517 B | 5,742 B | 3,019 B |
-| Part 2 (7) | 74.3 KB | 11,099 B | 50,588 B | 7,566 B |
+| Part 1 (14) | 314.9 KB | 5,517 B | 5,742 B | 3,012 B |
+| Part 2 (7) | 74.3 KB | 11,099 B | 50,588 B | 7,573 B |
 | All (21) | 389.2 KB | 16,616 B | 56,330 B | 10,585 B |
 
 ## What this measures and what it does not

@@ -79,8 +79,37 @@ export const TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title
 // most INDEX_WRITE_CHUNK bytes of chunk text (ADR-0002 decision 2). The source row rides the first
 // batch; its new id is returned.
 export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chunk[]): number {
+  const id = reserveSource(db, src, chunks);
+  insertChunks(db, id, src, chunks);
+  return id;
+}
+
+/**
+ * D-CR3-HANDLE-2: write the source row alone (one small transaction) and return its id, so a caller can name
+ * the source by its short id before the chunks are written (the detached F1 path). bytes_total and
+ * chunk_count come from `chunks`, as ftsInsert stores them.
+ */
+export function reserveSource(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chunk[]): number {
   let total = 0;
   for (const c of chunks) total += c.bytes;
+  return withWrite(db, (h) => {
+    const row = h.raw.prepare(INSERT_SOURCE).get({
+      session_id: src.sessionId,
+      worktree: src.worktree,
+      agent: src.agent,
+      kind: src.kind,
+      label: src.label,
+      bytes_total: total,
+      chunk_count: chunks.length,
+      created_ts: src.createdAt,
+      created_at: new Date(src.createdAt).toISOString(),
+    }) as { id: number };
+    return Number(row.id);
+  });
+}
+
+/** The chunks of a reserved source, batched at INDEX_WRITE_CHUNK bytes per withWrite (porter + trigram). */
+export function insertChunks(db: DbHandle, id: number, src: Omit<SourceRow, "id">, chunks: Chunk[]): void {
   const batches: Chunk[][] = [];
   let batch: Chunk[] = [];
   let batchBytes = 0;
@@ -93,25 +122,9 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
     batch.push(c);
     batchBytes += c.bytes;
   }
-  batches.push(batch);
-
-  let id = 0;
-  batches.forEach((rows, i) => {
+  if (batch.length > 0) batches.push(batch);
+  for (const rows of batches) {
     withWrite(db, (h) => {
-      if (i === 0) {
-        const row = h.raw.prepare(INSERT_SOURCE).get({
-          session_id: src.sessionId,
-          worktree: src.worktree,
-          agent: src.agent,
-          kind: src.kind,
-          label: src.label,
-          bytes_total: total,
-          chunk_count: chunks.length,
-          created_ts: src.createdAt,
-          created_at: new Date(src.createdAt).toISOString(),
-        }) as { id: number };
-        id = Number(row.id);
-      }
       const ins = h.raw.prepare(INSERT_CHUNK);
       const tri = h.raw.prepare(INSERT_TRI);
       for (const c of rows) {
@@ -120,12 +133,12 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
         tri.run(rid, c.text, title);
       }
     });
-  });
-  return id;
+  }
 }
 
 // D-SEARCH-4: one source's chunks leave both tables (porter and trigram). Returns the chunk rows deleted.
 export function deleteSourceChunks(raw: DatabaseSync, sourceId: number): number {
+  raw.prepare("DELETE FROM line_units WHERE source_id = ?").run(sourceId);
   raw.prepare(TRI_DELETE + " WHERE source_id = ?").run(sourceId);
   return Number(raw.prepare("DELETE FROM chunks WHERE source_id = ?").run(sourceId).changes);
 }
@@ -538,4 +551,87 @@ export function rankTexts(texts: string[], q: string, mode: "all" | "any" = "all
   } finally {
     mem.close();
   }
+}
+
+// D-CR3-HANDLE-1: the short stable id of a stored source: "s" + its sources.id (AUTOINCREMENT, never reused)
+// in base 36. The id is the row key, so it is stored and stable for the life of the row.
+const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+export const SOURCE_ID_PREFIX = "s";
+const LABEL_SUFFIX_SEP = "#";
+
+export function sourceHandle(id: number): string {
+  return SOURCE_ID_PREFIX + id.toString(36);
+}
+
+// The inverse of sourceHandle, or null. Digit by digit, no regex.
+export function parseSourceHandle(s: string): number | null {
+  if (!s.startsWith(SOURCE_ID_PREFIX) || s.length <= SOURCE_ID_PREFIX.length || s.length > SOURCE_ID_PREFIX.length + 10) return null;
+  let n = 0;
+  for (const ch of s.slice(SOURCE_ID_PREFIX.length)) {
+    const d = BASE36.indexOf(ch);
+    if (d < 0) return null;
+    n = n * 36 + d;
+  }
+  return n > 0 && sourceHandle(n) === s ? n : null;
+}
+
+// D-CR3-HANDLE-1: the label a `source` argument names, in this order: a short id of a stored row, a full
+// label, a label without its "#<call id>" suffix (the newest such source). No match -> the argument as given.
+export function resolveSourceLabel(db: DbHandle, source: string): string {
+  const id = parseSourceHandle(source);
+  if (id !== null) {
+    const row = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id) as { label: string } | undefined;
+    if (row !== undefined) return row.label;
+  }
+  if (stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(source) !== undefined) return source;
+  const prefix = source + LABEL_SUFFIX_SEP;
+  const rows = stmt(db.raw, "SELECT label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix) as Array<{ label: string }>;
+  for (const r of rows) {
+    if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === source.length) return r.label;
+  }
+  return source;
+}
+
+/** D-CR3-RESUME-1: this session's stored sources, newest first (id, label, bytes). */
+export function listSessionSources(db: DbHandle, sessionId: string, limit: number): Array<{ id: number; label: string; bytes: number }> {
+  const rows = stmt(db.raw, "SELECT id, label, bytes_total FROM sources WHERE session_id = ? ORDER BY id DESC LIMIT ?").all(sessionId, limit) as Array<{ id: number; label: string; bytes_total: number }>;
+  return rows.map((r) => ({ id: Number(r.id), label: r.label, bytes: Number(r.bytes_total) }));
+}
+
+// ---------- r3-ledger line units ----------
+
+export interface UnitHit { sourceId: number; ord: number; label: string; body: string; score: number }
+
+/** Store one output's line units, batched like ftsInsert (at most INDEX_WRITE_CHUNK bytes per withWrite). */
+export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, units: ReadonlyArray<{ ord: number; body: string }>): void {
+  let start = 0;
+  while (start < units.length) {
+    let end = start;
+    let bytes = 0;
+    while (end < units.length && (end === start || bytes + (units[end] as { body: string }).body.length <= INDEX_WRITE_CHUNK)) {
+      bytes += (units[end] as { body: string }).body.length;
+      end++;
+    }
+    const from = start;
+    withWrite(db, (h) => {
+      const ins = h.raw.prepare("INSERT INTO line_units(body, source_id, session_id, ord) VALUES (?, ?, ?, ?)");
+      for (let i = from; i < end; i++) {
+        const u = units[i] as { ord: number; body: string };
+        ins.run(u.body, sourceId, sessionId, u.ord);
+      }
+    });
+    start = end;
+  }
+}
+
+/** One ranked query over this session's line units (any-word form); best first, -bm25 as the score. */
+export function queryUnits(db: DbHandle, sessionId: string, q: string, limit: number): UnitHit[] {
+  const match = searchTerms(q).join(" OR ");
+  if (match === "" || sessionId === "") return [];
+  const rows = db.raw.prepare(
+    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label " +
+    "FROM line_units u JOIN sources s ON s.id = u.source_id " +
+    "WHERE line_units MATCH ? AND u.session_id = ? ORDER BY bm25(line_units) LIMIT ?",
+  ).all(match, sessionId, limit) as Array<{ source_id: number; ord: number; body: string; score: number; label: string }>;
+  return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
 }

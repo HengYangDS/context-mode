@@ -335,9 +335,10 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   assert.ok(whole.length > 0);
   const joined = whole.reduce((n, c) => n + Buffer.byteLength(c.text), 0) + whole.length - 1;
   assert.equal(joined, Buffer.byteLength(body), "the body is whole chunks, nothing cut");
-  const src = query("SELECT label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
+  const src = query("SELECT id, label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
   assert.equal(src.length, 1);
-  assert.ok(replaced.slice(more).includes(JSON.stringify(src[0].label)), "the more line names the source label");
+  // D-CR3-HANDLE-1: the more line names the stored source by its short id (ctx_search resolves it to the label).
+  assert.ok(replaced.slice(more).includes(JSON.stringify("s" + Number(src[0].id).toString(36))), "the more line names the source id");
   assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole output is indexed, nothing cut");
   // The full output is findable: a chunk the replace dropped comes back from ctx_search, by a line only it holds.
   const all = chunkText(text, "text", REPLACE_CHUNK_BYTES);
@@ -550,37 +551,81 @@ test("D-M2-SHAPE-2: a persisted Bash output is indexed and shaped whole; an unre
   }
 });
 
-// D-CR2-HANDLE-1: every replacement names its stored source, the full size and the exact search call, so a
-// compact summary written from the replaced text keeps a handle to the whole output (compact round 2 step 3).
-test("D-CR2-HANDLE-1: the replacement names the source label, the full byte size and the exact ctx_search call", async () => {
+// D-CR3-HANDLE-1 (replaces D-CR2-HANDLE-1): every replacement ends with one handle line: the exact ctx_search
+// call over the stored source by its short id, and the full size. The line counts inside the budget, so a
+// replace is never larger than the 18e4a6cd form (selection within REPLACE_RETURN_BYTES + the more line).
+test("D-CR3-HANDLE-1: golden handle line: short id, exact call, full size, inside the 18e4a6cd byte bound", async () => {
   const { lintPromptText } = await import("../../../docs/v2/prompt/lint.mjs");
+  const { moreLine } = await import("../../../src/core/index/select.ts");
   const text = bigText(40000);
   const p = mainBashPost(text);
   const out = parsed(await handleHook("claude-code", p, env));
   const replaced = replacedText(out.updatedToolOutput);
-  const src = query("SELECT label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
+  const src = query("SELECT id, label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
   assert.equal(src.length, 1);
-  const more = replaced.lastIndexOf("\nctx_search(");
-  assert.ok(more > 0, "the more line names ctx_search");
-  const tail = replaced.slice(more + 1).split("\n");
-  assert.equal(tail.length, 2, "the call line, then one handle line: " + JSON.stringify(tail));
-  assert.ok(tail[0].includes(", source:" + JSON.stringify(src[0].label) + "})"), "the call is exact: " + tail[0]);
-  assert.ok(tail[1].startsWith("context-mode: "), "the handle line says who wrote it: " + tail[1]);
-  assert.ok(tail[1].includes(String(Buffer.byteLength(text))), "the handle line names the full size: " + tail[1]);
-  for (const r of lintPromptText(tail[1])) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
-  // The handle is outside the selection budget; the body stays within REPLACE_RETURN_BYTES.
-  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
+  const id = "s" + Number(src[0].id).toString(36);
+  const nl = replaced.lastIndexOf("\n");
+  assert.ok(nl > 0, "a body, then the handle line");
+  const intent = p.tool_input.description ?? p.tool_input.command;
+  const golden = "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output of " + src[0].label + " (" + Buffer.byteLength(text) + " B).";
+  assert.equal(replaced.slice(nl + 1), golden);
+  assert.equal(replaced.split("\nctx_search(").length, 2, "one call line, no second more line: " + replaced);
+  for (const r of lintPromptText(golden)) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
+  const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
+  assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
 });
 
-test("D-CR2-HANDLE-1: a subagent replacement carries the same handle", async () => {
+test("D-CR3-HANDLE-1: a subagent replacement carries the same handle line", async () => {
   const text = bigText(40000);
   const p = cc({ hook_event_name: "PostToolUse", tool_name: "Read", agent_id: "a1", agent_type: "general-purpose", tool_input: { file_path: "/tmp/big.log" }, tool_use_id: "toolu_sub", tool_response: text });
   const out = parsed(await handleHook("claude-code", p, env));
   if (out === null || typeof out.updatedToolOutput !== "string") return; // no subagent replace for this shape
   const replaced = out.updatedToolOutput;
-  const src = query("SELECT label FROM sources WHERE session_id = ?", p.session_id);
+  const src = query("SELECT id FROM sources WHERE session_id = ?", p.session_id);
   assert.equal(src.length, 1);
-  const tail = replaced.slice(replaced.lastIndexOf("\nctx_search(") + 1).split("\n");
-  assert.ok(tail[0].includes(JSON.stringify(src[0].label)));
-  assert.ok(tail[1].startsWith("context-mode: ") && tail[1].includes(String(Buffer.byteLength(text))), tail[1]);
+  const last = replaced.slice(replaced.lastIndexOf("\n") + 1);
+  assert.ok(last.includes(", source:" + JSON.stringify("s" + Number(src[0].id).toString(36)) + "})"), last);
+  assert.ok(last.endsWith("(" + Buffer.byteLength(text) + " B)."), last);
+});
+
+// D-CR3-HANDLE-2: above SYNC_INDEX_MAX_BYTES the source row id is reserved before the detached write, so the
+// handle is the short id too (not the full label) and the selection budget stays above 0.
+test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short id of the stored row, the body keeps chunks", async () => {
+  const { moreLine } = await import("../../../src/core/index/select.ts");
+  const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
+  const p = mainBashPost(text);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const src = query("SELECT id, label FROM sources WHERE session_id = ?", p.session_id);
+  assert.equal(src.length, 1, "the source row exists when the hook returns");
+  const id = "s" + Number(src[0].id).toString(36);
+  const nl = replaced.lastIndexOf("\n");
+  assert.ok(nl > 0, "a body, then the handle line");
+  const intent = p.tool_input.description;
+  assert.equal(replaced.slice(nl + 1), "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output of " + src[0].label + " (" + Buffer.byteLength(text) + " B).");
+  assert.ok(Buffer.byteLength(replaced.slice(0, nl)) > 0 && replaced.slice(0, nl).includes("needle target"), "the selection budget is not 0");
+  const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
+  assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
+  const chunks = await waitRows("SELECT ord FROM chunks WHERE source_id = ?", [src[0].id], 1);
+  assert.ok(chunks.length > 0, "the detached write stores the chunks under the reserved id");
+  const units = await waitRows("SELECT ord FROM line_units WHERE source_id = ?", [src[0].id], 1);
+  assert.ok(units.length > 0, "the detached write stores the line units under the reserved id");
+});
+
+// D-M2-JSON-1: a JSON output above the sync-index limit has the full label as its handle (a long line). The
+// digest budget does not depend on the handle line, so the rare row the prompt names still comes back whole.
+test("D-M2-JSON-1: a 200 KB JSON cat returns the rare row whole next to a long handle line", async () => {
+  const rows = Array.from({ length: 900 }, (_, i) => ({ id: "ord-" + i, region: "north", amount: i * 3 + 1, priority: i === 411, items: ["a", "b"], note: "some filler words number " + i }));
+  const text = JSON.stringify(rows, null, 2);
+  assert.ok(Buffer.byteLength(text) > SYNC_INDEX_MAX_BYTES);
+  const pr = cc({ hook_event_name: "UserPromptSubmit", prompt: 'Exactly one order has "priority": true. Give three times its "amount".' });
+  await handleHook("claude-code", pr, env);
+  await waitRows("SELECT 1 FROM events WHERE session_id = ? AND kind = 'prompt'", [pr.session_id], 1);
+  const post = { ...mainBashPost(text, ""), session_id: pr.session_id };
+  post.tool_input = { command: "cat data/orders.json" };
+  const replaced = replacedText(parsed(await handleHook("claude-code", post, env)).updatedToolOutput);
+  assert.ok(replaced.includes('"amount":1234,"priority":true'), replaced);
+  assert.ok(replaced.split("\n")[0].includes("{id,region,amount,priority,items,note}"), replaced);
+  const nl = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(Buffer.byteLength(replaced.slice(0, nl)) <= 256, "digest within SHAPE_RETURN_BYTES");
 });

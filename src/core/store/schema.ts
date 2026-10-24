@@ -120,12 +120,25 @@ INSERT INTO chunks_tri(rowid, body, title) SELECT rowid, body, title FROM chunks
 CREATE VIRTUAL TABLE chunks_vocab USING fts5vocab(chunks, 'row');
 `;
 
+// Version 5 (r3-ledger): line units of stored tool outputs (index/units.ts), one FTS row per unit, linked
+// to the sources row. Recall after a compaction ranks them with one query instead of scanning a large row.
+export const DDL_V5: string = `
+CREATE VIRTUAL TABLE line_units USING fts5(
+  body,
+  source_id UNINDEXED,
+  session_id UNINDEXED,
+  ord UNINDEXED,
+  ${FTS_TOKENIZE}
+);
+`;
+
 // Ascending by version; step N brings the DB from N-1 to N.
 const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 1, sql: DDL },
   { version: 2, sql: DDL_V2 },
   { version: 3, sql: DDL_V3 },
   { version: 4, sql: DDL_V4 },
+  { version: 5, sql: DDL_V5 },
 ];
 
 export function applyMigrations(db: DatabaseSync, fromVersion: number): void {

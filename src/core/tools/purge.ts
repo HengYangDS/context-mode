@@ -51,10 +51,12 @@ function purgeScope(raw: DatabaseSync, scope: PurgeScope, input: CtxPurgeInput):
   if (scope === "source") {
     const label = input.source as string;
     raw.prepare(TRI_DELETE + " WHERE source_id IN (SELECT id FROM sources WHERE label = ?)").run(label);
+    raw.prepare("DELETE FROM line_units WHERE source_id IN (SELECT id FROM sources WHERE label = ?)").run(label);
     return changes(raw, "DELETE FROM chunks WHERE source_id IN (SELECT id FROM sources WHERE label = ?)", label) +
       changes(raw, "DELETE FROM sources WHERE label = ?", label);
   }
   raw.exec("INSERT INTO chunks_tri(chunks_tri) VALUES ('delete-all')");
+  raw.exec("DELETE FROM line_units");
   return changes(raw, "DELETE FROM events") + changes(raw, "DELETE FROM chunks") + changes(raw, "DELETE FROM sources");
 }
 

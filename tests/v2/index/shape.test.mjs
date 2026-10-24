@@ -61,3 +61,26 @@ test("JSON: a categorical key (few values, none dominant) makes its one-off valu
   const many = rows.map((r, i) => ({ ...r, status: "s" + (i % 40) }));
   assert.equal(jsonShape(JSON.stringify(many), "status"), null, "a key with many values is not categorical");
 });
+
+// D-M2-JSON-1: the digest header names the schema (keys) and the counts, when it fits.
+test("JSON digest header: schema keys and counts, then the rare row whole", () => {
+  const rows = Array.from({ length: 400 }, (_, i) => ({ id: "ord-" + i, amount: i * 3, priority: i === 211, note: "long note words here and there " + i }));
+  const d = shapeDigest(JSON.stringify(rows, null, 2), "priority true amount", 400);
+  assert.ok(d !== null);
+  const head = d.split("\n")[0];
+  assert.equal(head, "400 objects {id,amount,priority,note}, 1 rare:");
+  assert.ok(d.includes('[211] {"id":"ord-211","amount":633,"priority":true,'), d);
+});
+
+// D-M2-JSON-2: no skewed key, but the query names a numeric key: the rows at its two extremes, whole.
+test("JSON digest: a named numeric key gives its max and min rows (highest score)", () => {
+  const rows = Array.from({ length: 300 }, (_, i) => ({ id: "rec-" + i, score: (i * 7919) % 10007, tags: ["a", "b"], note: "n" + i }));
+  let hi = 0, lo = 0;
+  rows.forEach((r, i) => { if (r.score > rows[hi].score) hi = i; if (r.score < rows[lo].score) lo = i; });
+  const d = shapeDigest(JSON.stringify(rows, null, 2), "which record id has the highest score", 256);
+  assert.ok(d !== null && Buffer.byteLength(d) <= 256, String(d));
+  assert.ok(d.includes("[" + hi + "] " + JSON.stringify(rows[hi])), "max row whole: " + d);
+  assert.ok(d.includes("[" + lo + "] " + JSON.stringify(rows[lo])), "min row whole: " + d);
+  assert.equal(jsonShape(JSON.stringify(rows), "score"), null, "jsonShape (skew) is unchanged");
+  assert.equal(shapeDigest(JSON.stringify(rows, null, 2), "which record is newest", 256), null, "no numeric key named: no digest");
+});

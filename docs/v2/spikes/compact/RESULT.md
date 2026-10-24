@@ -25,6 +25,11 @@ Losses and gap:
   (config, tests); it does not help dist-* manifests (0/3 sonnet, 0/2 opus) or most heldout questions.
 - tokens after compaction rose (median 42,259 -> 55,229) from the model's own ctx_search calls.
 - 11 to 17 sessions per run hung on a model-run `find /`; the runner kill does not reach the grandchild.
+- Manual watchdog for the frozen runners (`e2e/live/compact-hard/run.mjs`, `bench/m2/eval.mjs` import no shared
+  harness, so they keep `child.kill()`): while a run is going, kill any model-run `find` older than the turn
+  timeout from a second shell, for example `while sleep 30; do pkill -9 -o -f '^find /' ; done`, then stop the loop
+  when the run ends. The run then reads the closed pipe and goes on. New runs use `e2e/live/lib/proc-group.mjs`
+  (`spawnGroup` + `watchdog`: SIGKILL to the whole process group, D-CR3-WATCHDOG-1).
 
 Details: `r2.md`, `a-ledger.md`, `a-push.md`. Guards: `r2.md` "Guards".
 
@@ -69,3 +74,9 @@ The combined win holds: the transcripts show the `<context_mode_recall>` block p
 (`@Bash:cat -n logs/server.log#... line 1057: ... FATAL ...`) into the next prompt after compaction. The
 watchdog killed 4 hung model-run `find /` processes. Live spend for the checker: about 9.1 USD.
 Raw stream-json: private raw dir `compact-m2/r3-check/n2`.
+
+## r4 finish smoke (exp/r3-combined after D-CR3-HANDLE-2, D-CR3-RESUME-1, D-CR3-WATCHDOG-1)
+
+compact-hard main, v2 arm, n=1, claude-sonnet-5-5, Claude Code 2.1.303: 12/12 valid, 12/12 correct (100%),
+retrieval call rate 0.5, ctx call rate 0.167, tokens after compaction median 22,185, hook bytes after median
+1,350 B, cost $1.00. No hang. node --test tests/v2/: 1437 pass, 0 fail, 2 skip. gate --all --quick: exit 0.

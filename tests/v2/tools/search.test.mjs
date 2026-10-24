@@ -244,3 +244,104 @@ test("[M2] GP7/worktree-label-session-first", async () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// D-CR3-HANDLE-1: source resolves as a short id, then a full label, then a label without its "#" suffix.
+test("D-CR3-HANDLE-1: ctx_search source accepts the short id, the full label and the label without #suffix", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-se-h-"));
+  try {
+    const { openDb, closeDb } = await import("../../../src/core/store/db.ts");
+    const { indexText } = await import("../../../src/core/index/text.ts");
+    const { sourceHandle, parseSourceHandle } = await import("../../../src/core/store/fts.ts");
+    const c = ctxFor(root);
+    const db = await openDb(c.project);
+    const label = "Bash:cat config/deploy.json#toolu_01ABCdef";
+    const { sourceId } = indexText(db, c.project, "s1", label, "region eu-west-3 replicas 7 canary", "text");
+    indexText(db, c.project, "s1", "Bash:cat other.json#toolu_02", "region us-east-1 replicas 2", "text");
+    closeDb(db);
+    assert.equal(parseSourceHandle(sourceHandle(sourceId)), sourceId);
+    assert.equal(parseSourceHandle("s"), null);
+    assert.equal(parseSourceHandle("s0"), null);
+    assert.equal(parseSourceHandle("sZ"), null);
+    for (const source of [sourceHandle(sourceId), label, "Bash:cat config/deploy.json"]) {
+      const out = await ctxSearch.handler({ queries: ["region"], source }, c);
+      assert.equal(out.isError, false);
+      assert.ok(out.text.includes("eu-west-3"), source + ": " + out.text);
+      assert.equal(out.text.includes("us-east-1"), false, source + ": " + out.text);
+    }
+    const none = await ctxSearch.handler({ queries: ["region"], source: "Bash:cat config" }, c);
+    assert.ok(none.text.includes("across 0 source(s)"), none.text);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// D-CR3-HANDLE-3: a source argument of the form s<base36> is an id only when that id row exists in this
+// project's store; otherwise it is a label (exact, then without "#" suffix), so a label like "s9z" still works.
+test("D-CR3-HANDLE-3: short-id collision guard: s<base36> with no such row falls through to labels", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-se-c-"));
+  try {
+    const { openDb, closeDb } = await import("../../../src/core/store/db.ts");
+    const { indexText } = await import("../../../src/core/index/text.ts");
+    const { resolveSourceLabel, sourceHandle, parseSourceHandle } = await import("../../../src/core/store/fts.ts");
+    const c = ctxFor(root);
+    const db = await openDb(c.project);
+    const a = indexText(db, c.project, "s1", "Bash:cat a.json#toolu_a", "alpha region eu-west-3", "text").sourceId;
+    indexText(db, c.project, "s1", "s9z", "zulu region ap-south-1", "text");
+    indexText(db, c.project, "s1", "szz#toolu_b", "yankee region sa-east-1", "text");
+    assert.equal(parseSourceHandle("s9z"), 359, "s9z parses as an id");
+    assert.equal(resolveSourceLabel(db, sourceHandle(a)), "Bash:cat a.json#toolu_a", "an existing id row wins");
+    assert.equal(resolveSourceLabel(db, "s9z"), "s9z", "no row 359: the exact label");
+    assert.equal(resolveSourceLabel(db, "szz"), "szz#toolu_b", "no row: the label without its # suffix");
+    assert.equal(resolveSourceLabel(db, "s7y"), "s7y", "no row, no label: the argument as given");
+    closeDb(db);
+    const out = await ctxSearch.handler({ queries: ["region"], source: "s9z" }, c);
+    assert.ok(out.text.includes("ap-south-1") && !out.text.includes("eu-west-3"), out.text);
+    const other = mkdtempSync(join(tmpdir(), "cm-se-c2-"));
+    try {
+      const c2 = ctxFor(other);
+      const db2 = await openDb(c2.project);
+      indexText(db2, c2.project, "s1", "Bash:cat b.json#toolu_c", "bravo", "text");
+      closeDb(db2);
+      const miss = await ctxSearch.handler({ queries: ["region"], source: sourceHandle(a + 5) }, c);
+      assert.ok(miss.text.includes("across 0 source(s)"), "an id with no row in this project finds nothing: " + miss.text);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// D-M2-JSON-3: a source holding a JSON array of objects answers with whole rows ranked by BM25 over the row
+// text (keys and values), not with 48-byte line snippets.
+test("D-M2-JSON-3: ctx_search over a JSON source returns the matching whole row first, five rows a page", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-sej-"));
+  try {
+    const rows = Array.from({ length: 400 }, (_, i) => ({ id: "ord-" + i, region: "north", amount: i * 3 + 1, priority: i === 211, items: ["a", "b"], note: "filler words " + i }));
+    await ctxIndex.handler({ content: JSON.stringify(rows, null, 2), source: "orders.json" }, ctxFor(root));
+    const out = await ctxSearch.handler({ queries: ['"priority": true'], source: "orders.json" }, ctxFor(root));
+    assert.equal(out.isError, false);
+    const lines = out.text.split("\n");
+    assert.ok(lines[0].includes("400 objects {id,region,amount,priority,items,note}"), out.text);
+    const hit = lines.find((l) => l.startsWith("orders.json [211]: "));
+    assert.ok(hit !== undefined, out.text);
+    assert.deepEqual(JSON.parse(hit.slice("orders.json [211]: ".length)), rows[211]);
+    assert.equal(lines.indexOf(hit), 2, "the best row is the first hit (after the header and the query line)");
+    assert.equal(lines.filter((l) => l.startsWith("orders.json [")).length, 5);
+    assert.ok(lines.some((l) => l.startsWith("More: ")), "paging line");
+    assert.ok(Buffer.byteLength(out.text) < 1600, String(Buffer.byteLength(out.text)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("D-M2-JSON-3: a source that is not a JSON array of objects keeps the snippet reply", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-sej2-"));
+  try {
+    await ctxIndex.handler({ content: "alpha beta\ngamma delta fox\n", source: "plain.txt" }, ctxFor(root));
+    const out = await ctxSearch.handler({ queries: ["fox"], source: "plain.txt" }, ctxFor(root));
+    assert.ok(out.text.startsWith('Query "fox":\nplain.txt #0: '), out.text);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
