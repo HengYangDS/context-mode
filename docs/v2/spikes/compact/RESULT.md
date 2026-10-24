@@ -171,3 +171,42 @@ the recall block), so the median of one run moves between them; the round 4 figu
 split, not a stable value. In 6 transcripts read (4 main, 2 heldout) the answer reached the model only in the
 UserPromptSubmit recall block; no tool result after compaction held it. Two model-run `find /` grandchildren
 hung the frozen runner (heldout, `h-cfg-audit-mem`); a manual SIGKILL after 11 min freed it, both runs scored.
+
+## D3 on the merged head, re-measured (r4g-perf)
+
+The +79.9 ms above is mostly a measurement error. HEAD and PRE shared one HOME, so one store. The first HEAD
+call moved the store to schema 5. Every PRE call after that failed `SCHEMA_STALE` ("context.db schema is version 5,
+expected 4") and skipped its journal and index writes. PRE did less work, so it looked faster.
+`bench/hook-large-post.mjs` now gives each bundle its own HOME and repo, and fails on any stderr line.
+
+Event: PostToolUse, Bash `cat -n logs/server.log`, `serverLog(101)` (222,418 B). Host darwin, interleaved
+PRE/HEAD, n=20 each, one HOME per bundle. PRE = 5a79496d, HEAD = v2-design a9f30767.
+
+| Node | PRE median / p95 ms | HEAD median / p95 ms | paired median HEAD-PRE ms |
+|---|---|---|---|
+| v26.8.1 | 118.2 / 149.3 | 126.4 / 158.7 | +11.1 |
+| v24.15.0 | 105.3 / 120.3 | 117.4 / 137.7 | +11.0 |
+
+Where the +11 ms goes (`--cpu-prof`, both Node versions): the chunk write (porter + trigram, 6000 rows) is the same
+in both builds. The new cost is `insertUnits`: 2000 `line_units` rows, about 18 ms CPU in the cold hook process
+and 6.3 ms (v26) / 5.7 ms (v24) in a warm micro run. `buildUnits` is 0.4-0.5 ms. Changes tried in the micro run
+that did not help: one transaction for chunks and units (40.1 vs 40.1 ms), one `json_each` insert statement
+(39.3 vs 39.3 ms), `detail=none` or `columnsize=0` (under 0.5 ms). A HEAD build with the unit write switched off
+was 6.4 ms faster than PRE in the same interleaved run (load average 6.9, so noisy). The cost is the FTS5
+tokenization of the 222 KB a second time, not statement setup. The detached write does not help the wall:
+the hook process stays up until the event loop is empty (D-M3-H2-8).
+
+Open: the target (within 10 ms of PRE) is missed by about 1 ms. A real cut needs units out of the hook process
+(for example, build them from the stored chunks the first time recall asks). That is a design change, not done here.
+
+D3 gate (PreToolUse `true`, codex, overhead = median wall minus bare `node -e ""`, n=40, one HOME per bundle):
+
+| Node | PRE ms | HEAD ms |
+|---|---|---|
+| v26.8.1 | 8.8 | 9.2 |
+| v24.15.0 | 8.0 | 7.5 |
+
+The common hook path did not get slower on darwin. The bundle grew 101,141 B -> 106,363 B; the build uses
+`splitting: false`, so a lazy `import()` would stay in the same file and save no parse time. Windows CI runs
+40103915339 and 40104728664 failed the 15 ms gate with batches of 13-25 ms; in 40104728664 the Node 26 Windows job
+passed on the same head. The budget stays 15 ms.
