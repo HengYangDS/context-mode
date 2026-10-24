@@ -51,3 +51,13 @@ test("budget: a rare unit that does not fit is skipped, never cut", () => {
   const t = Array.from({ length: 100 }, (_, i) => (i === 50 ? "FAIL " + "x".repeat(200) : "ok case " + i)).join("\n");
   assert.equal(shapeDigest(t, "FAIL", 96), null);
 });
+
+test("JSON: a categorical key (few values, none dominant) makes its one-off value rare (D-M2-MCP-2)", () => {
+  const st = ["open", "in_progress", "review"];
+  const rows = Array.from({ length: 180 }, (_, i) => ({ key: "TIX-" + i, title: "task " + i + " words", status: i === 97 ? "blocked" : st[i % 3], labels: ["a", "b"] }));
+  const d = shapeDigest(JSON.stringify(rows, null, 2), "ticket with status blocked", 256);
+  assert.ok(d !== null && d.includes("[97] ") && d.includes("TIX-97"), String(d));
+  assert.equal(jsonShape(JSON.stringify(rows.map((r, i) => ({ ...r, status: st[i % 3] }))), "status"), null, "no one-off value -> no shape");
+  const many = rows.map((r, i) => ({ ...r, status: "s" + (i % 40) }));
+  assert.equal(jsonShape(JSON.stringify(many), "status"), null, "a key with many values is not categorical");
+});

@@ -21,6 +21,7 @@ import { rankTexts } from "../store/fts.ts";
 const SHAPE_MIN_ROWS = 20; // fewer rows or lines: no statistics to stand on
 const SHAPE_RARE_MAX = 2; // a value, token or template seen in at most 2 rows is rare
 const SHAPE_RARE_UNITS_MAX = 9; // more rare units than this: the structure is not a strong one
+const SHAPE_CATEGORICAL_MAX = 8; // a key or position with at most this many distinct values is categorical (D-M2-MCP-2)
 const SHAPE_DOMINANT = 0.9; // the common value of a skewed key or position holds 90% of the rows
 const SHAPE_SIMILARITY = 0.5; // Drain similarity threshold
 const SHAPE_MAX_CLUSTERS = 64; // more templates than this: free text or code, not a log
@@ -71,10 +72,18 @@ function isPlainObject(v: unknown): v is Record<string, unknown> {
 
 // Skewed-value outliers, shared by JSON keys and log token positions: the rows of the non-dominant values.
 function rareOfSkewed(n: number, counts: Map<string, number[]>, totals: Map<string, number>): number[] {
-  if (totals.size < 2 || totals.size > SHAPE_RARE_MAX + 1) return [];
+  if (totals.size < 2 || totals.size > SHAPE_CATEGORICAL_MAX) return [];
   const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
-  if (sorted[0][1] < SHAPE_DOMINANT * n || n - sorted[0][1] > SHAPE_RARE_MAX) return [];
-  return sorted.slice(1).flatMap(([v]) => counts.get(v) ?? []);
+  if (totals.size <= SHAPE_RARE_MAX + 1) {
+    if (sorted[0][1] < SHAPE_DOMINANT * n || n - sorted[0][1] > SHAPE_RARE_MAX) return [];
+    return sorted.slice(1).flatMap(([v]) => counts.get(v) ?? []);
+  }
+  // D-M2-MCP-2: a categorical key with no dominant value: the values seen in at most SHAPE_RARE_MAX rows are
+  // rare when the other values (each common) hold the rest and there are at least two of them.
+  const common = sorted.filter(([, c]) => c > SHAPE_RARE_MAX);
+  const oneOff = sorted.filter(([, c]) => c <= SHAPE_RARE_MAX);
+  if (common.length < 2 || oneOff.length === 0) return [];
+  return oneOff.flatMap(([v]) => counts.get(v) ?? []);
 }
 
 export function jsonShape(text: string, query: string): Shape | null {
@@ -103,7 +112,7 @@ export function jsonShape(text: string, query: string): Shape | null {
       const at = counts.get(s) ?? [];
       if (at.length <= SHAPE_RARE_MAX) at.push(i);
       counts.set(s, at);
-      if (totals.size > SHAPE_RARE_MAX + 1) break; // more than dominant + 2 values: not skewed
+      if (totals.size > SHAPE_CATEGORICAL_MAX) break; // many values: not categorical
     }
     if (!scalar) continue;
     for (const i of rareOfSkewed(objs.length, counts, totals)) outliers.set(i, [...(outliers.get(i) ?? []), k]);
