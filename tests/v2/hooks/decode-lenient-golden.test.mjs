@@ -7,7 +7,8 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, readdirSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -35,6 +36,13 @@ function payload() {
   p.cwd = repo;
   p.transcript_path = join(root, "transcript.jsonl");
   return p;
+}
+
+// D-R4-HANDLE-LABEL-1: the label is no longer in the replace; it is the stored source row's label.
+function storedLabel() {
+  const projects = join(root, ".context-mode", "projects");
+  const db = new DatabaseSync(join(projects, readdirSync(projects)[0], "context.db"), { readOnly: true });
+  try { return db.prepare("SELECT label FROM sources ORDER BY id DESC LIMIT 1").get().label; } finally { db.close(); }
 }
 
 function run(p) {
@@ -92,17 +100,18 @@ test("D-FU-RF-DECODE-1: optional tool_response.stdout dropped -> defaults to \"\
 test("D-FU-RF-DECODE-1: tool_use_id dropped -> label from a hash of the command and turn, stable per command", () => {
   const p = payload();
   delete p.tool_use_id;
-  const a = assertReplaced(run(p), "-tool_use_id a");
-  const b = assertReplaced(run(p), "-tool_use_id b");
-  const label = a.match(/Bash:seq 1 2000#(\S+?)["')\s]/);
-  assert.ok(label !== null, a);
+  assertReplaced(run(p), "-tool_use_id a");
+  const la = storedLabel();
+  const label = la.match(/Bash:seq 1 2000#(\S+)$/);
+  assert.ok(label !== null, la);
   assert.match(label[1], /^h[0-9a-f]{8}$/);
-  assert.ok(b.includes("#" + label[1]), "same command, same turn -> same label");
+  assertReplaced(run(p), "-tool_use_id b");
+  assert.ok(storedLabel().includes("#" + label[1]), "same command, same turn -> same label");
   const q = payload();
   delete q.tool_use_id;
   q.tool_input.command = "seq 1 2000 # other";
-  const c = assertReplaced(run(q), "-tool_use_id other command");
-  assert.ok(!c.includes("#" + label[1]), "another command -> another label");
+  assertReplaced(run(q), "-tool_use_id other command");
+  assert.ok(!storedLabel().includes("#" + label[1]), "another command -> another label");
 });
 
 for (const field of REQUIRED) {
