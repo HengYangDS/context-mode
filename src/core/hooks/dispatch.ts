@@ -427,11 +427,17 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // replace is the 18e4a6cd size bound (REPLACE_RETURN_BYTES of selection + the more line with the full
   // label); the selection gets that budget minus the handle line, so a replace never grows.
   const handleLine = "\n" + REPLACE_HANDLE_LINE(intent, handle, label, result.bytes);
-  const budget = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, label)) - Buffer.byteLength(handleLine);
+  const budget = replaceBudget(handleLine, moreLine(intent, label));
   const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES); // D-M2-JSON-1
   if (digest !== null) return { kind: "replace", output: digest + handleLine };
   const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
   return { kind: "replace", output: selected.text + (selected.more !== null ? handleLine : "") };
+}
+
+// D-R4-BUDGET-1: the selection budget left after the handle line. It never goes below 0 (a handle line
+// longer than the more line plus REPLACE_RETURN_BYTES leaves no room for a body, not a negative budget).
+export function replaceBudget(handleLine: string, more: string): number {
+  return Math.max(0, REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + more) - Buffer.byteLength(handleLine));
 }
 
 // D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
