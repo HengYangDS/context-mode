@@ -630,16 +630,21 @@ test("D-M2-JSON-1: a 200 KB JSON cat returns the rare row whole next to a long h
   assert.ok(Buffer.byteLength(replaced.slice(0, nl)) <= 256, "digest within SHAPE_RETURN_BYTES");
 });
 
-// D-R4-BUDGET-1: the selection budget never goes below 0, whatever the handle line length.
 // D-R4-BUDGET-1: at selection budget 0 the replace is the handle line alone, with no leading newline.
-test("D-R4-BUDGET-1: end-to-end at budget 0 the replace is the handle line alone, no leading newline", async () => {
-  const text = bigText(40000);
-  const intent = "needle target " + "x".repeat(400);
-  const p = mainBashPost(text, intent);
-  const out = parsed(await handleHook("claude-code", p, env));
+// Through dispatch the budget is never 0 (chunks are at most REPLACE_CHUNK_BYTES, the budget is at least
+// REPLACE_RETURN_BYTES - 35), so the join step is tested directly, plus one end-to-end check of the normal join.
+test("D-R4-BUDGET-1: replaceOutput with an empty body is the handle line alone, no leading newline", async () => {
+  const { replaceOutput } = await import("../../../src/core/hooks/dispatch.ts");
+  const line = "ctx_search({queries:[\"q\"], source:\"s1\"}) searches the whole output (9 B).";
+  assert.equal(replaceOutput("", line), line);
+  assert.equal(replaceOutput("body", line), "body\n" + line);
+});
+
+test("D-R4-BUDGET-1: end-to-end a replace never starts with a newline and ends with the handle line after one newline", async () => {
+  const out = parsed(await handleHook("claude-code", mainBashPost(bigText(40000), "needle target"), env));
   const replaced = replacedText(out.updatedToolOutput);
-  assert.ok(replaced.startsWith("ctx_search({"), "no body and no leading newline: " + JSON.stringify(replaced.slice(0, 80)));
-  assert.equal(replaced.split("\nctx_search(").length, 1, "one line only");
+  assert.ok(!replaced.startsWith("\n"), JSON.stringify(replaced.slice(0, 40)));
+  assert.equal(replaced.split("\nctx_search(").length, 2, "body, newline, one handle line");
 });
 
 test("D-R4-BUDGET-1: replaceBudget is 0 when the handle line is longer than the more line plus REPLACE_RETURN_BYTES", async () => {
