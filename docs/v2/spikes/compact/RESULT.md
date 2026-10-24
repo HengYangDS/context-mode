@@ -80,3 +80,24 @@ Raw stream-json: private raw dir `compact-m2/r3-check/n2`.
 compact-hard main, v2 arm, n=1, claude-sonnet-5-5, Claude Code 2.1.303: 12/12 valid, 12/12 correct (100%),
 retrieval call rate 0.5, ctx call rate 0.167, tokens after compaction median 22,185, hook bytes after median
 1,350 B, cost $1.00. No hang. node --test tests/v2/: 1437 pass, 0 fail, 2 skip. gate --all --quick: exit 0.
+
+## Round 4: interleaved measure and merge rule (2026-10-24)
+
+Builds: HEAD = v2-design 60f2991d; FINAL = exp/r4-final bf9c810a (exp/r4-m2-json rebased on the finished
+exp/r3-combined 0899441b). Claude Code 2.1.303, claude-sonnet-5-5, effort low, `--budget 1`, `--jobs 9`, n = 3,
+v2 arm. Order: H, F, H, F (M2 runs between them), then FINAL heldout.
+
+| Run | correct | valid | tokens after (median) | hook bytes after (median) | retrieval rate | ctx rate | cost USD |
+|---|---|---|---|---|---|---|---|
+| HEAD main 1 | 14/36 = 38.9% (14/35 valid = 40.0%) | 35 | 45,499 | 353 | 1 | 0.778 | 3.16 |
+| FINAL main 1 | 36/36 = 100% | 36 | 11,606 | 1,338 | 0.417 | 0.194 | 2.27 |
+| HEAD main 2 | 16/36 = 44.4% | 36 | 66,721 | 353 | 1 | 0.917 | 3.70 |
+| FINAL main 2 | 36/36 = 100% | 36 | 11,731 | 1,338 | 0.472 | 0.194 | 2.22 |
+| FINAL heldout | 18/18 = 100% | 18 | 21,981 | 2,260 | 0.556 | 0.056 | 1.16 |
+
+Mean (min-max): HEAD 41.65% (38.9-44.4), FINAL 100% (100-100). Rule: mean(FINAL) >= mean(HEAD) + 30 and FINAL
+heldout >= 80% valid-correct. 100 >= 71.65 and heldout 100%: met. With M2 and guards also met
+(`../m2/RESULT.md` round 4), exp/r4-final is merged into v2-design (2c40245e).
+
+A manual watchdog (`find /` older than 420 s, SIGKILL) killed 25 model-run `find` processes; no run hung.
+Live spend for round 4: 19.20 USD (cap 40). Raw stream-json: private raw dir `compact-m2/r4-meas`.

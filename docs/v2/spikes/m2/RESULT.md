@@ -133,3 +133,29 @@ replace is near its raw size).
 
 Combined big-json: two of three v2 runs called `ctx_search` (2194 B per-tool). Round 3 gave head 78.97 and
 combined 86.56; the order of the two builds flips between runs. Neither run reaches 90.
+
+## Round 4: interleaved measure and merge rule (2026-10-24)
+
+Builds: HEAD = v2-design 60f2991d; FINAL = exp/r4-final bf9c810a (exp/r4-m2-json on exp/r3-combined).
+`bench/m2/eval.mjs --set main`, Claude Code 2.1.303, claude-sonnet-5-5 low, n = 3, order H, F, H, F, H, F.
+Cells: off bytes -> v2 bytes (saving %).
+
+| Run | score | json-1 | multi-1 | big-tests | big-json | oracles |
+|---|---|---|---|---|---|---|
+| HEAD 1 | 83.99 | 801 -> 142 (82.27) | 2457 -> 915 (62.76) | 25653 -> 325 (98.73) | 2428 -> 347 (85.71) | all 3/3 |
+| FINAL 1 | 87.63 | 773 -> 142 (81.63) | 6906 -> 603 (91.27) | 25653 -> 225 (99.12) | 2428 -> 389 (83.98) | all 3/3 |
+| HEAD 2 | 84.97 | 900 -> 142 (84.22) | 2430 -> 915 (62.35) | 25653 -> 325 (98.73) | 2428 -> 347 (85.71) | all 3/3 |
+| FINAL 2 | 87.59 | 626 -> 142 (77.32) | 6906 -> 603 (91.27) | 25653 -> 225 (99.12) | 2419 -> 389 (83.92) | all 3/3 |
+| HEAD 3 | 71.64 | 901 -> 626 (30.52) | 2647 -> 915 (65.43) | 25653 -> 325 (98.73) | 2428 -> 538 (77.84) | all 3/3 |
+| FINAL 3 | 84.33 | 926 -> 142 (84.67) | 2356 -> 603 (74.41) | 25653 -> 225 (99.12) | 2428 -> 389 (83.98) | all 3/3 |
+
+Mean (min-max): HEAD 80.20 (71.64-84.97), FINAL 86.52 (84.33-87.63). Rule: mean(FINAL) >= mean(HEAD) - 2 and
+every oracle passes: 86.52 >= 78.20, all 3/3: met. M2 >= 90 on the mean: not met (86.52).
+The off reference of multi-1 moves between 2356 and 6906 B from run to run, which moves the score.
+
+Guards on FINAL: `node --test tests/v2/` 1444 tests, 1442 pass, 0 fail, 2 skip; `gate.mjs --all --quick` exit 0
+(live SKIP); D3 (`e2e/checks/setup-hook-overhead.mjs`) ok, claude-code 11 ms, codex 5 ms, budget 15 ms;
+GP-LIVE-ROUTING sonnet-5-5 (58 rows) under 0, over 0, correct 40/40, pass true. Info, not in the rule:
+`bench/hook-gs6.mjs` 40 runs p95 62.1 ms combined wall (limit 60, bare node 46.9 ms on the same loaded host),
+CPU over node 8.3 ms (limit 20), pass false. Frozen evals: no diff to 32f57beb / 69077b8a.
+Compaction for the same builds: `../compact/RESULT.md` round 4. Merged into v2-design (2c40245e).
