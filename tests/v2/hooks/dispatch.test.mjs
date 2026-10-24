@@ -611,3 +611,21 @@ test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short i
   const units = await waitRows("SELECT ord FROM line_units WHERE source_id = ?", [src[0].id], 1);
   assert.ok(units.length > 0, "the detached write stores the line units under the reserved id");
 });
+
+// D-M2-JSON-1: a JSON output above the sync-index limit has the full label as its handle (a long line). The
+// digest budget does not depend on the handle line, so the rare row the prompt names still comes back whole.
+test("D-M2-JSON-1: a 200 KB JSON cat returns the rare row whole next to a long handle line", async () => {
+  const rows = Array.from({ length: 900 }, (_, i) => ({ id: "ord-" + i, region: "north", amount: i * 3 + 1, priority: i === 411, items: ["a", "b"], note: "some filler words number " + i }));
+  const text = JSON.stringify(rows, null, 2);
+  assert.ok(Buffer.byteLength(text) > SYNC_INDEX_MAX_BYTES);
+  const pr = cc({ hook_event_name: "UserPromptSubmit", prompt: 'Exactly one order has "priority": true. Give three times its "amount".' });
+  await handleHook("claude-code", pr, env);
+  await waitRows("SELECT 1 FROM events WHERE session_id = ? AND kind = 'prompt'", [pr.session_id], 1);
+  const post = { ...mainBashPost(text, ""), session_id: pr.session_id };
+  post.tool_input = { command: "cat data/orders.json" };
+  const replaced = replacedText(parsed(await handleHook("claude-code", post, env)).updatedToolOutput);
+  assert.ok(replaced.includes('"amount":1234,"priority":true'), replaced);
+  assert.ok(replaced.split("\n")[0].includes("{id,region,amount,priority,items,note}"), replaced);
+  const nl = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(Buffer.byteLength(replaced.slice(0, nl)) <= 256, "digest within SHAPE_RETURN_BYTES");
+});

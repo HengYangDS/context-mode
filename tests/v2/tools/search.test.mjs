@@ -311,3 +311,37 @@ test("D-CR3-HANDLE-3: short-id collision guard: s<base36> with no such row falls
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// D-M2-JSON-3: a source holding a JSON array of objects answers with whole rows ranked by BM25 over the row
+// text (keys and values), not with 48-byte line snippets.
+test("D-M2-JSON-3: ctx_search over a JSON source returns the matching whole row first, five rows a page", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-sej-"));
+  try {
+    const rows = Array.from({ length: 400 }, (_, i) => ({ id: "ord-" + i, region: "north", amount: i * 3 + 1, priority: i === 211, items: ["a", "b"], note: "filler words " + i }));
+    await ctxIndex.handler({ content: JSON.stringify(rows, null, 2), source: "orders.json" }, ctxFor(root));
+    const out = await ctxSearch.handler({ queries: ['"priority": true'], source: "orders.json" }, ctxFor(root));
+    assert.equal(out.isError, false);
+    const lines = out.text.split("\n");
+    assert.ok(lines[0].includes("400 objects {id,region,amount,priority,items,note}"), out.text);
+    const hit = lines.find((l) => l.startsWith("orders.json [211]: "));
+    assert.ok(hit !== undefined, out.text);
+    assert.deepEqual(JSON.parse(hit.slice("orders.json [211]: ".length)), rows[211]);
+    assert.equal(lines.indexOf(hit), 2, "the best row is the first hit (after the header and the query line)");
+    assert.equal(lines.filter((l) => l.startsWith("orders.json [")).length, 5);
+    assert.ok(lines.some((l) => l.startsWith("More: ")), "paging line");
+    assert.ok(Buffer.byteLength(out.text) < 1600, String(Buffer.byteLength(out.text)));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("D-M2-JSON-3: a source that is not a JSON array of objects keeps the snippet reply", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-sej2-"));
+  try {
+    await ctxIndex.handler({ content: "alpha beta\ngamma delta fox\n", source: "plain.txt" }, ctxFor(root));
+    const out = await ctxSearch.handler({ queries: ["fox"], source: "plain.txt" }, ctxFor(root));
+    assert.ok(out.text.startsWith('Query "fox":\nplain.txt #0: '), out.text);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
