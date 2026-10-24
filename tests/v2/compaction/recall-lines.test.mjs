@@ -49,7 +49,7 @@ test("[M7] recall-lines/flat-log: the one rare line ranks first and keeps its ca
 test("[M7] recall-lines/indented-child: a failure detail line carries the test line above it", () => {
   const lines = ["# seed 4242"];
   for (let i = 1; i <= 300; i++) lines.push(i === 120 ? "not ok 120 - queue > keeps rows case 120 (5ms)" : `ok ${i} - fts > drops locks case ${i} (3ms)`);
-  lines.splice(122, 0, "  error: expected 1111 got 2222", "  at tests/queue/io-120.test.mjs:41:7");
+  lines.splice(121, 0, "  error: expected 1111 got 2222", "  at tests/queue/io-120.test.mjs:41:7");
   const out = pickRecall([row({ seq: 5, key: "Bash:cat test-output.txt", body: lines.join("\n") }) ], 'the test "queue > keeps rows case 120" failed with "expected X got Y". What was Y?', new Set());
   assert.ok(out.text.includes("not ok 120 - queue > keeps rows case 120 (5ms) > error: expected 1111 got 2222"), out.text);
 });

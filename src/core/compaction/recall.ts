@@ -40,7 +40,6 @@ export function pickRecall(rows: readonly JournalRow[], prompt: string, seen: Re
     .map((r, i) => ({ r, score: scores[i] as number }))
     .filter((x) => x.score >= RECALL_MIN_SCORE)
     .sort((a, b) => b.score - a.score || b.r.seq - a.r.seq);
-  if (order.length === 0) return NONE;
 
   let used = bytesOf(RECALL_OPEN_TAG) + 1 + bytesOf(RECALL_CLOSE_TAG);
   const taken: JournalRow[] = [];
@@ -50,7 +49,74 @@ export function pickRecall(rows: readonly JournalRow[], prompt: string, seen: Re
     used += cost;
     taken.push(r);
   }
-  if (taken.length === 0) return NONE;
   taken.sort((a, b) => a.seq - b.seq);
-  return { text: [RECALL_OPEN_TAG, ...taken.map(recallLine), RECALL_CLOSE_TAG].join("\n"), seqs: taken.map((r) => r.seq) };
+  // a-ledger (D-FU-CMP-LEDGER-1): a row too large to go out whole is ranked line by line instead.
+  const big = pool.filter((r) => bytesOf(recallLine(r)) + 1 > RECALL_BUDGET_BYTES);
+  const lines = pickLines(big, prompt, RECALL_BUDGET_BYTES - used);
+  if (taken.length === 0 && lines.length === 0) return NONE;
+  return { text: [RECALL_OPEN_TAG, ...taken.map(recallLine), ...lines, RECALL_CLOSE_TAG].join("\n"), seqs: taken.map((r) => r.seq) };
+}
+
+/** Leading spaces and tabs: the nesting depth of a line in JSON, YAML, test reports and indented logs. */
+function indentOf(line: string): number {
+  let n = 0;
+  while (n < line.length && (line[n] === " " || line[n] === "\t")) n++;
+  return n;
+}
+
+interface LineCandidate { seq: number; no: number; text: string; context: string[] }
+
+/**
+ * Each non-blank line of a row, with its context: the nearest earlier lines with less indentation (one
+ * stack pass, O(lines)). A JSON value gets its key path, a test failure detail gets its test line.
+ */
+function lineCandidates(r: JournalRow): LineCandidate[] {
+  const out: LineCandidate[] = [];
+  const stack: Array<{ indent: number; text: string }> = [];
+  const all = r.body.split("\n");
+  for (let i = 0; i < all.length; i++) {
+    const raw = all[i] as string;
+    const text = raw.trim();
+    if (text === "") continue;
+    const indent = indentOf(raw);
+    while (stack.length > 0 && (stack[stack.length - 1] as { indent: number }).indent >= indent) stack.pop();
+    out.push({ seq: r.seq, no: i + 1, text, context: stack.map((e) => e.text) });
+    stack.push({ indent, text });
+  }
+  return out;
+}
+
+/** "#seq L<n>: ctx > ... > line"; whole lines only. */
+function lineOut(c: LineCandidate): string {
+  return "#" + c.seq + " L" + c.no + ": " + [...c.context, c.text].join(" > ");
+}
+
+/**
+ * BM25 of every line (with its context) of the oversize rows against the prompt, in one corpus, so a
+ * term rare in the output (a req id, a path, a seed) ranks its line first. Lines at or over RECALL_MIN_SCORE,
+ * best first (ties: older row, earlier line), whole lines within `budget`, the same rendered line once.
+ */
+function pickLines(rows: readonly JournalRow[], prompt: string, budget: number): string[] {
+  if (rows.length === 0 || budget <= 0) return [];
+  const cands = rows.flatMap(lineCandidates);
+  if (cands.length === 0) return [];
+  const scores = rankTexts(cands.map((c) => [...c.context, c.text].join("\n")), prompt, "any");
+  const order = cands
+    .map((c, i) => ({ c, score: scores[i] as number }))
+    .filter((x) => x.score >= RECALL_MIN_SCORE)
+    .sort((a, b) => b.score - a.score || a.c.seq - b.c.seq || a.c.no - b.c.no);
+  const shown = new Set<string>();
+  const out: string[] = [];
+  let used = 0;
+  for (const { c } of order) {
+    const body = [...c.context, c.text].join(" > ");
+    if (shown.has(body)) continue;
+    const line = lineOut(c);
+    const cost = bytesOf(line) + 1;
+    if (used + cost > budget) continue;
+    used += cost;
+    shown.add(body);
+    out.push(line);
+  }
+  return out;
 }
