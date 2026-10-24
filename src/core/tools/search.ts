@@ -3,13 +3,15 @@
 // ctx_search: relevance (ContentStore, BM25 / RRF for scope "project", session first) or timeline
 // (ContentStore + SessionDB + auto-memory, oldest first, epoch-ms `after` cursor).
 import { z } from "zod/v4";
-import { DECISION_SOURCE, OUTPUT_CAP, SEARCH_PAGE_SIZE } from "../contracts/constants.ts";
+import { DECISION_SOURCE, OUTPUT_CAP, SEARCH_PAGE_SIZE, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
 import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
 import { ftsListSource, ftsQuery, ftsQueryTimeline, resolveSourceLabel } from "../store/fts.ts";
 import { readAutoMemory } from "../index/auto-memory.ts";
+import { fitRow, jsonRows, namedKeys } from "../index/shape.ts";
+import { rankTexts } from "../store/fts.ts";
 
 // DECISIONS-r9 V23, M23: six keys, strict (unknown key -> the SDK's isError); offset/after are
 // non-negative integers; an empty `queries` array is valid input. impl/05 §6 error table, D-M2-arch-3:
@@ -79,6 +81,50 @@ function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope
     return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
   }
   return ftsQuery(db, q, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset, input.source);
+}
+
+// D-M2-JSON-3: a `source` that holds a JSON array of objects answers with whole rows, BM25-ranked over the row
+// text (keys and values), JSON_ROWS_PAGE rows a page, each within SNIPPET_MAX_BYTES; the first line names the
+// schema and the count. The rows come from the stored chunks, joined in order. Not JSON -> null (snippet path).
+const JSON_ROWS_PAGE = 5;
+const JSON_SOURCE_MAX_BYTES = 8 * 1024 * 1024;
+const JSON_SOURCE = `
+SELECT id, bytes_total FROM sources
+WHERE label = :source
+  AND (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)
+ORDER BY id DESC LIMIT 1`;
+
+function jsonRowsReply(db: DbHandle, input: CtxSearchInput, scope: SearchScope, ctx: ToolContext): ToolReply | null {
+  if (input.source === undefined || input.source === DECISION_SOURCE || input.queries.length === 0) return null;
+  const src = db.raw.prepare(JSON_SOURCE).get({ source: input.source, scope, session_id: ctx.sessionId, worktree: ctx.project.worktree }) as { id: number; bytes_total: number } | undefined;
+  if (src === undefined || Number(src.bytes_total) > JSON_SOURCE_MAX_BYTES) return null;
+  const bodies = (db.raw.prepare("SELECT body FROM chunks WHERE source_id = ? ORDER BY CAST(ord AS INTEGER)").all(Number(src.id)) as unknown as Array<{ body: string }>).map((r) => r.body);
+  const parsed = jsonRows(bodies.join("")) ?? jsonRows(bodies.join("\n"));
+  if (parsed === null) return null;
+  const { objs, keys } = parsed;
+  const texts = objs.map((o) => JSON.stringify(o));
+  const offset = input.offset ?? 0;
+  const out: string[] = [objs.length + " objects {" + keys.join(",") + "}"];
+  let shown = 0;
+  let more = false;
+  for (const q of input.queries) {
+    const scores = rankTexts(texts, q, "any");
+    const order = objs.map((_, i) => i).filter((i) => scores[i] > 0).sort((a, b) => scores[b] - scores[a] || a - b);
+    const named = namedKeys(keys, q);
+    out.push("Query " + JSON.stringify(q) + ":");
+    for (const i of order.slice(offset, offset + JSON_ROWS_PAGE)) {
+      const row = fitRow(objs[i], [], named, SNIPPET_MAX_BYTES);
+      if (row === null) continue;
+      out.push(input.source + " [" + i + "]: " + row);
+      shown++;
+    }
+    if (order.length > offset + JSON_ROWS_PAGE) {
+      out.push("More: " + callText([q], scope, input.source, "offset:" + (offset + JSON_ROWS_PAGE)));
+      more = true;
+    }
+  }
+  return shown === 0 && !more ? null : reply(out.join("\n"), false);
 }
 
 // impl/05 §6 steps 5-10. Hits are kept whole: when the next hit line would not fit OUTPUT_CAP, that
@@ -198,7 +244,8 @@ async function handler(input: CtxSearchInput, ctx: ToolContext): Promise<ToolRep
   try {
     // D-CR3-HANDLE-1: a short id, a full label or a label without its "#" suffix all name one source.
     if (input.source !== undefined && input.source !== DECISION_SOURCE) input = { ...input, source: resolveSourceLabel(db, input.source) };
-    return sort === "timeline" ? timeline(db, input, scope, ctx) : relevance(db, input, scope, ctx);
+    if (sort === "timeline") return timeline(db, input, scope, ctx);
+    return jsonRowsReply(db, input, scope, ctx) ?? relevance(db, input, scope, ctx);
   } finally {
     closeDb(db);
   }
