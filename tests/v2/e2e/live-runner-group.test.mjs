@@ -33,7 +33,7 @@ test("runGroup timeout kills the grandchild and reports timedOut", { skip: proce
 });
 
 test("runGroup returns stdout and status for a run that ends in time", async () => {
-  const r = await runGroup("/bin/sh", ["-c", "echo ok"], {}, 5000);
+  const r = await runGroup(process.execPath, ["-e", "console.log('ok')"], {}, 5000);
   assert.equal(r.timedOut, false);
   assert.equal(r.status, 0);
   assert.equal(r.stdout.trim(), "ok");
