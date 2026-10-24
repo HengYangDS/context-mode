@@ -422,11 +422,10 @@ export function ftsListSource(
 // whole blocks (src/core/store/snippet.ts). Prose stays within maxBytes; a fenced block may use up to
 // SNIPPET_CODE_MAX_BYTES. Stopwords do not steer the window unless the query is only stopwords.
 export function highlight(row: string, terms: string, maxBytes: number = SNIPPET_MAX_BYTES): string {
-  const words = terms.split(WORD_SPLIT).filter((w) => w !== "");
+  const words = blankTokens(terms);
   const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
   return buildSnippet(row, snippetTerms(kept.length > 0 ? kept : words), maxBytes);
 }
-const WORD_SPLIT = /[\s\u0000]+/;
 
 // ---- ctx_search sort:"timeline" (ADR-0009 §8.1 rules 2-6, DECISIONS-r9 M14-M18, D-M2-3, D-M2-T3-1) ----
 
