@@ -5,7 +5,8 @@ import { POINTER_MIN, RATIO_SECTION_DECAY, STATE_BUDGET, STATE_CLOSE_TAG } from 
 import type { CandidateSection, JournalRow } from "../contracts/types.ts";
 import { buildCandidates, type SectionCandidate } from "./candidates.ts";
 import { scoreCandidates } from "./score.ts";
-import { pickUnits, unitLine, type UnitCandidate } from "./recall.ts";
+import { pickUnits, unitLine } from "./recall.ts";
+import type { UnitCandidate } from "../contracts/types.ts";
 
 /**
  * D-CR3-RESUME-1: ctx_resume extras. `sources`: one line per stored source of the session, best first

@@ -2,18 +2,16 @@
 // tool for state it does not know it lost (0 of 50 clean T-CMP sessions), so the hook pushes the rows the
 // next prompt asks about. Pure over JournalRow[]: BM25 (rankTexts, the store's tokenizer) of each row's
 // text against the prompt; whole rows only, never cut; nothing when the top score is under RECALL_MIN_SCORE.
-import { RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_MIN_SCORE, RECALL_OPEN_TAG } from "../contracts/constants.ts";
-import type { JournalRow } from "../contracts/types.ts";
+import { MMR_REDUNDANCY_WEIGHT, MMR_RELEVANCE_WEIGHT, RECALL_BUDGET_BYTES, RECALL_CLOSE_TAG, RECALL_MIN_SCORE, RECALL_OPEN_TAG } from "../contracts/constants.ts";
+import type { JournalRow, UnitCandidate } from "../contracts/types.ts";
 import { rankTexts } from "../store/fts.ts";
+import { wordTokens } from "../store/words.ts";
 
 export interface Recall {
   text: string; // "" = inject nothing
   seqs: number[]; // rows injected, seq ascending
   units?: string[]; // r3-ledger: line units injected, "sourceId:ord" (absent when none)
 }
-
-/** r3-ledger: one line unit of a stored output, as queryUnits returns it. */
-export interface UnitCandidate { sourceId: number; ord: number; label: string; body: string; score: number }
 
 export function unitKey(u: UnitCandidate): string {
   return u.sourceId + ":" + u.ord;
@@ -25,7 +23,7 @@ export function unitLine(u: UnitCandidate): string {
 }
 
 function wordsOf(s: string): Set<string> {
-  return new Set(s.toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter((w) => w !== ""));
+  return new Set(wordTokens(s.toLowerCase()));
 }
 
 function overlap(a: Set<string>, b: Set<string>): number {
@@ -52,7 +50,7 @@ export function pickUnits(cands: readonly UnitCandidate[], seen: ReadonlySet<str
     for (const i of left) {
       let sim = 0;
       for (const j of taken) sim = Math.max(sim, overlap(words[i] as Set<string>, words[j] as Set<string>));
-      const val = 0.7 * ((pool[i] as UnitCandidate).score / top) - 0.3 * sim;
+      const val = MMR_RELEVANCE_WEIGHT * ((pool[i] as UnitCandidate).score / top) - MMR_REDUNDANCY_WEIGHT * sim;
       if (val > bestVal) { bestVal = val; best = i; }
     }
     left.delete(best);

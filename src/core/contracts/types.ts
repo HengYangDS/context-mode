@@ -210,3 +210,6 @@ export type HostConfigFormat = "json" | "jsonc" | "toml";
 export interface HostConfigResult { text: string; format: HostConfigFormat; edits: HostConfigEdit[]; }
 export interface CtxUpgradeInput { mode?: UpgradeMode; confirmDelete?: boolean; } // A-T4
 export interface CtxDoctorInput {} // A-T3: no fields; any key is UNKNOWN_FIELD
+
+/** r3-ledger: one line unit of a stored output, as queryUnits returns it; the MMR pool of recall. */
+export interface UnitCandidate { sourceId: number; ord: number; label: string; body: string; score: number }

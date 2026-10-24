@@ -11,7 +11,7 @@ test("ASCII: lowercase words split on punctuation and spaces; _ joins", () => {
 
 test("Turkish: dotted and dotless i keep their letters, the combining dot separates", () => {
   assert.deepEqual(wordTokens("ışİğ"), ["ışİğ"]);
-  assert.deepEqual(wordTokens("ışİğ".toLowerCase()), ["ış", "i", "ğ"]);
+  assert.deepEqual(wordTokens("ışİğ".toLowerCase()), ["ışi", "ğ"]); // U+0307 (Mn) after the i separates, as the old regex did
 });
 
 test("Cyrillic letters are word chars", () => {

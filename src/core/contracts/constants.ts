@@ -45,6 +45,9 @@ export const MAX_CANDIDATES_TOTAL = 340; // ADR-0009 §4
 export const WEIGHT: Readonly<Record<"toolerr" | "decision" | "prompt" | "edit" | "index", number>> = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 export const DECAY_HALF_LIFE_TURNS = 4;
 export const RATIO_SECTION_DECAY = 0.7;
+// r3-ledger pickUnits (recall.ts): MMR picks by relevance (0.7) minus redundancy (0.3), lambda 0.7.
+export const MMR_RELEVANCE_WEIGHT = 0.7;
+export const MMR_REDUNDANCY_WEIGHT = 0.3;
 // DECAY_X1000[age] = round(1000 * (0.25 + 0.75 * 2^(-age / DECAY_HALF_LIFE_TURNS))), ages 0..127.
 // DECISIONS-r9 M6 (later than impl/01 A-C1 "0-64, computed at load") wins: a literal, checked-in 128-entry
 // integer table; the unit test recomputes the formula; callers clamp age > 127 to entry 127.
@@ -61,6 +64,8 @@ export const DECAY_X1000: readonly number[] = Object.freeze([
 export const COMPACT_POINTER_LINE = 'context-mode: earlier work of this session is in ctx_resume (state block) and ctx_search(scope:"session", sort:"timeline").'; // DECISIONS-r6 D6; byte-stable
 export const RRF_K = 60; // ADR-0009 §8.3/§9, DECISIONS-r7 R1, DECISIONS-r9 M20
 export const SEARCH_P95_MS = 30; // ADR-0009 §9, DECISIONS-r7 R5
+// D-CR3-HANDLE-1: a source handle is SOURCE_ID_PREFIX plus at most this many base-36 digits (parseSourceHandle).
+export const SOURCE_HANDLE_MAX_DIGITS = 10;
 
 // Time budgets (ms)
 export const EXEC_TIMEOUT_MS = 600000; // S-TIMEOUT, Q8: default and max

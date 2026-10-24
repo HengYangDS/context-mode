@@ -6,12 +6,13 @@
 // M2: ftsInsert returns the new id (D-M2-1); ftsQueryTimeline (ADR-0009 §8.1, DECISIONS-r9 M14-M18,
 // D-M2-3, D-M2-T3-1); rankTexts, the in-memory BM25 form selectChunksInMemory calls (impl/05 §5 step 2).
 import { CtxError } from "../contracts/errors.ts";
-import { DECISION_SOURCE, INDEX_WRITE_CHUNK, RRF_K, SNIPPET_MAX_BYTES } from "../contracts/constants.ts";
+import { DECISION_SOURCE, INDEX_WRITE_CHUNK, RRF_K, SNIPPET_MAX_BYTES, SOURCE_HANDLE_MAX_DIGITS } from "../contracts/constants.ts";
 import type { DatabaseSync, StatementSync } from "node:sqlite";
-import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow } from "../contracts/types.ts";
+import type { Chunk, DbHandle, Hit, ProjectContext, SearchScope, SourceRow, TimelineRow, UnitCandidate } from "../contracts/types.ts";
 import { withWrite } from "./db.ts";
 import { FTS_TOKENIZE } from "./schema.ts";
 import { buildSnippet, snippetTerms } from "./snippet.ts";
+import { blankTokens } from "./words.ts";
 
 // The DB owns sources.id (AUTOINCREMENT, D-M1-4, D-M2-1).
 const INSERT_SOURCE = `
@@ -208,7 +209,7 @@ interface PageRow { rid: number; source_id: number; ord: number; body: string; l
 // D-SEARCH-4: the trigram match: every query word (stopwords out) of 3+ characters as one quoted
 // substring, plus the whole query when it has more than one word; joined by OR.
 function trigramMatch(q: string): string {
-  const words = q.split(/[\s\u0000]+/).filter((w) => w !== "");
+  const words = blankTokens(q);
   const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
   const parts = new Set((kept.length > 0 ? kept : words).filter((w) => [...w].length >= 3));
   const whole = words.join(" ");
@@ -580,7 +581,7 @@ export function sourceHandle(id: number): string {
 
 // The inverse of sourceHandle, or null. Digit by digit, no regex.
 export function parseSourceHandle(s: string): number | null {
-  if (!s.startsWith(SOURCE_ID_PREFIX) || s.length <= SOURCE_ID_PREFIX.length || s.length > SOURCE_ID_PREFIX.length + 10) return null;
+  if (!s.startsWith(SOURCE_ID_PREFIX) || s.length <= SOURCE_ID_PREFIX.length || s.length > SOURCE_ID_PREFIX.length + SOURCE_HANDLE_MAX_DIGITS) return null;
   let n = 0;
   for (const ch of s.slice(SOURCE_ID_PREFIX.length)) {
     const d = BASE36.indexOf(ch);
@@ -615,8 +616,6 @@ export function listSessionSources(db: DbHandle, sessionId: string, limit: numbe
 
 // ---------- r3-ledger line units ----------
 
-export interface UnitHit { sourceId: number; ord: number; label: string; body: string; score: number }
-
 /** Store one output's line units, batched like ftsInsert (at most INDEX_WRITE_CHUNK bytes per withWrite). */
 export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, units: ReadonlyArray<{ ord: number; body: string }>): void {
   let start = 0;
@@ -640,7 +639,7 @@ export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, u
 }
 
 /** One ranked query over this session's line units (any-word form); best first, -bm25 as the score. */
-export function queryUnits(db: DbHandle, sessionId: string, q: string, limit: number): UnitHit[] {
+export function queryUnits(db: DbHandle, sessionId: string, q: string, limit: number): UnitCandidate[] {
   const match = searchTerms(q).join(" OR ");
   if (match === "" || sessionId === "") return [];
   const rows = db.raw.prepare(
