@@ -25,5 +25,10 @@ Losses and gap:
   (config, tests); it does not help dist-* manifests (0/3 sonnet, 0/2 opus) or most heldout questions.
 - tokens after compaction rose (median 42,259 -> 55,229) from the model's own ctx_search calls.
 - 11 to 17 sessions per run hung on a model-run `find /`; the runner kill does not reach the grandchild.
+- Manual watchdog for the frozen runners (`e2e/live/compact-hard/run.mjs`, `bench/m2/eval.mjs` import no shared
+  harness, so they keep `child.kill()`): while a run is going, kill any model-run `find` older than the turn
+  timeout from a second shell, for example `while sleep 30; do pkill -9 -o -f '^find /' ; done`, then stop the loop
+  when the run ends. The run then reads the closed pipe and goes on. New runs use `e2e/live/lib/proc-group.mjs`
+  (`spawnGroup` + `watchdog`: SIGKILL to the whole process group, D-CR3-WATCHDOG-1).
 
 Details: `r2.md`, `a-ledger.md`, `a-push.md`. Guards: `r2.md` "Guards".
