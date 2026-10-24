@@ -405,7 +405,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
   // replace is the 18e4a6cd size bound (REPLACE_RETURN_BYTES of selection + the more line with the full
   // label); the selection gets that budget minus the handle line, so a replace never grows.
-  const handleLine = "\n" + REPLACE_HANDLE_LINE(intent, handle, result.bytes);
+  const handleLine = "\n" + REPLACE_HANDLE_LINE(intent, handle, label, result.bytes);
   const budget = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, label)) - Buffer.byteLength(handleLine);
   const digest = shapeDigest(text, rankQuery ?? intent, budget);
   if (digest !== null) return { kind: "replace", output: digest + handleLine };

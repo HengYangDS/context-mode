@@ -567,7 +567,7 @@ test("D-CR3-HANDLE-1: golden handle line: short id, exact call, full size, insid
   const nl = replaced.lastIndexOf("\n");
   assert.ok(nl > 0, "a body, then the handle line");
   const intent = p.tool_input.description ?? p.tool_input.command;
-  const golden = "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
+  const golden = "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output of " + src[0].label + " (" + Buffer.byteLength(text) + " B).";
   assert.equal(replaced.slice(nl + 1), golden);
   assert.equal(replaced.split("\nctx_search(").length, 2, "one call line, no second more line: " + replaced);
   for (const r of lintPromptText(golden)) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));

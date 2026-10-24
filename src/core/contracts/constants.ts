@@ -21,8 +21,9 @@ export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
 // D-CR3-HANDLE-1: the last line of every replacement (it replaces the more line and the D-CR2-HANDLE-1 line).
 // One short line: the exact call over the stored source by its short id, then the full size.
-export function REPLACE_HANDLE_LINE(intent: string, handle: string, bytes: number): string {
-  return "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output (" + bytes + " B).";
+// The label stays in the line as text (the model and tests read it); the call uses the short id.
+export function REPLACE_HANDLE_LINE(intent: string, handle: string, label: string, bytes: number): string {
+  return "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output of " + label + " (" + bytes + " B).";
 }
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15
