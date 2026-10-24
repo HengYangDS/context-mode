@@ -20,7 +20,8 @@ block after compaction is empty. a-ledger (572eaa46) ranked lines at prompt time
   over this session's units, by prompt + session goal (first prompt of the session), 64 candidates.
   `pickUnits` applies MMR (0.7 score, 0.3 word overlap), whole units only, inside the budget the rows left.
   Units already injected are kept in meta `recall_units_seen:<session>`.
-- Not done: `ctx_resume` does not read units yet.
+- Done since: `ctx_resume` reads line units (`src/core/tools/resume.ts`).
+- Schema v5 (`line_units`): sources stored before v5 have no line units and are not backfilled. After an upgrade, only new outputs get unit recall after compaction. Old sources stay searchable with `ctx_search`.
 
 ## Numbers
 

@@ -134,8 +134,9 @@ test("every formatted error is one line with '. Fix: ' and no '<' left (A-C6)", 
   }
 });
 
-test("SCHEMA_STALE formats with SCHEMA_VERSION as <want>", () => {
-  assert.equal(formatError("SCHEMA_STALE", { found: 5, want: C.SCHEMA_VERSION }), "context.db schema is version 5, expected 5. Fix: run ctx_doctor.");
+test("SCHEMA_STALE formats found (want + 1) and want (SCHEMA_VERSION)", () => {
+  const found = C.SCHEMA_VERSION + 1;
+  assert.equal(formatError("SCHEMA_STALE", { found, want: C.SCHEMA_VERSION }), `context.db schema is version ${found}, expected ${C.SCHEMA_VERSION}. Fix: run ctx_doctor.`);
 });
 
 test("every error code formats with its vars", () => {

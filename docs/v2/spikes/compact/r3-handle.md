@@ -27,6 +27,6 @@ Done:
 - Golden tests: tests/v2/hooks/dispatch.test.mjs (D-CR3-HANDLE-1 golden line + byte bound), tests/v2/tools/search.test.mjs (id, full label, label without suffix; a partial label still gets 0 sources).
 
 Not done:
-- ctx_resume output does not use the id yet (indexed_sources lines come from journal keys, which carry no row id).
-- Unit: 1387 tests, all failures except one are pre-existing on 5996c145 (cli/build tests need a build). New failure: tests/v2/bench/fixtures-run.test.mjs `run.mjs --check`: v2 hook bytes moved > 5% (part1 3010 vs 4817, part2 7573 vs 8293). The handle line keeps the full label as text (tests read `#<tool_use_id>`), so with REPLACE_RETURN_BYTES = 96 the selection budget falls near zero. Open question: drop the label text (needs the owner to accept a change to six label-reading assertions) or keep it and accept a smaller selection.
-- No live run: M2 main, compaction main and heldout, D3 and prompt lint are not measured on this branch. No DEVIATIONS.md row yet.
+- Done since: ctx_resume lists sources by short id and reads line units (`src/core/tools/resume.ts`). The detached index path uses the short id (D-CR3-HANDLE-2).
+- Unit: 1387 tests, all failures except one are pre-existing on 5996c145 (cli/build tests need a build). New failure: tests/v2/bench/fixtures-run.test.mjs `run.mjs --check`: v2 hook bytes moved > 5% (part1 3012 vs 4817, part2 7573 vs 8293; results.json now shows part1 3012). The handle line keeps the full label as text (tests read `#<tool_use_id>`), so with REPLACE_RETURN_BYTES = 96 the selection budget falls near zero. Open question: drop the label text (needs the owner to accept a change to six label-reading assertions) or keep it and accept a smaller selection.
+- No live run: M2 main, compaction main and heldout, D3 and prompt lint are not measured on this branch. DEVIATIONS.md rows exist: 2026-10-24 (D-CR3-HANDLE-1, -2, -3).

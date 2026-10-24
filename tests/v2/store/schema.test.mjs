@@ -18,7 +18,7 @@ function freshDb(dir) {
 
 test("SCHEMA_VERSION equals the constants.ts SCHEMA_VERSION", () => {
   assert.equal(SCHEMA_VERSION, C.SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 5); // D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram
+  assert.equal(SCHEMA_VERSION, 5); // D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units
 });
 
 test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_id, turn) WHERE kind = 'cost'", () => {
@@ -41,7 +41,7 @@ test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_i
   }
 });
 
-test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, then 4) without losing rows", () => {
+test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, 4, then 5) without losing rows", () => {
   const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
   try {
     const db = freshDb(dir);

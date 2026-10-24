@@ -40,7 +40,7 @@ function row(kind, turn, bytes = 0) {
   };
 }
 
-test("[M5] SCHEMA_VERSION is 3 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3) and the trigram table (4, D-SEARCH-4)", () => {
+test("[M5] SCHEMA_VERSION is 5 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4) and line units (5, r3-ledger)", () => {
   assert.equal(SCHEMA_VERSION, 5);
 });
 
