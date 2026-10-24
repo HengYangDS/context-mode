@@ -163,3 +163,22 @@ Compaction for the same builds: `../compact/RESULT.md` round 4. Merged into v2-d
 Round 4 checker (fresh clone of v2-design 24a42ab4, same settings, n=3, twice): 87.74 and 87.68, all oracles
 3/3. json-1 34.25 and 29.74 in both runs (v2 bytes 526 and 633: the model used Read after the digest), the same
 low json-1 as HEAD run 3; the other three workloads match FINAL (91.3, 99.12, 84.0-84.2). M2 >= 90: not met.
+
+## du merge (2026-10-24, Claude Code 2.1.303, claude-sonnet-5-5 low, n = 3)
+
+Merge rule, no judgement, each branch on its own. Cells: off bytes -> v2 bytes (saving %).
+
+exp/du-deny (a2e537ad, D-DU-DENY-1, `du-deny.md`): main runs 90.15 / 90.12 / 90.12, mean 90.13 (rule: >= 88.0, met);
+heldout 98.59 (rule: >= 96.4, met); GP-LIVE-ROUTING under 0, over 0 on sonnet-5-5 and opus-5-5; every oracle passes;
+`node --test tests/v2/` 1474 pass, 0 fail, 2 skip; `gate.mjs --all --quick` exit 0. Merged into v2-design as b558bb37.
+
+exp/du-units (7f21dab7): one main run 84.36, under the 85 floor, so it is not merged.
+
+| Run | score | json-1 | multi-1 | big-tests | big-json | oracles |
+|---|---|---|---|---|---|---|
+| du-units | 84.36 | 814 -> 142 (82.56) | 2352 -> 429 (81.76) | 25653 -> 171 (99.33) | 2376 -> 329 (86.15) | all 3/3 |
+| merged head b558bb37 | 90.48 | 811 -> 142 (82.49) | 6894 -> 429 (93.78) | 25653 -> 171 (99.33) | 2569 -> 329 (87.19) | all 3/3 |
+
+du-units has no deny change; its multi-1 off reference (2352 B) is at the low end of the range seen (2352-6906 B).
+Merged head (= du-deny tree, units not merged): runs 90.15, 90.12, 90.12, 90.48, mean 90.22. M2 >= 90 holds.
+Cost: du-units $1.02, merged head $0.83.

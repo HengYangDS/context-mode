@@ -226,3 +226,22 @@ regression we can find on darwin; runs 40103915339 and 40104728664 differ on the
 runner noise. The budget stays 15 ms. The 222 KB gap is +10 ms, all from the second FTS5 tokenization in
 `insertUnits`. Moving it out of the hook process needs a design change (build units from stored chunks on the
 first recall), not done in this round.
+
+## du merge (2026-10-24, Claude Code 2.1.303, sonnet-5-5 low, `--budget 1`, `--jobs 9`, v2 arm)
+
+exp/du-units (7f21dab7, lazy line units, `du-units.md`):
+
+| Measure | Result | Rule |
+|---|---|---|
+| compact-hard main | run 1 36/36 (100%, $2.49), run 2 36/36 (100%, $1.92), mean 100% | >= 97%: met |
+| compact-hard heldout | 18/18 ($0.99) | >= 17/18: met |
+| 222 KB PostToolUse, interleaved n=20 (darwin, Node v26.8.1) | pre-round-3 5a79496d 111.6 / 139.0 ms, du-units 110.5 / 138.3 ms (median / p95), paired -0.4 ms | within 3 ms: met |
+| D3, `e2e/checks/setup-hook-overhead.mjs` | ok, claude-code 4 ms, codex 5 ms, budget 15 | pass: met |
+| M2 main (n=3) | 84.36 (`../m2/RESULT.md` "du merge") | >= 85: not met |
+| `node --test tests/v2/`, `gate.mjs --all --quick` | 1473 pass, 0 fail, 2 skip; exit 0 | green: met |
+
+exp/du-units is not merged: M2 main is 0.64 under the floor. The first UserPromptSubmit after compaction is still
+about 27 ms median slower than head on that branch (`du-units.md`); the D3 gate does not time that path.
+
+Merged head b558bb37 (exp/du-deny only): compact-hard main 36/36 = 100% ($1.99). The 222 KB PostToolUse gap of
++10 ms over pre-round-3 stays open on v2-design.

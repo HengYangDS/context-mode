@@ -24,6 +24,8 @@ On six short Opus 5.5 tasks, v1 cost **34.6% more** than Claude Code alone and v
 | Search: held-out recall@5 / MRR@10 (50 queries) | n/a | 0.84 / 0.76 | **0.98 / 0.827** | n/a | [DIAGNOSIS section 8](../../v2/spikes/search/DIAGNOSIS.md#8-verbatim-fence-aware-snippets-d-search-7-2026-10-23-node-26-macos) |
 | Search: code blocks whole in replies (bench 7) | n/a | 21 / 70 | **42 / 70** | n/a | same |
 | Search: p50 / p95 ms on +1 MB | n/a | 3.0 / 7.7 | 4.3-4.6 / 11.2-11.8 | n/a | same |
+| Saving M2, frozen eval `bench/m2` (Sonnet 5.5, n=3 per run) | n/a | not measured | main 90.15 / 90.12 / 90.12 / 90.48, mean **90.22**; heldout 98.59 | not measured | [m2/RESULT.md, du merge](../../v2/spikes/m2/RESULT.md) |
+| Compaction recall, frozen eval `e2e/live/compact-hard` (Sonnet 5.5) | main 72.2% | not measured | main 100% (36/36); heldout 18/18 (round 4) | not measured | [compact/RESULT.md, du merge](../../v2/spikes/compact/RESULT.md) |
 | Hook latency, Claude Code p95 (budget 40 ms) | no hook | not measured | 41 ms, **FAIL** by 1 ms | no hook (proxy) | [OPEN-ITEMS.md item 1](../../v2/OPEN-ITEMS.md), [TECH-SPEC.md section 1.1](../../v2/TECH-SPEC.md) |
 | Install | n/a | per-agent steps: npm install, then a config entry and a hook file per agent | 2 commands: `npm i -g context-mode`, `context-mode setup` | set `ANTHROPIC_BASE_URL` to the gateway | [CLI-REPORT.md](../../v2/CLI-REPORT.md), [README rollback table](../../../README.md#upgrading-from-v1), [How we measured](../v1-v2-gateway/README.md#how-we-measured) |
 | Issue coverage (351 issue and PR rows) | n/a | the source of the 351 rows | resolved+tested 171, resolved-untested 110, partly 7, not resolved 27, out of scope 36 | n/a | [ISSUE-COVERAGE.md](../../v2/ISSUE-COVERAGE.md) |
