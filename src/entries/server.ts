@@ -8,7 +8,7 @@ import { McpServer, type ServerContext, type StandardSchemaWithJSON } from "@mod
 import { serveStdio, type StdioServerHandle } from "@modelcontextprotocol/server/stdio";
 import { AGENT_IDS, type AgentId } from "../core/contracts/agents.ts";
 import {
-  INTERNAL_ERROR_LINE, NODE_MIN, OWNER_STOP_EXT, OWNERS_DIR_NAME, PROJECTS_DIR_NAME, SERVER_KEY, TOOLS_TTL_MS,
+  HOST_SESSION_ENV, INTERNAL_ERROR_LINE, NODE_MIN, OWNER_STOP_EXT, OWNERS_DIR_NAME, PROJECTS_DIR_NAME, RUN_SESSION_PREFIX, SERVER_KEY, TOOLS_TTL_MS,
   UPGRADE_STOP_DELAY_MS,
 } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
@@ -66,6 +66,17 @@ function metaString(meta: Record<string, unknown> | undefined, key: string): str
 function metaNumber(meta: Record<string, unknown> | undefined, key: string): number | undefined {
   const v = meta?.[key];
   return typeof v === "number" && Number.isSafeInteger(v) ? v : undefined;
+}
+
+// D-CR2-SID-1: _meta.sessionId, else the session id the host put in the server env (the id its hooks
+// journal under, so scope:"session" finds hook-indexed rows), else the process-local mcp:<serverId>.
+export function sessionIdOf(meta: Record<string, unknown> | undefined, agent: AgentId | undefined, env: NodeJS.ProcessEnv, serverId: string): string {
+  const fromMeta = metaString(meta, "sessionId");
+  if (fromMeta !== undefined) return fromMeta;
+  const key = agent === undefined ? undefined : HOST_SESSION_ENV[agent];
+  const fromHost = key === undefined ? undefined : env[key];
+  if (typeof fromHost === "string" && fromHost !== "") return fromHost;
+  return RUN_SESSION_PREFIX + serverId;
 }
 
 // §5 step 7d: one line to the client, the stack to stderr only.
@@ -172,7 +183,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
         get project(): ProjectContext {
           return projectOf();
         },
-        sessionId: metaString(meta, "sessionId") ?? "mcp:" + serverId,
+        sessionId: sessionIdOf(meta, agent, env, serverId),
         turn: metaNumber(meta, "turn") ?? 0,
         signal: req.mcpReq.signal,
         clientInfo: server.server.getClientVersion(),

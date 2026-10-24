@@ -49,3 +49,16 @@ test("installExitGuard calls onShutdown on stdin 'end', then SIGTERM, then SIGKI
   t.mock.timers.tick(1);
   assert.deepEqual(kills, [[process.pid, "SIGTERM"], [process.pid, "SIGKILL"]]);
 });
+
+// D-CR2-SID-1: the MCP server uses the session id the hooks journal under, when the host exposes it.
+test("sessionIdOf: _meta first, then the host session env, then mcp:<serverId>", async () => {
+  const { sessionIdOf } = await import("../../../src/entries/server.ts");
+  const env = { CLAUDE_CODE_SESSION_ID: "280ff837-09ba-4152-bb02-89ec3a42eca9" };
+  assert.equal(sessionIdOf({ sessionId: "m-1" }, "claude-code", env, "srv"), "m-1");
+  assert.equal(sessionIdOf(undefined, "claude-code", env, "srv"), "280ff837-09ba-4152-bb02-89ec3a42eca9");
+  assert.equal(sessionIdOf(undefined, "claude-code", {}, "srv"), "mcp:srv");
+  assert.equal(sessionIdOf(undefined, "claude-code", { CLAUDE_CODE_SESSION_ID: "" }, "srv"), "mcp:srv");
+  // A host without a session env keeps the process-local id.
+  assert.equal(sessionIdOf(undefined, "gemini", env, "srv"), "mcp:srv");
+  assert.equal(sessionIdOf(undefined, undefined, env, "srv"), "mcp:srv");
+});
