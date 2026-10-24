@@ -11,8 +11,8 @@ const SRC = new URL("../../../src/prompt/hooks/read-deny.md", import.meta.url);
 
 test("D-DU-DENY-1: golden Read deny text", () => {
   assert.equal(READ_DENY_MESSAGE("/repo/big.log", 307200),
-    'context-mode: 307200-byte file, over the one-read limit. Run ctx_execute(language, code, file="/repo/big.log"): ' +
-    "the code gets the path in CTX_FILE; print only the answer.");
+    'context-mode: 307200-byte file, over the one-read limit. Run ctx_execute(language, code, file="/repo/big.log") ' +
+    "and print only the answer.");
 });
 
 test("D-DU-DENY-1: the template is src/prompt/hooks/read-deny.md, one line, path once", () => {
@@ -27,10 +27,10 @@ test("D-DU-DENY-1: the template is src/prompt/hooks/read-deny.md, one line, path
 test("D-DU-DENY-1: byte cap on the fixed text (placeholders removed)", () => {
   const fixed = READ_DENY_TEMPLATE.split("{path}").join("").split("{size}").join("");
   assert.ok(Buffer.byteLength(fixed) <= READ_DENY_FIXED_CAP, `${Buffer.byteLength(fixed)} > ${READ_DENY_FIXED_CAP}`);
-  assert.ok(READ_DENY_FIXED_CAP <= 140);
+  assert.ok(READ_DENY_FIXED_CAP <= 120);
   // json-1 shape: 90-byte path, 6-digit size; the old text was 465 B here.
   const json1 = READ_DENY_MESSAGE("/" + "p".repeat(89), 501233);
-  assert.ok(Buffer.byteLength(json1) <= 240, String(Buffer.byteLength(json1)));
+  assert.ok(Buffer.byteLength(json1) <= 220, String(Buffer.byteLength(json1)));
 });
 
 test("D-DU-DENY-1: the prompt lint covers the hook template, and fails a bad one", () => {
