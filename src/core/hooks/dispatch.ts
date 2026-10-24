@@ -427,18 +427,24 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
   // replace is the 18e4a6cd size bound (REPLACE_RETURN_BYTES of selection + the more line with the full
   // label); the selection gets that budget minus the handle line, so a replace never grows.
-  const handleLine = "\n" + REPLACE_HANDLE_LINE(intent, handle, result.bytes);
+  const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes);
   const budget = replaceBudget(handleLine, moreLine(intent, label));
   const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES); // D-M2-JSON-1
-  if (digest !== null) return { kind: "replace", output: digest + handleLine };
+  if (digest !== null) return { kind: "replace", output: replaceOutput(digest, handleLine) };
   const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
-  return { kind: "replace", output: selected.text + (selected.more !== null ? handleLine : "") };
+  return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, handleLine) : selected.text };
 }
 
-// D-R4-BUDGET-1: the selection budget left after the handle line. It never goes below 0 (a handle line
-// longer than the more line plus REPLACE_RETURN_BYTES leaves no room for a body, not a negative budget).
+// D-R4-BUDGET-1: the replace is the body, one newline, the handle line. An empty body (selection budget 0, no
+// chunk fits) gives the handle line alone, with no leading newline.
+export function replaceOutput(body: string, handleLine: string): string {
+  return body === "" ? handleLine : body + "\n" + handleLine;
+}
+
+// D-R4-BUDGET-1: the selection budget left after the handle line and the newline that joins it to the body.
+// It never goes below 0 (a handle line longer than the more line plus REPLACE_RETURN_BYTES leaves no room for a body).
 export function replaceBudget(handleLine: string, more: string): number {
-  return Math.max(0, REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + more) - Buffer.byteLength(handleLine));
+  return Math.max(0, REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + more) - 1 - Buffer.byteLength(handleLine));
 }
 
 // D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
