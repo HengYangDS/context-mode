@@ -592,6 +592,12 @@ export function resolveSourceLabel(db: DbHandle, source: string): string {
   return source;
 }
 
+/** D-CR3-RESUME-1: this session's stored sources, newest first (id, label, bytes). */
+export function listSessionSources(db: DbHandle, sessionId: string, limit: number): Array<{ id: number; label: string; bytes: number }> {
+  const rows = stmt(db.raw, "SELECT id, label, bytes_total FROM sources WHERE session_id = ? ORDER BY id DESC LIMIT ?").all(sessionId, limit) as Array<{ id: number; label: string; bytes_total: number }>;
+  return rows.map((r) => ({ id: Number(r.id), label: r.label, bytes: Number(r.bytes_total) }));
+}
+
 // ---------- r3-ledger line units ----------
 
 export interface UnitHit { sourceId: number; ord: number; label: string; body: string; score: number }
