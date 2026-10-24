@@ -4,6 +4,7 @@
 import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
+  PUSH_HITS, PUSH_KEY, PUSH_META_PREFIX,
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
   OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
@@ -24,6 +25,8 @@ import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { hasAgentRows, hasSessionRows, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
+import { pickPush, type PushSource } from "../compaction/push.ts";
+import { chunkRange, ftsRank, sourceLabel } from "../store/fts.ts";
 import { chunkText } from "../index/chunk.ts";
 import { selectChunksInMemory } from "../index/select.ts";
 import { indexText } from "../index/text.ts";
@@ -170,7 +173,49 @@ async function firstTurnResume(ev: CanonicalHookEvent, row: AdapterRow, project:
 // ---------- DECISIONS-r11 (B) turn-boundary recall ----------
 
 function markCompacted(db: DbHandle, sessionId: string): void {
-  if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+  if (sessionId === "") return;
+  metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
+  metaSet(db, PUSH_META_PREFIX + sessionId, PENDING_COMPACT_FLAG); // D-CMP-PUSH-1: one push per compaction
+}
+
+// D-CMP-PUSH-1: chunks around a hit that the push reads to rebuild whole lines and their indent ancestors.
+const PUSH_WINDOW_CHUNKS = 24;
+
+// D-CMP-PUSH-1: the store search over this session's outputs with the prompt plus the session goal (first
+// prompt), hit chunks rebuilt into the source text around them, then pickPush (relevance + MMR, byte budget).
+function pushText(db: DbHandle, ev: CanonicalHookEvent, project: ProjectContext, prompt: string): string {
+  const prompts = readSessionEvents(db, ev.sessionId, "prompt");
+  const goal = prompts.length > 0 ? prompts[0].body : "";
+  const query = goal === prompt ? prompt : prompt + "\n" + goal;
+  const ranked = ftsRank(db, query, "session", project, ev.sessionId, PUSH_HITS);
+  const bySource = new Map<number, number[]>();
+  for (const r of ranked) {
+    const l = bySource.get(r.sourceId) ?? [];
+    l.push(r.rid);
+    bySource.set(r.sourceId, l);
+  }
+  const sources: PushSource[] = [];
+  for (const [sourceId, rids] of bySource) {
+    const label = sourceLabel(db, sourceId);
+    if (label === "") continue;
+    const rows = chunkRange(db, sourceId, Math.min(...rids) - PUSH_WINDOW_CHUNKS, Math.max(...rids) + PUSH_WINDOW_CHUNKS);
+    const at = new Map<number, number>();
+    let text = "";
+    for (const c of rows) {
+      at.set(c.rid, text.length);
+      text += c.body;
+    }
+    const hits: number[] = [];
+    for (const rid of rids) {
+      const off = at.get(rid);
+      if (off === undefined) continue;
+      const body = rows.find((c) => c.rid === rid)?.body ?? "";
+      hits.push(off);
+      for (let i = body.indexOf("\n"); i >= 0 && i + 1 < body.length; i = body.indexOf("\n", i + 1)) hits.push(off + i + 1);
+    }
+    sources.push({ label, text, hits });
+  }
+  return pickPush(sources, query);
 }
 
 function seenSeqs(value: string | null): number[] {
@@ -190,12 +235,14 @@ async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectC
   if (!hasRecall(row) || ev.sessionId === "") return ALLOW;
   const db = await openDb(project);
   if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW;
+  const push = metaTake(db, PUSH_META_PREFIX + ev.sessionId) === null ? "" : pushText(db, ev, project, prompt);
   const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
   const seen = seenSeqs(metaGet(db, seenKey));
   const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen));
-  if (picked.text === "") return ALLOW;
-  metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
-  return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
+  if (picked.text !== "") metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  const text = [push, picked.text].filter((t) => t !== "").join("\n");
+  if (text === "") return ALLOW;
+  return { kind: "hint", text, onceKey: push === "" ? RECALL_KEY : PUSH_KEY };
 }
 
 // ---------- ADR-0009 §8.2 decision rows (D-M4-arch-5, D-M4-H2-2) ----------

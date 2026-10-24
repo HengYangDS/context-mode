@@ -11,7 +11,6 @@
 // Items under PUSH_MIN_REL * rel(top) are never picked; nothing goes out when rel(top) < RECALL_MIN_SCORE.
 import {
   PUSH_BLOCK_BYTES, PUSH_BUDGET_BYTES, PUSH_CLOSE_TAG, PUSH_LAMBDA, PUSH_MAX_ANCESTORS, PUSH_MIN_REL, PUSH_OPEN_TAG,
-  RECALL_MIN_SCORE,
 } from "../contracts/constants.ts";
 import { rankTexts } from "../store/fts.ts";
 
@@ -101,7 +100,7 @@ export function pickPush(sources: readonly PushSource[], query: string, budget: 
   const rel = rankTexts(items.map((i) => i.text), query, "any");
   items.forEach((it, i) => { it.rel = rel[i]; });
   const top = Math.max(...items.map((i) => i.rel));
-  if (!(top >= RECALL_MIN_SCORE)) return "";
+  if (!(top > 0)) return ""; // the store search already required a match; item scores are over a small corpus
 
   const picked = sources.map(() => new Set<number>());
   const pickedItems: Item[] = [];
