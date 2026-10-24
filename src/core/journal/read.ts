@@ -33,6 +33,15 @@ export function readLastPrompt(db: DbHandle, sessionId: string): string {
   return row === undefined ? "" : row.body;
 }
 
+/** r3-ledger: the session goal, read as the first prompt of the session ("" when none). */
+export function readFirstPrompt(db: DbHandle, sessionId: string): string {
+  if (sessionId === "") return "";
+  const row = db.raw
+    .prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq ASC LIMIT 1")
+    .get(sessionId) as { body: string } | undefined;
+  return row === undefined ? "" : row.body;
+}
+
 /**
  * DECISIONS-r11 (B): recall candidates, newest first. This session's rows plus the same worktree's rows of
  * prior sessions (ADR-0009 §8 rule 2: always filter by the current worktree). Cost rows carry no text.

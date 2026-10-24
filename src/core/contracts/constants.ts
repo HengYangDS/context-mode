@@ -84,7 +84,7 @@ export const MS_PER_DAY = 86400000; // DEVIATIONS D-M1-3: day-to-ms factor for t
 
 // Store (impl/02 §0; DEVIATIONS D-M1-3: impl/00 names NODE_MIN and INDEX_WRITE_CHUNK cover the rest)
 export const PROJECT_KEY_HEX_LEN = 16; // impl/00 A5: first 16 hex chars of sha256(git common dir realpath)
-export const SCHEMA_VERSION = 4; // ADR-0002 decision 2: PRAGMA user_version; 2 = cost dedup index (D-M5-arch-2); 3 = chunks title + porter (D-SEARCH-3); 4 = trigram table + vocab (D-SEARCH-4)
+export const SCHEMA_VERSION = 5; // ADR-0002 decision 2: PRAGMA user_version; 2 = cost dedup index (D-M5-arch-2); 3 = chunks title + porter (D-SEARCH-3); 4 = trigram table + vocab (D-SEARCH-4); 5 = line_units (r3-ledger)
 export const RETENTION_IDLE_DAYS = 30; // impl/02 A-S1: row-level, age since last access
 export const RETENTION_SIZE_CAP_BYTES = 524288000; // impl/02 A-S2 (Q7b): 500 MB per project
 export const PROJECT_DEAD_IDLE_DAYS = 14; // DECISIONS-r9 V22 (#1024): project-level sweep, dead owner
@@ -261,6 +261,8 @@ export const RECALL_BUDGET_BYTES = 2048; // whole recall block, wrapper included
 export const RECALL_MIN_SCORE = 5;
 export const RECALL_MAX_ROWS = 340; // newest rows read per prompt (= MAX_CANDIDATES_TOTAL)
 export const COMPACTED_META_PREFIX = "compacted:"; // meta key + session id: a compaction happened in this session
+export const RECALL_UNITS_SEEN_META_PREFIX = "recall_units_seen:"; // r3-ledger: JSON "source:ord" list of line units already injected
+export const RECALL_UNIT_CANDIDATES = 64; // r3-ledger: line units read per recall query (one ranked FTS query)
 export const RECALL_SEEN_META_PREFIX = "recall_seen:"; // meta key + session id: JSON seq list already injected
 export const RECALL_OPEN_TAG = "<context_mode_recall>";
 export const RECALL_CLOSE_TAG = "</context_mode_recall>";
