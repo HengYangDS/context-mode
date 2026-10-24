@@ -132,6 +132,15 @@ CREATE VIRTUAL TABLE line_units USING fts5(
 );
 `;
 
+// Version 6 (du-units): PostToolUse stores chunks only; the line units of a source are built on first need
+// (store/fts.ts ensureUnits). units_built = 0 marks a source that waits for them; unit_gaps holds the newline
+// runs the chunker dropped, so the rebuild keeps each unit's line number. Rows that exist at migration already
+// have their units (or never get any), so they default to built.
+export const DDL_V6: string = `
+ALTER TABLE sources ADD COLUMN units_built INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE sources ADD COLUMN unit_gaps TEXT NOT NULL DEFAULT '';
+`;
+
 // Ascending by version; step N brings the DB from N-1 to N.
 const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 1, sql: DDL },
@@ -139,6 +148,7 @@ const MIGRATIONS: ReadonlyArray<{ version: number; sql: string }> = [
   { version: 3, sql: DDL_V3 },
   { version: 4, sql: DDL_V4 },
   { version: 5, sql: DDL_V5 },
+  { version: 6, sql: DDL_V6 },
 ];
 
 export function applyMigrations(db: DatabaseSync, fromVersion: number): void {

@@ -18,7 +18,7 @@ function freshDb(dir) {
 
 test("SCHEMA_VERSION equals the constants.ts SCHEMA_VERSION", () => {
   assert.equal(SCHEMA_VERSION, C.SCHEMA_VERSION);
-  assert.equal(SCHEMA_VERSION, 5); // D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units
+  assert.equal(SCHEMA_VERSION, 6); // D-M5-arch-2: v2 adds the cost dedup index; D-SEARCH-3: v3 chunks title + porter; D-SEARCH-4: v4 trigram; r3-ledger: v5 line_units; du-units: v6 units_built
 });
 
 test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_id, turn) WHERE kind = 'cost'", () => {
@@ -41,7 +41,7 @@ test("v2 (D-M5-arch-2): a fresh DB has the partial unique index events(session_i
   }
 });
 
-test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, 4, then 5) without losing rows", () => {
+test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, 4, 5, then 6) without losing rows", () => {
   const dir = mkdtempSync(join(tmpdir(), "cm-schema-"));
   try {
     const db = freshDb(dir);
@@ -49,7 +49,7 @@ test("v2 (D-M5-arch-2): a version-1 DB migrates to the current version (2, 3, 4,
     db.exec("PRAGMA user_version = 1");
     db.exec("INSERT INTO events(session_id, worktree, agent, kind, turn, created_at, accessed_at) VALUES ('s','w','claude-code','prompt',1,0,0)");
     applyMigrations(db, 1);
-    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 5);
+    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 6);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM events").get().n, 1);
     assert.ok(db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'idx_events_cost_session_turn'").get());
     db.close();
@@ -177,7 +177,7 @@ test("[search-L3] v3 (D-SEARCH-3): a version-2 DB migrates to the current versio
     ins.run(1, 0, "connection pooling");
     ins.run(1, 1, "Привет café");
     applyMigrations(v2, 2);
-    assert.equal(v2.prepare("PRAGMA user_version").get().user_version, 5);
+    assert.equal(v2.prepare("PRAGMA user_version").get().user_version, 6);
     assert.equal(v2.prepare("SELECT COUNT(*) AS n FROM chunks").get().n, 2);
     assert.deepEqual(v2.prepare("SELECT ord, title FROM chunks WHERE chunks MATCH 'connecting'").all().map((r) => ({ ...r })), [{ ord: 0, title: "" }]);
     assert.equal(v2.prepare("SELECT COUNT(*) AS n FROM chunks WHERE chunks MATCH 'cafe'").get().n, 1);
@@ -200,7 +200,7 @@ test("[search-L4] v4 (D-SEARCH-4): a version-3 DB migrates to 4 and fills the tr
     ins.run(1, 0, "see T-CMP here", "");
     ins.run(1, 1, "other", "Guide > src/core/fts.ts");
     applyMigrations(db, 3);
-    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 5);
+    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 6);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM chunks").get().n, 2);
     const rid = (m) => db.prepare("SELECT rowid AS r FROM chunks_tri WHERE chunks_tri MATCH ?").all(m).map((r) => r.r);
     const want = (o) => db.prepare("SELECT rowid AS r FROM chunks WHERE ord = ?").get(o).r;

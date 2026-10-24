@@ -333,8 +333,12 @@ function merge(src: string, blocks: Span[], join: boolean, cap: number, lineCut:
   const scratch = new Uint8Array(cap);
   let cur: Span | undefined;
   let curBytes = 0;
+  let prevEnd = 0;
   const emit = (start: number, end: number, bytes: number): void => {
-    out.push({ ord: out.length, text: src.slice(start, end), bytes });
+    const c: Chunk = { ord: out.length, text: src.slice(start, end), bytes };
+    if (start > prevEnd) c.gap = start - prevEnd; // du-units: the dropped newlines, to rebuild the line numbers
+    prevEnd = end;
+    out.push(c);
   };
   for (const b of blocks) {
     if (cur !== undefined && !join) {

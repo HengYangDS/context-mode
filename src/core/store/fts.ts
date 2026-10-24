@@ -13,11 +13,12 @@ import { withWrite } from "./db.ts";
 import { FTS_TOKENIZE } from "./schema.ts";
 import { buildSnippet, snippetTerms } from "./snippet.ts";
 import { blankTokens } from "./words.ts";
+import { buildUnits } from "../index/units.ts";
 
 // The DB owns sources.id (AUTOINCREMENT, D-M1-4, D-M2-1).
 const INSERT_SOURCE = `
-INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts)
-VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_count, :created_ts, :created_at, :created_ts)
+INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts, units_built, unit_gaps)
+VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_count, :created_ts, :created_at, :created_ts, :units_built, :unit_gaps)
 RETURNING id`;
 
 const INSERT_CHUNK = `
@@ -83,7 +84,7 @@ export type SourceDraft = Pick<SourceRow, "sessionId" | "worktree" | "agent" | "
 // most INDEX_WRITE_CHUNK bytes of chunk text (ADR-0002 decision 2). The source row rides the first
 // batch; its new id is returned.
 export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chunk[]): number {
-  const id = reserveSource(db, src, chunks);
+  const id = reserveSource(db, src, chunks, false); // du-units: only a hook output (PostToolUse) is a recall source
   insertChunks(db, id, src, chunks);
   return id;
 }
@@ -93,9 +94,10 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
  * the source by its short id before the chunks are written (the detached F1 path). bytes_total and
  * chunk_count come from `chunks`, as ftsInsert stores them.
  */
-export function reserveSource(db: DbHandle, src: SourceDraft, chunks: Chunk[]): number {
+export function reserveSource(db: DbHandle, src: SourceDraft, chunks: Chunk[], lazyUnits: boolean = true): number {
   let total = 0;
   for (const c of chunks) total += c.bytes;
+  const gaps = lazyUnits ? unitGaps(chunks) : "";
   return withWrite(db, (h) => {
     const row = h.raw.prepare(INSERT_SOURCE).get({
       session_id: src.sessionId,
@@ -107,17 +109,19 @@ export function reserveSource(db: DbHandle, src: SourceDraft, chunks: Chunk[]): 
       chunk_count: chunks.length,
       created_ts: src.createdAt,
       created_at: new Date(src.createdAt).toISOString(),
+      units_built: lazyUnits ? 0 : 1,
+      unit_gaps: gaps,
     }) as { id: number };
     return Number(row.id);
   });
 }
 
-// D-R4-RESERVE-1: the detached write of a reserved source. When the chunk or unit write throws, the reserved
+// D-R4-RESERVE-1: the write of a reserved source's chunks. When the chunk write throws, the reserved
 // row and whatever part of it landed are deleted, so no 0-chunk orphan stays in sources; the error is rethrown.
-export function finishReserved(db: DbHandle, id: number, src: SourceDraft, chunks: Chunk[], units: ReadonlyArray<{ ord: number; body: string }>): void {
+// du-units: line units are not written here; ensureUnits builds them from these chunks on first need.
+export function finishReserved(db: DbHandle, id: number, src: SourceDraft, chunks: Chunk[]): void {
   try {
     insertChunks(db, id, src, chunks);
-    insertUnits(db, id, src.sessionId, units);
   } catch (err) {
     withWrite(db, (h) => {
       deleteChunkRows(h.raw, { sourceId: id });
@@ -634,6 +638,49 @@ export function listSessionSources(db: DbHandle, sessionId: string, limit: numbe
 }
 
 // ---------- r3-ledger line units ----------
+
+// du-units: the newline runs the chunker dropped between chunks (blank lines, the block break), as JSON
+// [[ord, count], ...] for the chunks that follow one. Chunks are otherwise contiguous, so the stored chunks
+// plus these runs give back the output text line for line, and with it each unit's line ord.
+function unitGaps(chunks: ReadonlyArray<Chunk>): string {
+  const gaps: number[][] = [];
+  for (const c of chunks) if (c.gap !== undefined && c.gap > 0) gaps.push([c.ord, c.gap]);
+  return gaps.length === 0 ? "" : JSON.stringify(gaps);
+}
+
+/**
+ * du-units: build the line units of this session's sources that still wait for them, once per source, from
+ * the stored chunks (same buildUnits pass as before, so the units and their ranking are unchanged). Marks
+ * each source built. The caller holds a writable handle. Returns the number of sources built.
+ */
+export function ensureUnits(db: DbHandle, sessionId: string): number {
+  const todo = db.raw.prepare("SELECT id, unit_gaps FROM sources WHERE session_id = ? AND units_built = 0 ORDER BY id").all(sessionId) as Array<{ id: number; unit_gaps: string }>;
+  if (todo.length === 0) return 0;
+  const texts = new Map<number, Array<{ ord: number; body: string }>>();
+  for (const t of todo) texts.set(Number(t.id), []);
+  // One scan of the chunk table for every waiting source (source_id is UNINDEXED, so a scan per source would repeat it).
+  const rows = db.raw.prepare("SELECT source_id, ord, body FROM chunks WHERE source_id IN (SELECT value FROM json_each(?))")
+    .all(JSON.stringify(todo.map((t) => Number(t.id)))) as Array<{ source_id: number; ord: number; body: string }>;
+  for (const r of rows) texts.get(Number(r.source_id))?.push({ ord: Number(r.ord), body: r.body });
+  for (const t of todo) {
+    const id = Number(t.id);
+    const parts = (texts.get(id) as Array<{ ord: number; body: string }>).sort((a, b) => a.ord - b.ord);
+    const gaps = new Map<number, number>();
+    if (t.unit_gaps !== "") for (const g of JSON.parse(t.unit_gaps) as number[][]) gaps.set(g[0] as number, g[1] as number);
+    let text = "";
+    for (const p of parts) text += "\n".repeat(gaps.get(p.ord) ?? 0) + p.body;
+    insertUnits(db, id, sessionId, buildUnits(text));
+    withWrite(db, (h) => {
+      h.raw.prepare("UPDATE sources SET units_built = 1 WHERE id = ?").run(id);
+    });
+  }
+  return todo.length;
+}
+
+/** du-units: true when some source of this session still waits for its line units (a read; any handle). */
+export function hasUnbuiltUnits(db: DbHandle, sessionId: string): boolean {
+  return db.raw.prepare("SELECT 1 AS x FROM sources WHERE session_id = ? AND units_built = 0 LIMIT 1").get(sessionId) !== undefined;
+}
 
 /** Store one output's line units, batched like ftsInsert (at most INDEX_WRITE_CHUNK bytes per withWrite). */
 export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, units: ReadonlyArray<{ ord: number; body: string }>): void {

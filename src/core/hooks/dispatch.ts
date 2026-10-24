@@ -24,8 +24,7 @@ import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { hasAgentRows, hasSessionRows, readFirstPrompt, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
-import { finishReserved, insertChunks, insertUnits, queryUnits, recallQueryText, reserveSource, sourceHandle, type SourceDraft } from "../store/fts.ts";
-import { buildUnits } from "../index/units.ts";
+import { ensureUnits, finishReserved, insertChunks, queryUnits, recallQueryText, reserveSource, sourceHandle, type SourceDraft } from "../store/fts.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
 import { chunkText } from "../index/chunk.ts";
@@ -211,6 +210,7 @@ async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectC
   const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
   const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
   const goal = readFirstPrompt(db, ev.sessionId);
+  ensureUnits(db, ev.sessionId); // du-units: the first recall after a compaction builds the units, once per source
   const units = queryUnits(db, ev.sessionId, recallQueryText(prompt, goal), RECALL_UNIT_CANDIDATES);
   const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW;
@@ -411,8 +411,8 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const db = await openDb(project);
   let sourceId: number;
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
-    sourceId = indexText(db, project, ev.sessionId, label, text, "text", chunks).sourceId;
-    insertUnits(db, sourceId, ev.sessionId, buildUnits(text)); // r3-ledger
+    sourceId = reserveSource(db, sourceRowOf(project, ev.sessionId, label), chunks); // du-units: chunks only, units on first need
+    finishReserved(db, sourceId, sourceRowOf(project, ev.sessionId, label), chunks);
   } else {
     sourceId = reserveSource(db, sourceRowOf(project, ev.sessionId, label), chunks);
     indexDetached(project, ev.sessionId, sourceId, label, text, chunks);
@@ -481,7 +481,7 @@ function mainLabel(tool: ToolCall, ev: CanonicalHookEvent): string {
 function indexDetached(project: ProjectContext, sessionId: string, sourceId: number, label: string, text: string, chunks: Chunk[]): void {
   void openDb(project)
     .then((db) => {
-      finishReserved(db, sourceId, sourceRowOf(project, sessionId, label), chunks, buildUnits(text)); // r3-ledger, D-R4-RESERVE-1
+      finishReserved(db, sourceId, sourceRowOf(project, sessionId, label), chunks); // D-R4-RESERVE-1
     })
     .catch((err: unknown) => {
       process.stderr.write("hooks: index write failed: " + message(err) + "\n");

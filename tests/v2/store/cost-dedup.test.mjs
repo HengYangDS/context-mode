@@ -40,8 +40,8 @@ function row(kind, turn, bytes = 0) {
   };
 }
 
-test("[M5] SCHEMA_VERSION is 5 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4) and line units (5, r3-ledger)", () => {
-  assert.equal(SCHEMA_VERSION, 5);
+test("[M5] SCHEMA_VERSION is 6 after the Usage/cost dedup migration (2), the search title + porter migration (3, D-SEARCH-3), the trigram table (4, D-SEARCH-4) and line units (5, r3-ledger) and lazy units (6, du-units)", () => {
+  assert.equal(SCHEMA_VERSION, 6);
 });
 
 test("[M5] cost-dedup/usage-events-idempotent-per-turn: 3 step-finish events in one turn journal once", async (t) => {
