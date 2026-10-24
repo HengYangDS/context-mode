@@ -549,3 +549,38 @@ test("D-M2-SHAPE-2: a persisted Bash output is indexed and shaped whole; an unre
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// D-CR2-HANDLE-1: every replacement names its stored source, the full size and the exact search call, so a
+// compact summary written from the replaced text keeps a handle to the whole output (compact round 2 step 3).
+test("D-CR2-HANDLE-1: the replacement names the source label, the full byte size and the exact ctx_search call", async () => {
+  const { lintPromptText } = await import("../../../docs/v2/prompt/lint.mjs");
+  const text = bigText(40000);
+  const p = mainBashPost(text);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const src = query("SELECT label, bytes_total FROM sources WHERE session_id = ?", p.session_id);
+  assert.equal(src.length, 1);
+  const more = replaced.lastIndexOf("\nctx_search(");
+  assert.ok(more > 0, "the more line names ctx_search");
+  const tail = replaced.slice(more + 1).split("\n");
+  assert.equal(tail.length, 2, "the call line, then one handle line: " + JSON.stringify(tail));
+  assert.ok(tail[0].includes(", source:" + JSON.stringify(src[0].label) + "})"), "the call is exact: " + tail[0]);
+  assert.ok(tail[1].startsWith("context-mode: "), "the handle line says who wrote it: " + tail[1]);
+  assert.ok(tail[1].includes(String(Buffer.byteLength(text))), "the handle line names the full size: " + tail[1]);
+  for (const r of lintPromptText(tail[1])) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
+  // The handle is outside the selection budget; the body stays within REPLACE_RETURN_BYTES.
+  assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
+});
+
+test("D-CR2-HANDLE-1: a subagent replacement carries the same handle", async () => {
+  const text = bigText(40000);
+  const p = cc({ hook_event_name: "PostToolUse", tool_name: "Read", agent_id: "a1", agent_type: "general-purpose", tool_input: { file_path: "/tmp/big.log" }, tool_use_id: "toolu_sub", tool_response: text });
+  const out = parsed(await handleHook("claude-code", p, env));
+  if (out === null || typeof out.updatedToolOutput !== "string") return; // no subagent replace for this shape
+  const replaced = out.updatedToolOutput;
+  const src = query("SELECT label FROM sources WHERE session_id = ?", p.session_id);
+  assert.equal(src.length, 1);
+  const tail = replaced.slice(replaced.lastIndexOf("\nctx_search(") + 1).split("\n");
+  assert.ok(tail[0].includes(JSON.stringify(src[0].label)));
+  assert.ok(tail[1].startsWith("context-mode: ") && tail[1].includes(String(Buffer.byteLength(text))), tail[1]);
+});

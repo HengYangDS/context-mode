@@ -6,7 +6,7 @@ import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
-  OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
@@ -399,9 +399,11 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // D-M2-SHAPE-1: a parser-found shape (JSON rows, a line log) gives its rare units the query names, whole,
   // within the same budget, plus the handle. No shape or no named rare unit -> the BM25 pick below, unchanged.
   const digest = shapeDigest(text, rankQuery ?? intent, REPLACE_RETURN_BYTES);
-  if (digest !== null) return { kind: "replace", output: digest + "\n" + moreLine(intent, label) };
+  // D-CR2-HANDLE-1: the handle line follows the more line, outside the selection budget.
+  const handle = "\n" + REPLACE_HANDLE_LINE(result.bytes, label);
+  if (digest !== null) return { kind: "replace", output: digest + "\n" + moreLine(intent, label) + handle };
   const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
-  return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
+  return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more + handle : "") };
 }
 
 // D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
