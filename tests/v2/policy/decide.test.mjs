@@ -7,8 +7,9 @@ import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { decide, denyMessage } from "../../../src/core/policy/decide.ts";
 import { getAdapter } from "../../../src/adapters/table.ts";
+import { READ_DENY_MESSAGE } from "../../../src/core/policy/read-deny.ts";
 import {
-  OUTPUT_CAP, READ_DENY_MESSAGE, PARSE_ERROR_DENY_LINE,
+  OUTPUT_CAP, PARSE_ERROR_DENY_LINE,
   POLICY_UNREADABLE_LINE, REQUIRE_SECURITY_ENV, USER_DENY_REASON_PREFIX,
 } from "../../../src/core/contracts/constants.ts";
 

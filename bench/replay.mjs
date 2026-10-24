@@ -17,6 +17,7 @@ const { capBytes } = await lib("src/core/sandbox/cap.ts");
 const { chunkText } = await lib("src/core/index/chunk.ts");
 const { selectChunksInMemory } = await lib("src/core/index/select.ts");
 const C = await lib("src/core/contracts/constants.ts");
+const { READ_DENY_MESSAGE } = await lib("src/core/policy/read-deny.ts");
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg("--out", path.join(ROOT, "bench", "offline-aggregate.json"));
@@ -126,7 +127,7 @@ async function replayFile(file) {
               // The file on disk is gone or changed: use the result bytes as the size (README, approximation 1).
               const noRange = u.input.offset == null && u.input.limit == null;
               const p = u.input.file_path;
-              if (noRange && typeof p === "string" && before > OUTPUT_CAP) d = { kind: "deny", reason: C.READ_DENY_MESSAGE(path.resolve(u.cwd || "/", p), before) };
+              if (noRange && typeof p === "string" && before > OUTPUT_CAP) d = { kind: "deny", reason: READ_DENY_MESSAGE(path.resolve(u.cwd || "/", p), before) };
               else d = decide({ ...ev, tool: { ...ev.tool, input: { ...u.input, file_path: "/nonexistent-offline-replay/x" } } }, row, []);
             } else d = decide(ev, row, []);
           } catch { meta.decideErrors++; }

@@ -130,7 +130,7 @@ Tool: {prefix}ctx_index, then {prefix}ctx_search
 
 <!-- id: deny-read -->
 ```text
-context-mode: this file is {size} bytes, more than the 16384 byte limit for one read. Pick one: read part of it with Read(file_path, offset, limit), for example limit 200; or run code on it with ctx_execute(language, code, file="{path}"), which gives your code the path in CTX_FILE and returns only stdout, up to 16384 bytes; or search it with a bounded command such as grep -n or tail.
+context-mode: {size}-byte file, over the one-read limit. Run ctx_execute(language, code, file="{path}") and print only the answer.
 ```
 
 <!-- id: hint-bash -->

@@ -10,7 +10,7 @@ import {
   DENY_EXEC_TOOL, DENY_INTENT_DEFAULT, DENY_PREFIX, DENY_RUN_HERE_LINE, DENY_TOOL_LABEL, DENY_WEBFETCH_JOIN,
   DENY_WEBFETCH_TOOLS, DENY_WHAT, DENY_WHAT_SUFFIX, DUMP_COUNT_COMMANDS, DUMP_COUNT_FLAGS, FETCH_CALL, FETCH_QUOTES,
   HTTP_SCHEME, INLINE_HTTP_CALLS, JQ_COMMAND, JQ_WHITELIST, NEVER_DENY_HOSTS,
-  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING, READ_DENY_MESSAGE,
+  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING,
   READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
@@ -20,6 +20,7 @@ import { parseShell } from "./parse.ts";
 import { isSubagentCall } from "./subagent.ts";
 import { unwrap } from "./unwrap.ts";
 import { matchesAnyDenyPattern } from "./user-deny.ts";
+import { READ_DENY_MESSAGE } from "./read-deny.ts";
 
 // Canonical tool names (impl/01 §2) and input field values; names, not tunable values.
 const BASH = "Bash";
