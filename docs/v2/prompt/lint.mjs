@@ -151,6 +151,13 @@ async function bundleMode(outArg) {
     if (prefixed.length) fail("PR12", `${id}: host-prefixed names ${JSON.stringify(prefixed)}`);
   }
 
+  // D-DU-DENY-1: hook text templates (src/prompt/hooks/*.md) get the same text rules.
+  const hookDir = path.join(PROMPT_DIR, "hooks");
+  for (const f of fs.existsSync(hookDir) ? fs.readdirSync(hookDir).sort() : []) {
+    if (!f.endsWith(".md")) continue;
+    for (const x of lintHookText(`hooks/${f}`, fs.readFileSync(path.join(hookDir, f), "utf8"), names)) failures.push(x);
+  }
+
   // PR4: the instructions say when to use the normal tools (review + golden: byte equality below).
   // PR8: line 1 of the instructions stands alone (Pi shows only that line).
   const lines = (instructions ?? "").split("\n");
@@ -200,6 +207,27 @@ async function bundleMode(outArg) {
     process.exit(1);
   }
   console.log("lint: PR1-12, GS5, GS9 OK");
+}
+
+/**
+ * D-DU-DENY-1: a hook text template in src/prompt/hooks/ (the Read deny). PR1, PR2, PR5, PR6, PR11, PR12,
+ * plus: one line, not empty. Returns the failures as "rule: message" strings ([] = pass).
+ * @param {string} id @param {string} text @param {string[]} names tools/list names
+ */
+export function lintHookText(id, text, names) {
+  const out = [];
+  for (const r of lintPromptText(text)) if (!r.ok) out.push(`${r.rule}: ${id}: ${JSON.stringify(r.matches)}`);
+  if (!text.length) out.push(`PR3: ${id}: empty text`);
+  if (text.includes("\n")) out.push(`HOOK1: ${id}: more than one line`);
+  const tags = matches(text, RULES.tags);
+  if (tags.length) out.push(`PR5: ${id}: ${JSON.stringify(tags)}`);
+  const quoted = count(text, RULES.quoted);
+  if (quoted > QUOTED_MAX) out.push(`PR6: ${id}: ${quoted} quoted phrases, max ${QUOTED_MAX}`);
+  const unknown = [...new Set(matches(text, RULES.toolRef))].filter((n) => !names.includes(n));
+  if (unknown.length) out.push(`PR11: ${id}: names not in tools/list ${JSON.stringify(unknown)}`);
+  const prefixed = matches(text, RULES.prefixed);
+  if (prefixed.length) out.push(`PR12: ${id}: host-prefixed names ${JSON.stringify(prefixed)}`);
+  return out;
 }
 
 // ---- draft mode: drafts.md before the bundle exists (gate < M2, live case doc-lint) ----

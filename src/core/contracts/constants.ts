@@ -170,17 +170,12 @@ export const LIVE_SKIP_LIMIT = 3;
 export const README_MAX_LINES = 200; // ADR-0015: CI cap on README.md length
 
 // Enforcement (M3; impl/08 §2.3 step 2a, §2.4, §6.1 steps 3, 5b, 5d, 6, §6.2; DEVIATIONS D-M3-arch-5:
-// the text templates are fixed strings here, READ_DENY_MESSAGE is the one formatter).
+// the text templates are fixed strings here; the Read deny is a src/prompt template, D-DU-DENY-1).
 export const MAX_NEST_DEPTH = 32; // impl/08 §2.3 step 2a, ADR-0008 "Parse errors": deeper -> construct "nesting-too-deep"
 
-// impl/08 §6.1 step 6: Read (or one-file shell dump) over OUTPUT_CAP with no offset/limit. Three alternatives,
-// in this order: ranged Read, ctx_execute with file, bounded shell search. READ_MAX_LINES is text only.
-export function READ_DENY_MESSAGE(path: string, size: number): string {
-  return `context-mode: this file is ${size} bytes, more than the ${OUTPUT_CAP} byte limit for one read. ` +
-    `Pick one: read part of it with Read(file_path, offset, limit), for example limit ${READ_MAX_LINES}; ` +
-    `or run code on it with ctx_execute(language, code, file="${path}"), which gives your code the path in CTX_FILE ` +
-    `and returns only stdout, up to ${OUTPUT_CAP} bytes; or search it with a bounded command such as grep -n or tail.`;
-}
+// impl/08 §6.1 step 6: Read (or one-file shell dump) over OUTPUT_CAP with no offset/limit. The text is the
+// src/prompt/hooks/read-deny.md template (D-DU-DENY-1, src/core/policy/read-deny.ts); this caps its fixed bytes.
+export const READ_DENY_FIXED_CAP = 120;
 
 // impl/08 §6.2, ADR-0008 "Deny message" (kept verbatim). Lines, joined by "\n":
 //   DENY_PREFIX + DENY_WHAT[kind] + DENY_WHAT_SUFFIX

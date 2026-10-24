@@ -208,19 +208,10 @@ test("[M3] MAX_NEST_DEPTH is 32 (impl/08 §2.3 step 2a, ADR-0008 Parse errors)",
   assert.equal(C.MAX_NEST_DEPTH, 32);
 });
 
-test("[M3] READ_DENY_MESSAGE(path, size) is the impl/08 §6.1 step 6 text with OUTPUT_CAP and READ_MAX_LINES", () => {
-  assert.equal(typeof C.READ_DENY_MESSAGE, "function");
-  const want = "context-mode: this file is 307200 bytes, more than the 16384 byte limit for one read. Pick one: " +
-    "read part of it with Read(file_path, offset, limit), for example limit 200; or run code on it with " +
-    'ctx_execute(language, code, file="/repo/big.log"), which gives your code the path in CTX_FILE and returns ' +
-    "only stdout, up to 16384 bytes; or search it with a bounded command such as grep -n or tail.";
-  assert.equal(C.READ_DENY_MESSAGE("/repo/big.log", 307200), want);
-  const line = C.READ_DENY_MESSAGE("a b.txt", 16385);
-  assert.equal(line.includes("\n"), false);
-  assert.ok(line.includes('file="a b.txt"'));
-  // three named alternatives, in this order: ranged Read, ctx_execute with file, bounded shell search
-  const a = line.indexOf("Read(file_path, offset, limit)"), b = line.indexOf("ctx_execute("), c = line.indexOf("grep -n");
-  assert.ok(a > 0 && a < b && b < c);
+test("[M3] Read deny: constants.ts holds only READ_DENY_FIXED_CAP; the text is the src/prompt template (D-DU-DENY-1)", () => {
+  assert.equal(C.READ_DENY_MESSAGE, undefined);
+  assert.equal(C.READ_DENY_FIXED_CAP, 120);
+  // golden text, byte cap and lint: tests/v2/policy/read-deny.test.mjs
 });
 
 test("[M3] deny templates carry the ADR-0008 'Deny message' text per kind (impl/08 §6.2)", () => {
