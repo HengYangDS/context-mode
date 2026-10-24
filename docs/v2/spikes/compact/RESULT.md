@@ -161,3 +161,13 @@ Verdict: the merged head passes the 15 ms overhead budget on the common path (ga
 CPU over Node 6.65 ms). On the 222 KB PostToolUse event the merged head is over the 15 ms budget. Its overhead over
 bare Node is about 118 ms (147 ms minus about 29 ms), against about 30 ms for PRE. This was measured, not fixed here.
 
+## Round 4 checker
+
+Round 4 checker (fresh clone of v2-design 24a42ab4, Claude Code 2.1.303, claude-sonnet-5-5 low, `--budget 1`,
+`--jobs 9`, v2 arm): main n=2 24/24 valid, 24/24 correct (100%), tokens after median 32,396, hook bytes after
+median 1,338, $1.45; heldout n=3 18/18 valid, 18/18 correct (100%), tokens after median 32,994, $1.35.
+Tokens after compaction are two groups per question (about 10.5-11.5k, or 21-62k when the model re-reads after
+the recall block), so the median of one run moves between them; the round 4 figure 11,606 is one side of that
+split, not a stable value. In 6 transcripts read (4 main, 2 heldout) the answer reached the model only in the
+UserPromptSubmit recall block; no tool result after compaction held it. Two model-run `find /` grandchildren
+hung the frozen runner (heldout, `h-cfg-audit-mem`); a manual SIGKILL after 11 min freed it, both runs scored.

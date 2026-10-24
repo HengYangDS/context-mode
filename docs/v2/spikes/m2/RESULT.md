@@ -159,3 +159,7 @@ GP-LIVE-ROUTING sonnet-5-5 (58 rows) under 0, over 0, correct 40/40, pass true. 
 `bench/hook-gs6.mjs` 40 runs p95 62.1 ms combined wall (limit 60, bare node 46.9 ms on the same loaded host),
 CPU over node 8.3 ms (limit 20), pass false. Frozen evals: no diff to 32f57beb / 69077b8a.
 Compaction for the same builds: `../compact/RESULT.md` round 4. Merged into v2-design (2c40245e).
+
+Round 4 checker (fresh clone of v2-design 24a42ab4, same settings, n=3, twice): 87.74 and 87.68, all oracles
+3/3. json-1 34.25 and 29.74 in both runs (v2 bytes 526 and 633: the model used Read after the digest), the same
+low json-1 as HEAD run 3; the other three workloads match FINAL (91.3, 99.12, 84.0-84.2). M2 >= 90: not met.
