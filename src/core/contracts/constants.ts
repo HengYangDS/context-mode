@@ -133,7 +133,7 @@ export const HOST_SESSION_ENV: Readonly<Partial<Record<string, string>>> = Objec
 export const NODE_MIN = "24.15.0"; // S-NODE
 export const DATA_ROOT = "~/.context-mode"; // PRD §4; the store module expands "~"
 export const INTERNAL_ERROR_LINE = "Internal error. Fix: run ctx_doctor."; // impl/11 §5 step 7d, §7 table
-export const REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY"; // v1 a4ab72eb #468; DECISIONS-r9 E2
+export const REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY"; // v1 issue #468; DECISIONS-r9 E2
 
 // Subagent tool-set sources (impl/08 §5.2, ADR-0016 "How the subagent's tools are known", DEVIATIONS D-M3-E3-1)
 export const HOST_CONFIG_DIR_NAME = ".claude"; // project and user agents: <root>/.claude/agents/<type>.md

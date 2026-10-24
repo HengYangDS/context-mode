@@ -19,14 +19,14 @@ import {
 import { CtxError } from "../contracts/errors.ts";
 import type { DbHandle } from "../contracts/types.ts";
 import { closeDb, withWrite } from "./db.ts";
-import { deleteSourceChunks } from "./fts.ts";
+import { deleteChunkRows } from "./fts.ts";
 import { listLiveOwners } from "./owners.ts";
 import { applyMigrations } from "./schema.ts";
 
 // §8.1 step 3: a source and its chunks go together.
 function deleteSource(raw: DatabaseSync, id: number): void {
   raw.prepare("DELETE FROM sources WHERE id = ?").run(id);
-  deleteSourceChunks(raw, id);
+  deleteChunkRows(raw, { sourceId: id });
 }
 
 /** impl/02 §8.1: row-level retention, all inside one withWrite. */

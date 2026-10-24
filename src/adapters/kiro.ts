@@ -63,7 +63,7 @@ export function decode(raw: unknown): CanonicalHookEvent {
   return ev;
 }
 
-// PromptSubmit: stdout "" exit 0 for every decision (A28, v1 ff0a9a26, GP3 promptsubmit.json).
+// PromptSubmit: stdout "" exit 0 for every decision (A28, v1 PromptSubmit rule, GP3 promptsubmit.json).
 // hint -> plain text stdout, exit 0. deny -> plain text reason (rewrite first), exit 2; the reason rides in
 // HookOutput.stdout because HookOutput has no stderr field (DEVIATIONS D-M3-A5-1). replace -> no-op.
 export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): HookOutput {

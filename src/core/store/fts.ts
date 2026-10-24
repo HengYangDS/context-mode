@@ -73,7 +73,10 @@ WHERE c.rowid IN (SELECT value FROM json_each(:ids))`;
 
 const INSERT_TRI = "INSERT INTO chunks_tri(rowid, body, title) VALUES (?, ?, ?)";
 // Contentless FTS5 delete: the row's own indexed text goes back in with the 'delete' command.
-export const TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title) SELECT 'delete', rowid, body, title FROM chunks";
+const TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title) SELECT 'delete', rowid, body, title FROM chunks";
+
+// The source fields a write stores. The id is the DB's own AUTOINCREMENT id; bytes_total and chunk_count come from the chunks.
+export type SourceDraft = Pick<SourceRow, "sessionId" | "worktree" | "agent" | "kind" | "label" | "createdAt">;
 
 
 // impl/02 §9.1, impl/05 step 4, D-M2-1: one sources INSERT + chunk INSERTs, each withWrite holding at
@@ -90,7 +93,7 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
  * the source by its short id before the chunks are written (the detached F1 path). bytes_total and
  * chunk_count come from `chunks`, as ftsInsert stores them.
  */
-export function reserveSource(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chunk[]): number {
+export function reserveSource(db: DbHandle, src: SourceDraft, chunks: Chunk[]): number {
   let total = 0;
   for (const c of chunks) total += c.bytes;
   return withWrite(db, (h) => {
@@ -111,13 +114,13 @@ export function reserveSource(db: DbHandle, src: Omit<SourceRow, "id">, chunks: 
 
 // D-R4-RESERVE-1: the detached write of a reserved source. When the chunk or unit write throws, the reserved
 // row and whatever part of it landed are deleted, so no 0-chunk orphan stays in sources; the error is rethrown.
-export function finishReserved(db: DbHandle, id: number, src: Omit<SourceRow, "id">, chunks: Chunk[], units: ReadonlyArray<{ ord: number; body: string }>): void {
+export function finishReserved(db: DbHandle, id: number, src: SourceDraft, chunks: Chunk[], units: ReadonlyArray<{ ord: number; body: string }>): void {
   try {
     insertChunks(db, id, src, chunks);
     insertUnits(db, id, src.sessionId, units);
   } catch (err) {
     withWrite(db, (h) => {
-      deleteSourceChunks(h.raw, id);
+      deleteChunkRows(h.raw, { sourceId: id });
       h.raw.prepare("DELETE FROM sources WHERE id = ?").run(id);
     });
     throw err;
@@ -125,7 +128,7 @@ export function finishReserved(db: DbHandle, id: number, src: Omit<SourceRow, "i
 }
 
 /** The chunks of a reserved source, batched at INDEX_WRITE_CHUNK bytes per withWrite (porter + trigram). */
-export function insertChunks(db: DbHandle, id: number, src: Omit<SourceRow, "id">, chunks: Chunk[]): void {
+export function insertChunks(db: DbHandle, id: number, src: SourceDraft, chunks: Chunk[]): void {
   const batches: Chunk[][] = [];
   let batch: Chunk[] = [];
   let batchBytes = 0;
@@ -152,11 +155,28 @@ export function insertChunks(db: DbHandle, id: number, src: Omit<SourceRow, "id"
   }
 }
 
-// D-SEARCH-4: one source's chunks leave both tables (porter and trigram). Returns the chunk rows deleted.
+// The chunks a delete reaches: one source by id, every source with one label, or all of them.
+export type ChunkScope = { sourceId: number } | { label: string } | "all";
+
+// The one place chunk text leaves the store: porter rows, trigram rows and line units go together (D-SEARCH-4).
+// Source rows stay with the caller. Returns the chunk rows deleted.
+export function deleteChunkRows(raw: DatabaseSync, scope: ChunkScope): number {
+  if (scope === "all") {
+    raw.exec("INSERT INTO chunks_tri(chunks_tri) VALUES ('delete-all')");
+    raw.exec("DELETE FROM line_units");
+    return Number(raw.prepare("DELETE FROM chunks").run().changes);
+  }
+  const [where, arg] = "sourceId" in scope
+    ? ["source_id = ?", scope.sourceId]
+    : ["source_id IN (SELECT id FROM sources WHERE label = ?)", scope.label];
+  raw.prepare(TRI_DELETE + " WHERE " + where).run(arg);
+  raw.prepare("DELETE FROM line_units WHERE " + where).run(arg);
+  return Number(raw.prepare("DELETE FROM chunks WHERE " + where).run(arg).changes);
+}
+
+// One source's chunks leave both tables (porter and trigram). Returns the chunk rows deleted.
 export function deleteSourceChunks(raw: DatabaseSync, sourceId: number): number {
-  raw.prepare("DELETE FROM line_units WHERE source_id = ?").run(sourceId);
-  raw.prepare(TRI_DELETE + " WHERE source_id = ?").run(sourceId);
-  return Number(raw.prepare("DELETE FROM chunks WHERE source_id = ?").run(sourceId).changes);
+  return deleteChunkRows(raw, { sourceId });
 }
 
 // D-M1-T8-1: each whitespace-separated word becomes one FTS5 string ("" doubles a quote) with a
@@ -636,6 +656,12 @@ export function insertUnits(db: DbHandle, sourceId: number, sessionId: string, u
     });
     start = end;
   }
+}
+
+// The recall query text: the prompt alone when it equals the session goal, else the prompt, one space, the goal.
+// dispatch.ts (turn-boundary recall) and resume.ts (ctx_resume) both rank line units by this text.
+export function recallQueryText(prompt: string, goal: string): string {
+  return goal === prompt ? prompt : prompt + " " + goal;
 }
 
 /** One ranked query over this session's line units (any-word form); best first, -bm25 as the score. */

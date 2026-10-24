@@ -14,7 +14,7 @@ import {
 } from "../contracts/constants.ts";
 import type { CtxPurgeInput, ToolContext, ToolReply } from "../contracts/types.ts";
 import { closeDb, openDb, withWrite } from "../store/db.ts";
-import { TRI_DELETE } from "../store/fts.ts";
+import { deleteChunkRows } from "../store/fts.ts";
 import { unknownField } from "./search.ts";
 
 export type { CtxPurgeInput } from "../contracts/types.ts";
@@ -50,14 +50,10 @@ function purgeScope(raw: DatabaseSync, scope: PurgeScope, input: CtxPurgeInput):
   if (scope === "session") return changes(raw, "DELETE FROM events WHERE session_id = ?", input.session as string);
   if (scope === "source") {
     const label = input.source as string;
-    raw.prepare(TRI_DELETE + " WHERE source_id IN (SELECT id FROM sources WHERE label = ?)").run(label);
-    raw.prepare("DELETE FROM line_units WHERE source_id IN (SELECT id FROM sources WHERE label = ?)").run(label);
-    return changes(raw, "DELETE FROM chunks WHERE source_id IN (SELECT id FROM sources WHERE label = ?)", label) +
-      changes(raw, "DELETE FROM sources WHERE label = ?", label);
+    return deleteChunkRows(raw, { label }) + changes(raw, "DELETE FROM sources WHERE label = ?", label);
   }
-  raw.exec("INSERT INTO chunks_tri(chunks_tri) VALUES ('delete-all')");
-  raw.exec("DELETE FROM line_units");
-  return changes(raw, "DELETE FROM events") + changes(raw, "DELETE FROM chunks") + changes(raw, "DELETE FROM sources");
+  const chunks = deleteChunkRows(raw, "all");
+  return changes(raw, "DELETE FROM events") + chunks + changes(raw, "DELETE FROM sources");
 }
 
 // PRD §4: SQLITE_BUSY past the node:sqlite timeout is the busy line; no added retry loop.

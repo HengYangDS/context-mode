@@ -53,7 +53,7 @@ const PS_PRELUDE = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8";
 const PS_ARGS: readonly string[] = Object.freeze(["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File"]);
 // GP4/deleted-cwd-no-ansi (#1286): plain output even when the parent sets FORCE_COLOR (D-M2-T10-4).
 const PLAIN_OUTPUT_ENV: Readonly<Record<string, string>> = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
-// Q8, v1 ab5aad90: a shell exit 1 with empty stderr is "no match", not an error (D-M2-T10-1).
+// Q8 (v1 grep rule): a shell exit 1 with empty stderr is "no match", not an error (D-M2-T10-1).
 const SOFT_EXIT = 1;
 
 // Step 9 (D-M2-T10-2): the background launcher runs through runProcess like any other call. "start"

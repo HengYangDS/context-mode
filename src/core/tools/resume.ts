@@ -15,7 +15,7 @@ import {
 import type { CtxResumeInput, ToolContext, ToolReply } from "../contracts/types.ts";
 import { renderState } from "../compaction/render.ts";
 import { readEventBySeq, readFirstPrompt, readLastPrompt, readSessionEvents } from "../journal/read.ts";
-import { listSessionSources, queryUnits, sourceHandle } from "../store/fts.ts";
+import { listSessionSources, queryUnits, recallQueryText, sourceHandle } from "../store/fts.ts";
 import { closeDb, openDb } from "../store/db.ts";
 
 export type { CtxResumeInput } from "../contracts/types.ts";
@@ -57,7 +57,7 @@ async function handler(input: CtxResumeInput, ctx: ToolContext): Promise<ToolRep
       .map((r) => "source " + sourceHandle(r.id) + ": " + r.label + " (" + r.bytes + " B)");
     const goal = readFirstPrompt(db, sessionId);
     const last = readLastPrompt(db, sessionId);
-    const units = queryUnits(db, sessionId, goal === last ? goal : last + " " + goal, RECALL_UNIT_CANDIDATES)
+    const units = queryUnits(db, sessionId, recallQueryText(last, goal), RECALL_UNIT_CANDIDATES)
       .map((u) => ({ ...u, label: sourceHandle(u.sourceId) }));
     const block = renderState(rows, newest.turn, { sources, units });
     // V21: renderState selects whole lines within STATE_BUDGET (= RESUME_CAP), so this never cuts;

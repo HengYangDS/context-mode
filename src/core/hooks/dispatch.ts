@@ -14,7 +14,7 @@ import {
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
 import type {
-  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, SourceRow, ToolCall, ToolResultInfo,
+  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall, ToolResultInfo,
 } from "../contracts/types.ts";
 import { getAdapter, hasRecall, hasReplace } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
@@ -24,7 +24,7 @@ import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { hasAgentRows, hasSessionRows, readFirstPrompt, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
-import { finishReserved, insertChunks, insertUnits, queryUnits, reserveSource, sourceHandle } from "../store/fts.ts";
+import { finishReserved, insertChunks, insertUnits, queryUnits, recallQueryText, reserveSource, sourceHandle, type SourceDraft } from "../store/fts.ts";
 import { buildUnits } from "../index/units.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
@@ -188,9 +188,6 @@ function seenSeqs(value: string | null): number[] {
   }
 }
 
-// No compaction in this session (or a row without UserPromptSubmit additionalContext): ALLOW, zero added
-// bytes. After one: BM25 of this session's rows and the same worktree's prior-session rows against the
-// prompt; whole rows over RECALL_MIN_SCORE, within RECALL_BUDGET_BYTES; a row goes out once per session.
 function seenUnitKeys(value: string | null): string[] {
   if (value === null) return [];
   try {
@@ -201,6 +198,9 @@ function seenUnitKeys(value: string | null): string[] {
   }
 }
 
+// No compaction in this session (or a row without UserPromptSubmit additionalContext): ALLOW, zero added
+// bytes. After one: BM25 of this session's rows and the same worktree's prior-session rows against the
+// prompt; whole rows over RECALL_MIN_SCORE, within RECALL_BUDGET_BYTES; a row goes out once per session.
 async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext, prompt: string): Promise<Decision> {
   if (!hasRecall(row) || ev.sessionId === "") return ALLOW;
   const db = await openDb(project);
@@ -211,7 +211,7 @@ async function recall(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectC
   const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
   const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
   const goal = readFirstPrompt(db, ev.sessionId);
-  const units = queryUnits(db, ev.sessionId, goal === prompt ? prompt : prompt + " " + goal, RECALL_UNIT_CANDIDATES);
+  const units = queryUnits(db, ev.sessionId, recallQueryText(prompt, goal), RECALL_UNIT_CANDIDATES);
   const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW;
   if (picked.seqs.length > 0) metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
@@ -425,7 +425,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // D-M2-SHAPE-1: a parser-found shape (JSON rows, a line log) gives its rare units the query names, whole,
   // within the same budget, plus the handle. No shape or no named rare unit -> the BM25 pick below, unchanged.
   // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
-  // replace is the 18e4a6cd size bound (REPLACE_RETURN_BYTES of selection + the more line with the full
+  // replace is the size bound of D-CR3-HANDLE-1 (REPLACE_RETURN_BYTES of selection + the more line with the full
   // label); the selection gets that budget minus the handle line, so a replace never grows.
   const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes);
   const budget = replaceBudget(handleLine, moreLine(intent, label));
@@ -488,9 +488,10 @@ function indexDetached(project: ProjectContext, sessionId: string, sourceId: num
     });
 }
 
-// The source row fields indexText stores for a hook output (kind "content").
-function sourceRowOf(project: ProjectContext, sessionId: string, label: string): Omit<SourceRow, "id"> {
-  return { projectKey: project.projectKey, sessionId, worktree: project.worktree, agent: project.agent, kind: "content", label, bytes: 0, chunkCount: 0, createdAt: Date.now() };
+// The source fields a hook output stores (kind "content"). reserveSource and finishReserved take these only;
+// the byte and chunk counts come from the chunks they write (DEVIATIONS D-CR3-HANDLE-2).
+export function sourceRowOf(project: ProjectContext, sessionId: string, label: string): SourceDraft {
+  return { sessionId, worktree: project.worktree, agent: project.agent, kind: "content", label, createdAt: Date.now() };
 }
 
 // ---------- §4.7 PreCompact ----------
