@@ -8,10 +8,9 @@ import { formatError } from "../contracts/errors.ts";
 import type { CtxSearchInput, DbHandle, Hit, SearchScope, TimelineRow, ToolContext, ToolReply } from "../contracts/types.ts";
 import { capBytes } from "../sandbox/cap.ts";
 import { closeDb, openDb } from "../store/db.ts";
-import { ftsListSource, ftsQuery, ftsQueryTimeline, resolveSourceLabel } from "../store/fts.ts";
+import { ftsListSource, ftsQuery, ftsQueryTimeline, rankTexts, resolveSourceLabel } from "../store/fts.ts";
 import { readAutoMemory } from "../index/auto-memory.ts";
 import { fitRow, jsonRows, namedKeys } from "../index/shape.ts";
-import { rankTexts } from "../store/fts.ts";
 
 // DECISIONS-r9 V23, M23: six keys, strict (unknown key -> the SDK's isError); offset/after are
 // non-negative integers; an empty `queries` array is valid input. impl/05 §6 error table, D-M2-arch-3:
