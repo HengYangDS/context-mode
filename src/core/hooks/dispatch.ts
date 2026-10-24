@@ -25,7 +25,8 @@ import { hasAgentRows, hasSessionRows, readLastPrompt, readRecallRows, readSessi
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
 import { chunkText } from "../index/chunk.ts";
-import { selectChunksInMemory } from "../index/select.ts";
+import { moreLine, selectChunksInMemory } from "../index/select.ts";
+import { shapeDigest } from "../index/shape.ts";
 import { indexText } from "../index/text.ts";
 import { appendDetached } from "./detached.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
@@ -392,6 +393,10 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // returns the line the user asked for. The more line keeps the intent. No prompt -> intent alone.
   const prompt = await lastPrompt(project, ev.sessionId);
   const rankQuery = prompt.trim() === "" ? undefined : intent + " " + prompt;
+  // D-M2-SHAPE-1: a parser-found shape (JSON rows, a line log) gives its rare units the query names, whole,
+  // within the same budget, plus the handle. No shape or no named rare unit -> the BM25 pick below, unchanged.
+  const digest = shapeDigest(text, rankQuery ?? intent, REPLACE_RETURN_BYTES);
+  if (digest !== null) return { kind: "replace", output: digest + "\n" + moreLine(intent, label) };
   const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
   return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
 }
