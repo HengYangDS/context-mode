@@ -405,6 +405,33 @@ test("D-M7-SV-1: small chunks drop no byte: chunk bytes sum to the text bytes; t
   assert.deepEqual(chunkText(text, "text", 1 << 30), chunkText(text, "text"));
 });
 
+test("D-M2-MCP-1: a large non-ctx MCP result on claude-code is replaced by one text block; the full text is indexed", async () => {
+  const text = bigText(40000);
+  const p = cc({ hook_event_name: "PostToolUse", tool_name: "mcp__tix__list_tickets", tool_input: { description: "needle target" }, tool_use_id: "toolu_m1", tool_response: [{ type: "text", text }] });
+  const out = parsed(await handleHook("claude-code", p, env));
+  assert.ok(Array.isArray(out.updatedToolOutput) && out.updatedToolOutput.length === 1 && out.updatedToolOutput[0].type === "text");
+  const replaced = out.updatedToolOutput[0].text;
+  assert.ok(Buffer.byteLength(replaced) <= REPLACE_RETURN_BYTES + 512 && replaced.includes("needle target"));
+  assert.equal(query("SELECT 1 FROM sources WHERE session_id = ?", p.session_id).length, 1);
+});
+
+test("D-M2-MCP-1: an MCP result with an image block, or a small one, stays as the host made it", async () => {
+  const big = bigText(40000);
+  const withImage = cc({ hook_event_name: "PostToolUse", tool_name: "mcp__tix__shot", tool_input: {}, tool_response: [{ type: "text", text: big }, { type: "image", data: "AAAA", mimeType: "image/png" }] });
+  assert.deepEqual(await handleHook("claude-code", withImage, env), { stdout: "", exitCode: 0 });
+  const small = cc({ hook_event_name: "PostToolUse", tool_name: "mcp__tix__get", tool_input: {}, tool_response: [{ type: "text", text: "tiny" }] });
+  assert.deepEqual(await handleHook("claude-code", small, env), { stdout: "", exitCode: 0 });
+});
+
+test("D-M2-MCP-1: a large Grep content result keeps the Grep shape and swaps content", async () => {
+  const resp = { mode: "content", numFiles: 0, filenames: [], content: bigText(40000), numLines: 900, totalLines: 900, appliedLimit: 250 };
+  const p = cc({ hook_event_name: "PostToolUse", tool_name: "Grep", tool_input: { pattern: "needle target" }, tool_use_id: "toolu_g1", tool_response: resp });
+  const out = parsed(await handleHook("claude-code", p, env));
+  const u = out.updatedToolOutput;
+  assert.deepEqual({ ...u, content: 0 }, { ...resp, content: 0 });
+  assert.ok(Buffer.byteLength(u.content) < Buffer.byteLength(resp.content) && u.content.includes("needle target"));
+});
+
 test("D-M7-RR-1: rows with no replace (codex, qwen) keep their one path: large PostToolUse is the empty allow", async () => {
   for (const agent of ["codex", "qwen"]) {
     const p = mainBashPost(bigText(40000));

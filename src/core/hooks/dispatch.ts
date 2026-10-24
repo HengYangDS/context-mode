@@ -370,6 +370,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // step 5: replace, DECISIONS-r9 F1 split. Subagent case B/C (ADR-0016), and the main agent on a row
   // with a replace channel ("run, then replace", D-M7-RR-1, DECISIONS-r10 (1)).
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW; // D-M7-SV-1
+  if (result.keep === true) return ALLOW; // D-M2-MCP-1: an MCP result with a non-text block stays as the host made it
   let label: string;
   if (isSubagentCall(ev)) {
     const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));

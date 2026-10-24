@@ -466,6 +466,8 @@ export const SHELL_QUOTE = '"'; // claude-code quotes "${CLAUDE_PLUGIN_ROOT}/hoo
 export const MATCHER_OPEN = "^(";
 export const MATCHER_CLOSE = ")$";
 export const MATCHER_ALT = "|";
+export const MCP_ANY_MATCH = "mcp__.*"; // D-M2-MCP-1: PostToolUse matcher alternative on rows with a replace channel
+export const POST_TOOL_USE = "PostToolUse";
 export const MATCHER_ANY = ".*"; // OWN_TOOL_PREFIX + MATCHER_ANY = "ctx_.*"
 export const REGEX_SPECIAL_CHARS = ".*+?^${}()|[]\\";
 export const REGEX_ESCAPE = "\\";

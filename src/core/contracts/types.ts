@@ -28,7 +28,10 @@ export interface ToolCall {
 }
 
 // persistedPath (D-M2-SHAPE-2): the host kept the whole output in this file and `text` is only its head.
-export interface ToolResultInfo { isError: boolean; bytes: number; text?: string; exitCode?: number; persistedPath?: string; }
+// blocks (D-M2-MCP-1): the host gave an MCP content-block array; a replace must be one text block.
+// keep: a block is not text (image, resource), so the original result stays.
+export interface ToolResultInfo { isError: boolean; bytes: number; text?: string; exitCode?: number; persistedPath?: string; blocks?: boolean; keep?: boolean; shape?: Record<string, unknown>; }
+// shape (D-M2-MCP-1): the Grep content response as the host gave it; a replace keeps its fields and swaps content.
 
 export type Decision =
   | { kind: "allow" }

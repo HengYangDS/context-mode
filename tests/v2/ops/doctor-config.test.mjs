@@ -26,7 +26,7 @@ function codexInstall(home, opts = {}) {
   const hooks = {};
   for (const [canonical, native] of Object.entries(row.eventMap)) {
     const group = { hooks: [{ type: "command", command: cmd, timeout: opts.timeout ?? 5 }] };
-    if (canonical === "PreToolUse" || canonical === "PostToolUse") group.matcher = opts.matcher ?? composeMatcher(row);
+    if (canonical === "PreToolUse" || canonical === "PostToolUse") group.matcher = opts.matcher ?? composeMatcher(row, canonical);
     hooks[native] = [group];
   }
   put(path.join(home, ".codex", "hooks.json"), { hooks });

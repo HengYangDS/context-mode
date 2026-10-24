@@ -305,3 +305,42 @@ test("D-M2-SHAPE-2: decode keeps persistedOutputPath only when the inline text i
   const plain = decode({ ...base, tool_response: { stdout: head, stderr: "", interrupted: false } });
   assert.equal(plain.result.persistedPath, undefined);
 });
+
+// ---------- D-M2-MCP-1: MCP content blocks and the Grep output shape (2.1.303 probes) ----------
+
+const blocksResp = [{ type: "text", text: "line one" }, { type: "text", text: "line two" }];
+
+test("D-M2-MCP-1: decode PostToolUse of an MCP tool reads the text blocks as the output", () => {
+  const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "mcp__tix__list_tickets", tool_input: {}, tool_response: blocksResp });
+  assert.equal(ev.tool.canonicalName, "mcp:tix:list_tickets");
+  assert.equal(ev.result.text, "line one\nline two");
+  assert.equal(ev.result.bytes, Buffer.byteLength("line one\nline two"));
+  assert.equal(ev.result.blocks, true);
+  assert.equal(ev.result.keep, undefined);
+});
+
+test("D-M2-MCP-1: a block that is not text (image) marks the result keep: the original stays", () => {
+  const resp = [{ type: "text", text: "a" }, { type: "image", data: "AAAA", mimeType: "image/png" }];
+  const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "mcp__tix__shot", tool_input: {}, tool_response: resp });
+  assert.equal(ev.result.keep, true);
+});
+
+test("D-M2-MCP-1: encode replace of an MCP result writes one text block", () => {
+  const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "mcp__tix__list_tickets", tool_input: {}, tool_response: blocksResp });
+  const out = encode(ev, { kind: "replace", output: "chunks" });
+  assert.deepEqual(JSON.parse(out.stdout), { hookSpecificOutput: { hookEventName: "PostToolUse", updatedToolOutput: [{ type: "text", text: "chunks" }] } });
+});
+
+test("D-M2-MCP-1: decode a Grep content result reads content as the output; encode keeps the Grep shape", () => {
+  const resp = { mode: "content", numFiles: 0, filenames: [], content: "a.js:1:x\nb.js:2:y", numLines: 2, totalLines: 2, appliedLimit: 250 };
+  const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "Grep", tool_input: { pattern: "x" }, tool_response: resp });
+  assert.equal(ev.result.text, "a.js:1:x\nb.js:2:y");
+  const out = encode(ev, { kind: "replace", output: "chunks" });
+  assert.deepEqual(JSON.parse(out.stdout).hookSpecificOutput.updatedToolOutput, { ...resp, content: "chunks" });
+});
+
+test("D-M2-MCP-1: a string response keeps the string replace shape", () => {
+  const ev = decode({ ...base, hook_event_name: "PostToolUse", tool_name: "WebFetch", tool_input: {}, tool_response: "text" });
+  assert.equal(ev.result.blocks, undefined);
+  assert.equal(JSON.parse(encode(ev, { kind: "replace", output: "c" }).stdout).hookSpecificOutput.updatedToolOutput, "c");
+});

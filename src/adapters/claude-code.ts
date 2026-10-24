@@ -27,8 +27,9 @@ function canonicalName(name: string, ownPrefix: string): string {
 function outputOf(resp: unknown): string {
   if (resp === undefined) return "";
   if (typeof resp === "string") return resp;
+  if (Array.isArray(resp)) return blocksOf(resp).text; // D-M2-MCP-1
   if (typeof resp === "object" && resp !== null) {
-    const r = resp as { stdout?: unknown; stderr?: unknown };
+    const r = resp as { stdout?: unknown; stderr?: unknown; content?: unknown; mode?: unknown };
     // D-FU-RF-DECODE-1: a Bash shape with only one of stdout/stderr reads the missing one as "".
     if (typeof r.stdout === "string" || typeof r.stderr === "string") {
       const out = typeof r.stdout === "string" ? r.stdout : "";
@@ -36,13 +37,38 @@ function outputOf(resp: unknown): string {
       return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
+  // D-M2-MCP-1: the Grep content shape {mode:"content", content, ...}: the content is the output the model sees.
+  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return (resp as { content: string }).content;
   return JSON.stringify(resp);
+}
+
+function isGrepContent(resp: object): boolean {
+  const r = resp as { mode?: unknown; content?: unknown };
+  return r.mode === "content" && typeof r.content === "string";
+}
+
+// D-M2-MCP-1: an MCP result is an array of content blocks; the text blocks joined by a newline are the output.
+// A block of another type (image, resource) is not ours to rewrite: keep marks the result as untouchable.
+function blocksOf(resp: unknown[]): { text: string; keep: boolean } {
+  const parts: string[] = [];
+  let keep = false;
+  for (const b of resp) {
+    const blk = typeof b === "object" && b !== null ? (b as { type?: unknown; text?: unknown }) : {};
+    if (blk.type === "text" && typeof blk.text === "string") parts.push(blk.text);
+    else keep = true;
+  }
+  return { text: parts.join("\n"), keep };
 }
 
 function readResult(resp: unknown): ToolResultInfo {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && (resp as { is_error?: unknown }).is_error === true;
   const info: ToolResultInfo = { isError, bytes: Buffer.byteLength(text), text };
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp as Record<string, unknown>;
+  if (Array.isArray(resp)) {
+    info.blocks = true;
+    if (blocksOf(resp).keep) info.keep = true;
+  }
   // D-M2-SHAPE-2: above its inline limit Claude Code gives the hook only the head of stdout and keeps the
   // whole output in persistedOutputPath (persistedOutputSize bytes). The adapter names the file; dispatch reads it.
   if (typeof resp === "object" && resp !== null) {
@@ -83,7 +109,10 @@ export function decodeClaudeShape(raw: unknown, agent: AgentId, ownPrefix: strin
 // original output on a mismatch ("does not match Bash's output shape; using original output"). Bash
 // output is an object {stdout, stderr, interrupted}, so a bare string never reached the model.
 function replaceShape(ev: CanonicalHookEvent, output: string): unknown {
-  return ev.tool?.canonicalName === "Bash" ? { stdout: output, stderr: "", interrupted: false } : output;
+  if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
+  if (ev.result?.shape !== undefined) return { ...ev.result.shape, content: output }; // D-M2-MCP-1: Grep content shape
+  if (ev.result?.blocks === true) return [{ type: "text", text: output }]; // D-M2-MCP-1: the MCP result shape
+  return output;
 }
 
 export function encodeClaudeShape(ev: CanonicalHookEvent, d: Decision, hasReplace: boolean): HookOutput {

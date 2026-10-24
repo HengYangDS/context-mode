@@ -56,6 +56,15 @@ test("buildMatcher gives the impl/10 §1.5 matcher for every host-matcher row", 
   for (const [id, expected] of Object.entries(MATCHERS)) assert.equal(buildMatcher(getAdapter(id)), expected, id);
 });
 
+test("D-M2-MCP-1: the claude-code PostToolUse matcher also names every MCP tool; PreToolUse does not", () => {
+  const row = getAdapter("claude-code");
+  assert.equal(buildMatcher(row, "PostToolUse"), `^(${CLAUDE_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$`);
+  assert.equal(buildMatcher(row, "PreToolUse"), MATCHERS["claude-code"]);
+  const post = new RegExp(buildMatcher(row, "PostToolUse"));
+  assert.ok(post.test("mcp__tix__list_tickets") && post.test("mcp__plugin_context-mode_context-mode__ctx_search") && !post.test("Glob"));
+  for (const id of ["codex", "qwen", "zcode"]) assert.equal(buildMatcher(getAdapter(id), "PostToolUse"), MATCHERS[id], id);
+});
+
 test("buildMatcher escapes only the prefix; missing nativeTools slots add nothing", () => {
   const row = { ...getAdapter("kiro"), toolNamePrefix: "a.b(c)|", nativeTools: { shell: [], edit: ["x"] } };
   assert.equal(buildMatcher(row), "^(x|a\\.b\\(c\\)\\|ctx_.*)$");
@@ -121,6 +130,7 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   const claudeCmd = 'node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent claude-code';
   const claude = readJson(dir, "hooks/claude-code.json");
   assert.deepEqual(claude.hooks.PreToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: MATCHERS["claude-code"] }]);
+  assert.deepEqual(claude.hooks.PostToolUse, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }], matcher: `^(${CLAUDE_MATCHER_NAMES}|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$` }]);
   assert.deepEqual(claude.hooks.SessionStart, [{ hooks: [{ command: claudeCmd, timeout: 5, type: "command" }] }]);
   // D-FU-RM-QWEN-1: Qwen replaces only ${CLAUDE_PLUGIN_ROOT} in hook commands.
   const qwenCmd = 'node "${CLAUDE_PLUGIN_ROOT}/hook.mjs" --agent qwen';

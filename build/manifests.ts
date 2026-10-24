@@ -4,7 +4,7 @@
 // (D-M6-arch-3, D-M6-B2-1); hashes are build/hash.mjs.
 import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { ADAPTERS } from "../src/adapters/table.ts";
+import { ADAPTERS, hasReplace } from "../src/adapters/table.ts";
 import type { AgentId } from "../src/core/contracts/agents.ts";
 import { RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
 import type { AdapterRow } from "../src/core/contracts/types.ts";
@@ -17,6 +17,7 @@ const HOOK_BUNDLE = "hook.mjs";
 const AGENT_FLAG = "--agent";
 const MS_PER_SECOND = 1000;
 const OWN_TOOL_GLOB = "ctx_.*";
+const MCP_ANY_GLOB = "mcp__.*";
 const TOOL_EVENTS: readonly string[] = ["PreToolUse", "PostToolUse"]; // canonical events that carry the matcher
 const KIRO_TOOL_MATCHER = "@mcp"; // impl/10 §1.5 kiro row
 const HOOKS_DIR = "hooks";
@@ -50,9 +51,13 @@ type JsonObject = { [key: string]: Json };
 // impl/13 §3.1 step 5 (CI/build code: regex allowed).
 const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export function buildMatcher(row: AdapterRow): string {
+// D-M2-MCP-1: on a row with a replace channel the PostToolUse matcher also names every MCP tool, so a large
+// non-ctx MCP result reaches the replace path. PreToolUse keeps the narrow matcher (no extra hook spawn).
+export function buildMatcher(row: AdapterRow, event?: string): string {
   const names = Object.values(row.nativeTools).flat();
-  return `^(${[...names, escapeRegExp(row.toolNamePrefix) + OWN_TOOL_GLOB].join("|")})$`;
+  const alts = [...names, escapeRegExp(row.toolNamePrefix) + OWN_TOOL_GLOB];
+  if (event === "PostToolUse" && hasReplace(row)) alts.push(MCP_ANY_GLOB);
+  return `^(${alts.join("|")})$`;
 }
 
 const hookCommand = (row: AdapterRow): string => [NODE_COMMAND, bundleCmd(row, HOOK_BUNDLE), AGENT_FLAG, row.id].join(" ");
@@ -66,7 +71,7 @@ function nestedShape(row: AdapterRow, timeout: number, withMatcher: boolean): Js
   const hooks: JsonObject = {};
   for (const [canonical, native] of events(row)) {
     const group: JsonObject = { hooks: [{ ...command(row), timeout }] };
-    if (withMatcher && isToolEvent(canonical)) group.matcher = buildMatcher(row);
+    if (withMatcher && isToolEvent(canonical)) group.matcher = buildMatcher(row, native);
     hooks[native] = [group];
   }
   return { hooks };
@@ -94,7 +99,7 @@ function zcodeShape(row: AdapterRow): JsonObject {
   const byEvent: JsonObject = {};
   for (const [canonical, native] of events(row)) {
     const entry: JsonObject = { ...command(row), timeoutMs: row.hookTimeoutMs };
-    if (isToolEvent(canonical)) entry.matcher = buildMatcher(row);
+    if (isToolEvent(canonical)) entry.matcher = buildMatcher(row, native);
     byEvent[native] = [entry];
   }
   return { hooks: { enabled: true, events: byEvent } };
