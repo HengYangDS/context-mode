@@ -110,3 +110,16 @@ and GP-LIVE-ROUTING, D3 and Edit-after-Read are in the section "Live guards" bel
 - HEAD (fbd4f781) main: 84.03 (json-1 37.33, multi-1 6906 -> 915, big-tests 25653 -> 325, big-json 2428 -> 454),
   every oracle 2/2. D-CR2-HANDLE-1 adds one handle line (about 250 B) to each replace, outside the replace
   budget. On the small main outputs this drops main below 90. The 92.5 is true for 18e4a6cd only.
+
+## Round 3 (2026-10-24, Claude Code 2.1.303, sonnet-5-5 low, n = 3, one run per build)
+
+| Build | score | json-1 | multi-1 | big-tests | big-json | oracles |
+|---|---|---|---|---|---|---|
+| head (v2-design 5a79496d) | 78.97 | 34.38 (800 -> 525) | 86.8 (6930 -> 915) | 98.73 (25653 -> 325) | 71.14 (2436 -> 703) | all 3/3 |
+| handle (exp/r3-handle cccb08ca) | 85.02 | 34.38 | 86.45 | 99.25 | 83.58 | all 3/3 |
+| combined (exp/r3-combined bd4842fc) | 86.56 | 30.0 (900 -> 630) | 89.55 (6930 -> 724) | 99.25 (25653 -> 193) | 83.58 (2436 -> 400) | all 3/3 |
+
+Spread on head: the checker run on fbd4f781 (n = 2) gave 84.03; this run on 5a79496d gives 78.97. json-1
+and big-json move most. No build reaches 90, so the round 3 pick rule merges nothing. The handle line in
+the replace budget (D-CR3-HANDLE-1) gives about 6 points over head (one run each); the gap left is json-1 (small output, the
+replace is near its raw size).

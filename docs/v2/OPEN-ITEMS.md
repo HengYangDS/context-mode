@@ -24,6 +24,8 @@ On this commit (macOS, clean clone, `node build/build.mjs --out release-out`):
 
 ## Open items
 
+- Compaction round 3 (2026-10-24, `docs/v2/spikes/compact/RESULT.md`): exp/r3-combined scores 100% on compact-hard main (two runs) and heldout, but M2 main is 86.56 (< 90), so it is not merged. Head on v2-design: main 19.4%, heldout 27.8%, M2 main 78.97. To merge, combined needs about 3.5 more M2 points (json-1 is the gap) without losing the line units. Also open: ctx_resume does not read line units; `tests/v2/bench/fixtures-run.test.mjs` `run.mjs --check` fails on handle and combined (hook bytes moved > 5% vs results.json: part1 3010 vs 4817, part2 7573 vs 8293), so results.json needs a re-record or the drift a reason; the compact-hard runner kill does not reach a model-run `find /` grandchild.
+
 | # | Item | Status | Evidence | Owner or next step |
 |---|---|---|---|---|
 | 1 | Claude Code hook p95 41 ms against 40 ms (GS6) | open, FAIL | `docs/v2/TECH-SPEC.md` section 1.1; `docs/v2/review/OVERNIGHT-REPORT-2026-10-19.md` item 1 | A/B of base vs b-shape, 6 rounds on one loaded host: median paired -1.75 ms (`docs/v2/spikes/m2/RESULT.md`), so the miss is load. Owner re-measures on an idle machine. No budget was changed. |
