@@ -120,4 +120,44 @@ if the run can keep such processes for a long time.
 
 ## D3 on the merged head
 
-(filled below by the D3 measurement step)
+Builds: HEAD = v2-design edabbb38 (includes the item 1 change). PRE = 5a79496d (pre round 3). Host: darwin, Node v26.8.1.
+Each measurement interleaves HEAD and PRE on the same host and run.
+
+hook-gs6 (`bench/hook-gs6.mjs`, 40 runs per event, 6 rounds each, ABABAB). `p95Ms` is the combined wall
+(spawn plus hook body; budget 60 ms). `cpuOverNodeMs` is the hook CPU p95 minus bare Node CPU p95 (budget 20 ms).
+
+| Round | HEAD p95Ms | PRE p95Ms | HEAD cpuOverNodeMs | PRE cpuOverNodeMs |
+|---|---|---|---|---|
+| 1 | 40.7 | 40.0 | 6.4 | 5.3 |
+| 2 | 39.7 | 39.1 | 6.9 | 6.3 |
+| 3 | 39.6 | 39.4 | 6.3 | 5.9 |
+| 4 | 39.3 | 40.2 | 4.5 | 6.6 |
+| 5 | 40.7 | 41.0 | 7.3 | 5.4 |
+| 6 | 41.3 | 40.2 | 7.1 | 6.4 |
+| Median | 40.2 | 40.1 | 6.65 | 6.1 |
+
+Paired median difference, p95Ms (HEAD minus PRE): +0.4 ms.
+
+setup-hook-overhead (`e2e/checks/setup-hook-overhead.mjs`, budget 15 ms, 5 batches of 40 pairs, gate = lowest batch p95):
+
+| Agent | HEAD overheadMs | PRE overheadMs | HEAD batches | PRE batches |
+|---|---|---|---|---|
+| claude-code | 6 | 6 | 6, 8, 6, 7, 8 | 7, 7, 7, 7, 6 |
+| codex | 6 | 6 | 8, 6, 8, 7, 7 | 8, 6, 7, 7, 7 |
+
+Both builds pass the 15 ms gate. Cold first call: HEAD claude-code 9 ms, PRE 7 ms (info only).
+
+PostToolUse on the 222 KB compact-hard serverLog fixture (`serverLog(101).text`, 222,418 bytes, n = 20 each, interleaved).
+Wall is the full spawn of the hook. Bare Node wall was about 29 ms in the gate run above.
+
+| Build | Median wall ms | p95 wall ms |
+|---|---|---|
+| HEAD | 147.2 | 177.6 |
+| PRE | 59.4 | 68.0 |
+
+Paired median difference (HEAD minus PRE): +79.9 ms.
+
+Verdict: the merged head passes the 15 ms overhead budget on the common path (gate overhead 6 ms, combined p95 40 ms,
+CPU over Node 6.65 ms). On the 222 KB PostToolUse event the merged head is over the 15 ms budget. Its overhead over
+bare Node is about 118 ms (147 ms minus about 29 ms), against about 30 ms for PRE. This was measured, not fixed here.
+
