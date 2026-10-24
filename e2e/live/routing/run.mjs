@@ -2,7 +2,8 @@
 // node e2e/live/routing/run.mjs --out <json> [--models a,b] [--runs 2] [--budget 0.4] [--conc 6] [--only L1,S2]
 // node e2e/live/routing/run.mjs --rescore <old-raw.json>   (no model calls: old rule vs new rule tables)
 // Scoring is deterministic and lives in score.mjs (owner decision 2026-10-19): tool class AND returned bytes.
-import { spawn, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
+import { spawnGroup, watchdog } from "../lib/proc-group.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -69,11 +70,11 @@ const rows = []; let next = 0;
 const finish = () => { for (const [m, v] of Object.entries(tally(rows.filter((r) => r.size !== "t4")))) console.log(m, JSON.stringify(v)); };
 function runJob(j) { return new Promise((res) => {
   const dir = mkRepo(j.t); let out = "", err = "";
-  const c = spawn(BIN, ["-p", j.t.prompt, "--model", j.m, "--effort", "low", "--max-budget-usd", BUDGET, "--no-session-persistence", "--setting-sources", "project",
+  const c = spawnGroup(BIN, ["-p", j.t.prompt, "--model", j.m, "--effort", "low", "--max-budget-usd", BUDGET, "--no-session-persistence", "--setting-sources", "project",
     "--output-format", "stream-json", "--verbose", "--plugin-dir", path.join(ROOT, "release-out"), "--permission-mode", "bypassPermissions"], { cwd: dir, env });
-  const to = setTimeout(() => c.kill("SIGKILL"), 420000);
+  watchdog(c, 420000);
   c.stdout.on("data", (d) => out += d); c.stderr.on("data", (d) => err += d);
-  c.on("close", () => { clearTimeout(to); drop(dir); const p = parseTranscript(out); const s = score(j.t, p); rows.push({ final: p.final.slice(0, 120), model: j.m, task: j.t.id, size: j.t.size, run: j.k, ...s, stderr: s.firstTool === "(none)" && !s.correct ? err.slice(0, 160) : "" }); fs.writeFileSync(OUT, JSON.stringify(rows, null, 1)); res(); });
+  c.on("close", () => { drop(dir); const p = parseTranscript(out); const s = score(j.t, p); rows.push({ final: p.final.slice(0, 120), model: j.m, task: j.t.id, size: j.t.size, run: j.k, ...s, stderr: s.firstTool === "(none)" && !s.correct ? err.slice(0, 160) : "" }); fs.writeFileSync(OUT, JSON.stringify(rows, null, 1)); res(); });
 }); }
 await Promise.all(Array.from({ length: CONC }, async () => { while (next < jobs.length) await runJob(jobs[next++]); }));
 console.log("done", rows.length, "rows ->", OUT);

@@ -1,6 +1,7 @@
 // Live A/B runner. node bench/live/run.mjs [--batch-size 10] [--max-batches N] [--only task-id] [--runs 3]
 // Raw rows -> /private/tmp/cm-v2-impl-private/bench/live-rows.jsonl (private). Aggregate -> bench/live/results/.
 import { spawnSync } from "node:child_process";
+import { runGroup } from "../../e2e/live/lib/proc-group.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -37,7 +38,7 @@ for (let r = 1; r <= RUNS; r++) for (const t of TASKS) { if (ONLY && t.id !== ON
 const done = new Set(fs.existsSync(ROWS) ? fs.readFileSync(ROWS, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l).id) : []);
 const todo = plan.filter((p) => !done.has(p.id));
 
-function session(p) {
+async function session(p) {
   const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "cm-live-")));
   initRepo(dir);
   const { prompt, expect } = p.task.build(dir);
@@ -45,8 +46,8 @@ function session(p) {
   const arm = p.arm === "on" ? ["--plugin-dir", path.join(ROOT, "release-out"), "--allowedTools", ...tools, "mcp__plugin_context-mode_context-mode"]
     : ["--strict-mcp-config", "--allowedTools", ...tools];
   const t0 = Date.now();
-  const r = spawnSync(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
-    "--no-session-persistence", "--setting-sources", "project", ...arm], { cwd: dir, env, encoding: "utf8", timeout: 600000, maxBuffer: 1 << 28 });
+  const r = await runGroup(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
+    "--no-session-persistence", "--setting-sources", "project", ...arm], { cwd: dir, env }, 600000);
   let res = null, calls = 0, mcpCalls = 0, mcpOk = 0, toolNames = [];
   for (const l of (r.stdout || "").split("\n")) {
     if (!l.startsWith("{")) continue;
@@ -90,7 +91,7 @@ function aggregate() {
 let b = 0;
 while (todo.length && b < MAXB) {
   const batch = todo.splice(0, BATCH); b++;
-  for (const p of batch) { const row = session(p); fs.appendFileSync(ROWS, JSON.stringify(row) + "\n"); console.log(p.id, row.ok ? "ok" : "FAIL", tot(row), "$" + row.cost.toFixed(3)); }
+  for (const p of batch) { const row = await session(p); fs.appendFileSync(ROWS, JSON.stringify(row) + "\n"); console.log(p.id, row.ok ? "ok" : "FAIL", tot(row), "$" + row.cost.toFixed(3)); }
   const agg = aggregate(); const out = path.join(ROOT, "bench/live/results"); fs.mkdirSync(out, { recursive: true });
   fs.writeFileSync(path.join(out, "aggregate.json"), JSON.stringify(agg, null, 2) + "\n");
   spawnSync("git", ["add", "bench/live/results/aggregate.json"], { cwd: ROOT });

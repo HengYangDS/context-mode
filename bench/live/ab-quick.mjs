@@ -1,6 +1,7 @@
 // Quick live A/B: all sessions in parallel, arms off / v1 / v2. node bench/live/ab-quick.mjs [--v1 <plugin dir>]
 // Raw rows -> /private/tmp/cm-v2-impl-private/bench/ab-quick-rows.json (private). Aggregate -> bench/live/results/ab-quick.json.
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
+import { spawnGroup, watchdog } from "../../e2e/live/lib/proc-group.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -60,12 +61,11 @@ function session(task, arm) {
     initRepo(dir);
     const { prompt, expect } = task.build(dir);
     const t0 = Date.now();
-    const p = spawn(bin, ["-p", prompt + " Reply with only the answer, no other text.", "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
+    const p = spawnGroup(bin, ["-p", prompt + " Reply with only the answer, no other text.", "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
       "--no-session-persistence", "--setting-sources", "project", ...armArgs(arm)], { cwd: dir, env, stdio: ["ignore", "pipe", "ignore"] });
     let out = ""; p.stdout.on("data", (d) => (out += d));
-    const kill = setTimeout(() => p.kill("SIGKILL"), TIMEOUT_MS);
+    watchdog(p, TIMEOUT_MS);
     p.on("close", () => {
-      clearTimeout(kill);
       let res = null, calls = 0, ctx = 0, trBytes = 0; const names = [];
       for (const l of out.split("\n")) {
         if (!l.startsWith("{")) continue; let ev; try { ev = JSON.parse(l); } catch { continue; }

@@ -2,7 +2,7 @@
 // One keyless `claude -p` process with stream-json in and out. It sends the earlier turns one by one,
 // waits for each turn's `result` event, sends `/compact` as a later user turn, then the next request.
 // Returns the tool calls, the final text, the list-price cost and whether a compact boundary event came.
-import { spawn } from "node:child_process";
+import { spawnGroup, killGroup } from "../lib/proc-group.mjs";
 import { tmpdir } from "node:os";
 
 const MODEL = "claude-sonnet-5";
@@ -47,7 +47,7 @@ export function runSession(o) {
     "--model", o.model ?? MODEL, "--effort", o.effort ?? EFFORT, "--max-budget-usd", String(o.budgetUsd),
     "--no-session-persistence", "--setting-sources", "project", ...args];
   const sends = [...o.turns, "/compact", o.nextRequest];
-  const child = spawn(o.bin, argv, { cwd: o.cwd, env: childEnv(), stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawnGroup(o.bin, argv, { cwd: o.cwd, env: childEnv(), stdio: ["pipe", "pipe", "pipe"] });
   const out = { toolCalls: [], toolResults: [], hookContexts: [], finalText: "", costUsd: 0, compacted: false, isError: false, exitCode: null, stderr: "" };
   let turn = 0;
   let timer = null;
@@ -56,7 +56,7 @@ export function runSession(o) {
     clearTimeout(timer);
     if (turn >= sends.length) { child.stdin.end(); return; }
     child.stdin.write(userLine(sends[turn]));
-    timer = setTimeout(() => { out.isError = true; child.kill(); }, TURN_TIMEOUT_MS);
+    timer = setTimeout(() => { out.isError = true; killGroup(child); }, TURN_TIMEOUT_MS);
   };
 
   const onEvent = (ev) => {

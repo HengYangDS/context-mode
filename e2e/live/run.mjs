@@ -3,6 +3,7 @@
 // A case with "plugin": true runs as ADR-0012 says: cwd = a temp git repo, release-out loaded with --plugin-dir
 // (hooks + MCP server, no --strict-mcp-config), "agents" written to <repo>/.claude/agents/<name>.md (D-M3-F-6).
 import { execFileSync, spawnSync } from "node:child_process";
+import { runGroup } from "./lib/proc-group.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -84,9 +85,9 @@ for (const c of selected) {
   const repo = c.plugin ? pluginRepo(c) : null;
   const mcp = c.plugin ? ["--plugin-dir", PLUGIN_DIR]
     : ["--strict-mcp-config", ...(c.tools.some((t) => t.startsWith(MCP_PREFIX)) ? ["--mcp-config", MCP_CONFIG] : [])];
-  const r = spawnSync(bin, ["-p", c.prompt, "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
+  const r = await runGroup(bin, ["-p", c.prompt, "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
     "--no-session-persistence", "--setting-sources", "project", "--output-format", "json", ...mcp,
-    ...(c.tools.length ? ["--allowedTools", ...c.tools] : ["--tools", ""])], { cwd: repo ?? ROOT, env, encoding: "utf8", timeout: 600000 });
+    ...(c.tools.length ? ["--allowedTools", ...c.tools] : ["--tools", ""])], { cwd: repo ?? ROOT, env }, 600000);
   if (repo) dropProjectData(repo);
   let res; try { res = JSON.parse(r.stdout); } catch { res = { is_error: true, result: (r.stderr || r.stdout || "").slice(0, 200) }; }
   const text = String(res.result || "").trim();

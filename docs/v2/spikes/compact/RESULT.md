@@ -101,3 +101,23 @@ heldout >= 80% valid-correct. 100 >= 71.65 and heldout 100%: met. With M2 and gu
 
 A manual watchdog (`find /` older than 420 s, SIGKILL) killed 25 model-run `find` processes; no run hung.
 Live spend for round 4: 19.20 USD (cap 40). Raw stream-json: private raw dir `compact-m2/r4-meas`.
+
+## Round 4 review item 1: process-group kill in live runners (D-CR3-WATCHDOG-1)
+
+Non-frozen runners that spawn `claude -p` now use `e2e/live/lib/proc-group.mjs`: `e2e/live/run.mjs`,
+`e2e/live/routing/run.mjs`, `e2e/live/compact/session.mjs`, `bench/live/run.mjs`, `bench/live/ab-quick.mjs`,
+`bench/saving-score.mjs`. A timeout sends SIGKILL to the whole process group, so a grandchild cannot keep the
+stdout pipe open. Test: `tests/v2/e2e/live-runner-group.test.mjs` (red commit 368acb65 first).
+
+Frozen runners are NOT changed: `e2e/live/compact-hard/*` and `bench/m2/*`. They run without the group helper.
+Guard for a frozen run is a manual watchdog. Start it in a second shell while the run is live. It kills
+`find /` processes that run past 420 s (the round 4 limit). Exact command (not run in this batch):
+
+    ps -axo pid=,etime=,command= | awk '/find \/( |$)/ {print $1}' | xargs -r kill -9
+
+Check the list it prints before you kill. The etime column is `[[dd-]hh:]mm:ss`, so filter on age in the shell
+if the run can keep such processes for a long time.
+
+## D3 on the merged head
+
+(filled below by the D3 measurement step)

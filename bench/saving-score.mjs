@@ -19,6 +19,7 @@
 //   gate         node scripts/gate.mjs --milestone M7 --quick exits 0
 // Report only: corpus-total offline saving, median session tokens per arm, cost.
 import { spawn, spawnSync } from "node:child_process";
+import { spawnGroup, watchdog } from "../e2e/live/lib/proc-group.mjs";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
@@ -135,11 +136,10 @@ function session(bin, env, task, arm, run) {
     fs.mkdirSync(PRIV, { recursive: true });
     const outFile = path.join(PRIV, `saving-score-out-${process.pid}-${task.id}-${arm}-${run}.jsonl`);
     const fd = fs.openSync(outFile, "w");
-    const p = spawn(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
+    const p = spawnGroup(bin, ["-p", prompt, "--output-format", "stream-json", "--verbose", "--model", MODEL, "--effort", EFFORT, "--max-budget-usd", BUDGET,
       "--no-session-persistence", "--setting-sources", "project", ...armArgs], { cwd: dir, env, stdio: ["ignore", fd, "ignore"] });
-    const kill = setTimeout(() => p.kill("SIGKILL"), TIMEOUT_MS);
+    watchdog(p, TIMEOUT_MS);
     p.on("close", () => {
-      clearTimeout(kill);
       fs.closeSync(fd);
       const out = fs.readFileSync(outFile, "utf8");
       const { bytes, results, res, calls, ctxCalls } = toolResultBytes(out);
