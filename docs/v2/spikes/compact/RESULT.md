@@ -52,3 +52,20 @@ Notes:
 - Model-run `find /` calls hung sessions again. A watchdog killed 44 such `find` processes after 430 s
   (the runner turn timeout is 420 s and its kill does not reach the grandchild).
 - Spend 23.51 USD of the 30 USD cap. Raw stream-json is in the private raw dir `compact-m2/r3-merge`.
+
+### Round 3 checker re-run (2026-10-24, fresh clone, Claude Code 2.1.303, sonnet-5-5 low, `--budget 1`, `--jobs 9`, v2 arm)
+
+| Build | main (n = 2) | heldout (n = 3) | tokens after (main median) |
+|---|---|---|---|
+| head (v2-design 5a79496d) | 7/24 = 29.2% | not re-run | 54,873 |
+| combined (exp/r3-combined bd4842fc) | 24/24 = 100% | 17/17 valid = 100% (1 of 18 invalid, runner shows 94.4%) | 11,471 |
+
+M2 main, same day, n = 3: head 86.18, combined 60.08. Combined big-json went from 2420 B to 3062 B
+(-26.53%): in two of three runs the model called `ctx_search`, which returned 2194 B. All oracles 3/3.
+One M2 run per build swings 7 to 26 points (round 3: head 78.97, combined 86.56), so a single M2 run cannot
+decide the M2 >= 90 gate.
+
+The combined win holds: the transcripts show the `<context_mode_recall>` block puts the asked log line
+(`@Bash:cat -n logs/server.log#... line 1057: ... FATAL ...`) into the next prompt after compaction. The
+watchdog killed 4 hung model-run `find /` processes. Live spend for the checker: about 9.1 USD.
+Raw stream-json: private raw dir `compact-m2/r3-check/n2`.

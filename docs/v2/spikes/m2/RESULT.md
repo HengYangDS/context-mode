@@ -123,3 +123,13 @@ Spread on head: the checker run on fbd4f781 (n = 2) gave 84.03; this run on 5a79
 and big-json move most. No build reaches 90, so the round 3 pick rule merges nothing. The handle line in
 the replace budget (D-CR3-HANDLE-1) gives about 6 points over head (one run each); the gap left is json-1 (small output, the
 replace is near its raw size).
+
+### Round 3 checker re-run (2026-10-24, fresh clone, Claude Code 2.1.303, sonnet-5-5 low, n = 3)
+
+| Build | score | json-1 | multi-1 | big-tests | big-json | oracles |
+|---|---|---|---|---|---|---|
+| head (v2-design 5a79496d) | 86.18 | 29.08 | 86.7 | 98.73 | 85.66 | all 3/3 |
+| combined (exp/r3-combined bd4842fc) | 60.08 | 30.67 | 89.48 | 99.25 | -26.53 (2420 -> 3062) | all 3/3 |
+
+Combined big-json: two of three v2 runs called `ctx_search` (2194 B per-tool). Round 3 gave head 78.97 and
+combined 86.56; the order of the two builds flips between runs. Neither run reaches 90.
