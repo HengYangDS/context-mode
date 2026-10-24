@@ -100,3 +100,13 @@ and GP-LIVE-ROUTING, D3 and Edit-after-Read are in the section "Live guards" bel
   does not touch; the cases that cover this change (routing, T-GS6) were run alone.
 - Edit-after-Read was not re-run in round 2. The Read path was not changed in round 2 (only the MCP and Grep
   replace, and the shape detector); the round 1 result 3/3 stands.
+
+## Checker re-run (2026-10-24, Claude Code 2.1.303, sonnet-5-5 low, n=2, fresh clone)
+
+- 18e4a6cd main: 92.47 (json-1 801 -> 142, multi-1 6979 -> 474, big-tests 25653 -> 182, big-json 2378.5 -> 197),
+  every oracle 2/2. This matches the 92.5 above.
+- HEAD (fbd4f781, after D-CR2-HANDLE-1) heldout: 97.73 (read-src 96.1, read-csv 97.96, mcp-1 40012 -> 322,
+  http-1 97.29, node-tests-1 0.01, jsonl-1 98.15, grep-1 16976 -> 386), every oracle 2/2.
+- HEAD (fbd4f781) main: 84.03 (json-1 37.33, multi-1 6906 -> 915, big-tests 25653 -> 325, big-json 2428 -> 454),
+  every oracle 2/2. D-CR2-HANDLE-1 adds one handle line (about 250 B) to each replace, outside the replace
+  budget. On the small main outputs this drops main below 90. The 92.5 is true for 18e4a6cd only.
