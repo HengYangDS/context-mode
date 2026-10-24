@@ -587,3 +587,27 @@ test("D-CR3-HANDLE-1: a subagent replacement carries the same handle line", asyn
   assert.ok(last.includes(", source:" + JSON.stringify("s" + Number(src[0].id).toString(36)) + "})"), last);
   assert.ok(last.endsWith("(" + Buffer.byteLength(text) + " B)."), last);
 });
+
+// D-CR3-HANDLE-2: above SYNC_INDEX_MAX_BYTES the source row id is reserved before the detached write, so the
+// handle is the short id too (not the full label) and the selection budget stays above 0.
+test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short id of the stored row, the body keeps chunks", async () => {
+  const { moreLine } = await import("../../../src/core/index/select.ts");
+  const text = bigText(SYNC_INDEX_MAX_BYTES * 2);
+  const p = mainBashPost(text);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  const src = query("SELECT id, label FROM sources WHERE session_id = ?", p.session_id);
+  assert.equal(src.length, 1, "the source row exists when the hook returns");
+  const id = "s" + Number(src[0].id).toString(36);
+  const nl = replaced.lastIndexOf("\n");
+  assert.ok(nl > 0, "a body, then the handle line");
+  const intent = p.tool_input.description;
+  assert.equal(replaced.slice(nl + 1), "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output of " + src[0].label + " (" + Buffer.byteLength(text) + " B).");
+  assert.ok(Buffer.byteLength(replaced.slice(0, nl)) > 0 && replaced.slice(0, nl).includes("needle target"), "the selection budget is not 0");
+  const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
+  assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
+  const chunks = await waitRows("SELECT ord FROM chunks WHERE source_id = ?", [src[0].id], 1);
+  assert.ok(chunks.length > 0, "the detached write stores the chunks under the reserved id");
+  const units = await waitRows("SELECT ord FROM line_units WHERE source_id = ?", [src[0].id], 1);
+  assert.ok(units.length > 0, "the detached write stores the line units under the reserved id");
+});
