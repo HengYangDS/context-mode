@@ -42,7 +42,7 @@ test("D-M7-NG-1: PostToolUse Bash large output in a non-git cwd returns the Bash
   assert.equal(out.stderr, "");
   assert.equal(out.interrupted, false);
   assert.ok(Buffer.byteLength(out.stdout) * 10 < Buffer.byteLength(full), `replaced ${Buffer.byteLength(out.stdout)} bytes`);
-  assert.ok(out.stdout.includes(`#${payload.tool_use_id}`));
+  assert.ok(out.stdout.includes('source:"s'));
   assert.ok(out.stdout.includes("ctx_search("));
   // The output is indexed in this project's DB, under the config dir in HOME.
   const projects = readdirSync(join(home, ".context-mode", "projects"));

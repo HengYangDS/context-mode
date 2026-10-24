@@ -51,7 +51,7 @@ function assertReplaced({ r, home, payload, full }, projectDir) {
   const out = JSON.parse(r.stdout).hookSpecificOutput.updatedToolOutput;
   assert.equal(typeof out, "object");
   assert.ok(Buffer.byteLength(out.stdout) * 10 < Buffer.byteLength(full), `replaced ${Buffer.byteLength(out.stdout)} bytes`);
-  assert.ok(out.stdout.includes(`#${payload.tool_use_id}`));
+  assert.ok(out.stdout.includes('source:"s'));
   const projects = readdirSync(join(home, ".context-mode", "projects"));
   assert.deepEqual(projects, [keyOf(projectDir)]);
 }

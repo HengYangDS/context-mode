@@ -567,7 +567,7 @@ test("D-CR3-HANDLE-1: golden handle line: short id, exact call, full size, insid
   const nl = replaced.lastIndexOf("\n");
   assert.ok(nl > 0, "a body, then the handle line");
   const intent = p.tool_input.description ?? p.tool_input.command;
-  const golden = "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output of " + src[0].label + " (" + Buffer.byteLength(text) + " B).";
+  const golden = "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
   assert.equal(replaced.slice(nl + 1), golden);
   assert.equal(replaced.split("\nctx_search(").length, 2, "one call line, no second more line: " + replaced);
   for (const r of lintPromptText(golden)) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
@@ -602,7 +602,7 @@ test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short i
   const nl = replaced.lastIndexOf("\n");
   assert.ok(nl > 0, "a body, then the handle line");
   const intent = p.tool_input.description;
-  assert.equal(replaced.slice(nl + 1), "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output of " + src[0].label + " (" + Buffer.byteLength(text) + " B).");
+  assert.equal(replaced.slice(nl + 1), "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).");
   assert.ok(Buffer.byteLength(replaced.slice(0, nl)) > 0 && replaced.slice(0, nl).includes("needle target"), "the selection budget is not 0");
   const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
   assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
@@ -631,6 +631,17 @@ test("D-M2-JSON-1: a 200 KB JSON cat returns the rare row whole next to a long h
 });
 
 // D-R4-BUDGET-1: the selection budget never goes below 0, whatever the handle line length.
+// D-R4-BUDGET-1: at selection budget 0 the replace is the handle line alone, with no leading newline.
+test("D-R4-BUDGET-1: end-to-end at budget 0 the replace is the handle line alone, no leading newline", async () => {
+  const text = bigText(40000);
+  const intent = "needle target " + "x".repeat(400);
+  const p = mainBashPost(text, intent);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  assert.ok(replaced.startsWith("ctx_search({"), "no body and no leading newline: " + JSON.stringify(replaced.slice(0, 80)));
+  assert.equal(replaced.split("\nctx_search(").length, 1, "one line only");
+});
+
 test("D-R4-BUDGET-1: replaceBudget is 0 when the handle line is longer than the more line plus REPLACE_RETURN_BYTES", async () => {
   const { replaceBudget } = await import("../../../src/core/hooks/dispatch.ts");
   const more = "ctx_search({queries:[\"a\"], source:\"l\"})";

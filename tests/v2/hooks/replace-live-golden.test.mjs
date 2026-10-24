@@ -45,6 +45,6 @@ test("D-M7-RL-1: real 2.1.303 Bash PostToolUse payload gives a Bash-shaped, much
   assert.equal(typeof out.stdout, "string");
   // Far below the full output, and it names the indexed source so the model can search the rest.
   assert.ok(Buffer.byteLength(out.stdout) * 10 < Buffer.byteLength(full), `replaced ${Buffer.byteLength(out.stdout)} bytes`);
-  assert.ok(out.stdout.includes(`#${payload.tool_use_id}`));
+  assert.ok(out.stdout.includes('source:"s'));
   assert.ok(out.stdout.includes("ctx_search("));
 });
