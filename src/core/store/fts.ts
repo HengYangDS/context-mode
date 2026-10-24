@@ -539,3 +539,42 @@ export function rankTexts(texts: string[], q: string, mode: "all" | "any" = "all
     mem.close();
   }
 }
+
+// D-CR3-HANDLE-1: the short stable id of a stored source: "s" + its sources.id (AUTOINCREMENT, never reused)
+// in base 36. The id is the row key, so it is stored and stable for the life of the row.
+const BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+export const SOURCE_ID_PREFIX = "s";
+const LABEL_SUFFIX_SEP = "#";
+
+export function sourceHandle(id: number): string {
+  return SOURCE_ID_PREFIX + id.toString(36);
+}
+
+// The inverse of sourceHandle, or null. Digit by digit, no regex.
+export function parseSourceHandle(s: string): number | null {
+  if (!s.startsWith(SOURCE_ID_PREFIX) || s.length <= SOURCE_ID_PREFIX.length || s.length > SOURCE_ID_PREFIX.length + 10) return null;
+  let n = 0;
+  for (const ch of s.slice(SOURCE_ID_PREFIX.length)) {
+    const d = BASE36.indexOf(ch);
+    if (d < 0) return null;
+    n = n * 36 + d;
+  }
+  return n > 0 && sourceHandle(n) === s ? n : null;
+}
+
+// D-CR3-HANDLE-1: the label a `source` argument names, in this order: a short id of a stored row, a full
+// label, a label without its "#<call id>" suffix (the newest such source). No match -> the argument as given.
+export function resolveSourceLabel(db: DbHandle, source: string): string {
+  const id = parseSourceHandle(source);
+  if (id !== null) {
+    const row = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id) as { label: string } | undefined;
+    if (row !== undefined) return row.label;
+  }
+  if (stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(source) !== undefined) return source;
+  const prefix = source + LABEL_SUFFIX_SEP;
+  const rows = stmt(db.raw, "SELECT label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix) as Array<{ label: string }>;
+  for (const r of rows) {
+    if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === source.length) return r.label;
+  }
+  return source;
+}

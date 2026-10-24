@@ -29,6 +29,7 @@ import { chunkText } from "../index/chunk.ts";
 import { moreLine, selectChunksInMemory } from "../index/select.ts";
 import { shapeDigest } from "../index/shape.ts";
 import { indexText } from "../index/text.ts";
+import { sourceHandle } from "../store/fts.ts";
 import { appendDetached } from "./detached.ts";
 import { answerDecisions, askOptionLabels, optionEchoDecision, type DecisionPart } from "./decision.ts";
 import { shouldHint } from "./throttle.ts";
@@ -386,9 +387,12 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
   const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES); // D-M7-SV-1: small chunks, line-aligned cuts
+  // D-CR3-HANDLE-1: the sync write gives the row id, so the handle is the short id; the detached write
+  // (F1) never blocks, so its handle is the full label (ctx_search resolves both).
+  let handle = label;
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
     const db = await openDb(project);
-    indexText(db, project, ev.sessionId, label, text, "text", chunks);
+    handle = sourceHandle(indexText(db, project, ev.sessionId, label, text, "text", chunks).sourceId);
   } else {
     indexDetached(project, ev.sessionId, label, text, chunks);
   }
@@ -398,12 +402,15 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   const rankQuery = prompt.trim() === "" ? undefined : intent + " " + prompt;
   // D-M2-SHAPE-1: a parser-found shape (JSON rows, a line log) gives its rare units the query names, whole,
   // within the same budget, plus the handle. No shape or no named rare unit -> the BM25 pick below, unchanged.
-  const digest = shapeDigest(text, rankQuery ?? intent, REPLACE_RETURN_BYTES);
-  // D-CR2-HANDLE-1: the handle line follows the more line, outside the selection budget.
-  const handle = "\n" + REPLACE_HANDLE_LINE(result.bytes, label);
-  if (digest !== null) return { kind: "replace", output: digest + "\n" + moreLine(intent, label) + handle };
-  const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
-  return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more + handle : "") };
+  // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
+  // replace is the 18e4a6cd size bound (REPLACE_RETURN_BYTES of selection + the more line with the full
+  // label); the selection gets that budget minus the handle line, so a replace never grows.
+  const handleLine = "\n" + REPLACE_HANDLE_LINE(intent, handle, result.bytes);
+  const budget = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, label)) - Buffer.byteLength(handleLine);
+  const digest = shapeDigest(text, rankQuery ?? intent, budget);
+  if (digest !== null) return { kind: "replace", output: digest + handleLine };
+  const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
+  return { kind: "replace", output: selected.text + (selected.more !== null ? handleLine : "") };
 }
 
 // D-M2-SHAPE-2: the whole output when the host persisted it to a file; an unreadable file keeps the head.
