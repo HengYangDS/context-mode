@@ -270,7 +270,7 @@ function typoTerms(db: DbHandle, words: string[]): string[] | null {
 
 // impl/02 §9.2 + impl/05 steps 5, 7, 8 (D-M1-T8-2, D-M1-T8-4). Zero hits -> [], never throws for
 // text input.
-export function ftsQuery(
+function rankPage(
   db: DbHandle,
   q: string,
   scope: SearchScope,
@@ -279,7 +279,7 @@ export function ftsQuery(
   limit: number,
   offset: number,
   source?: string,
-): Hit[] {
+): { r: RankRow; s: number; full: number; p: number }[] {
   const terms = searchTerms(q);
   if (terms.length === 0) return [];
   const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
@@ -306,10 +306,47 @@ export function ftsQuery(
     else fused.set(Number(r.rid), { r, s: 1 / (RRF_K + i + 1), full: 0, p: Number.MAX_SAFE_INTEGER });
   });
   const tier = (r: RankRow): number => (r.session_id === sessionId ? 2 : 0) + (r.worktree === ctx.worktree ? 1 : 0);
-  const page = [...fused.values()]
+  return [...fused.values()]
     .sort((a, b) => tier(b.r) - tier(a.r) || b.full - a.full || b.s - a.s || a.p - b.p ||
       Number(b.r.source_id) - Number(a.r.source_id) || Number(a.r.ord) - Number(b.r.ord))
     .slice(offset, offset + limit);
+}
+
+/** D-CMP-PUSH-1: the ranked page of ftsQuery without snippets: chunk rowid, source, ord, fused score. */
+export interface RankedChunk { rid: number; sourceId: number; ord: number; score: number; }
+
+export function ftsRank(db: DbHandle, q: string, scope: SearchScope, ctx: ProjectContext, sessionId: string, limit: number): RankedChunk[] {
+  return rankPage(db, q, scope, ctx, sessionId, limit, 0).map((e) => ({
+    rid: Number(e.r.rid), sourceId: Number(e.r.source_id), ord: Number(e.r.ord), score: e.s,
+  }));
+}
+
+/** D-CMP-PUSH-1: chunks with rowid in [lo, hi] of one source, ord ascending (rowid range scan, no MATCH). */
+export function chunkRange(db: DbHandle, sourceId: number, lo: number, hi: number): { rid: number; ord: number; body: string }[] {
+  const rows = stmt(db.raw, "SELECT rowid AS rid, source_id AS source_id, ord AS ord, body AS body FROM chunks WHERE rowid BETWEEN ? AND ?")
+    .all(lo, hi) as unknown as { rid: number; source_id: number; ord: number; body: string }[];
+  return rows.filter((r) => Number(r.source_id) === sourceId)
+    .map((r) => ({ rid: Number(r.rid), ord: Number(r.ord), body: r.body }))
+    .sort((a, b) => a.ord - b.ord);
+}
+
+/** Source label by id ("" when the source is gone). */
+export function sourceLabel(db: DbHandle, sourceId: number): string {
+  const r = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(sourceId) as { label: string } | undefined;
+  return r === undefined ? "" : r.label;
+}
+
+export function ftsQuery(
+  db: DbHandle,
+  q: string,
+  scope: SearchScope,
+  ctx: ProjectContext,
+  sessionId: string,
+  limit: number,
+  offset: number,
+  source?: string,
+): Hit[] {
+  const page = rankPage(db, q, scope, ctx, sessionId, limit, offset, source);
   if (page.length === 0) return [];
   const rows = new Map<number, PageRow>();
   for (const r of stmt(db.raw, PAGE_ROWS).all({ ids: JSON.stringify(page.map((e) => Number(e.r.rid))) }) as unknown as PageRow[]) {

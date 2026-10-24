@@ -256,6 +256,17 @@ export const RECALL_SEEN_META_PREFIX = "recall_seen:"; // meta key + session id:
 export const RECALL_OPEN_TAG = "<context_mode_recall>";
 export const RECALL_CLOSE_TAG = "</context_mode_recall>";
 export const RECALL_KEY = "recall"; // (B) onceKey of the recall hint (the seen list, not a marker, stops repeats)
+// D-CMP-PUSH-1 query-driven push: first UserPromptSubmit after a compaction (src/core/compaction/push.ts).
+export const PUSH_META_PREFIX = "push_pending:"; // meta key + session id: set at compaction, taken once at the next prompt
+export const PUSH_HITS = 100; // ftsRank page read per push (session scope)
+export const PUSH_BUDGET_BYTES = 3072; // whole push block, wrapper included (about 1k tokens; guard is 2k per compaction)
+export const PUSH_BLOCK_BYTES = 640; // an indent block goes in whole or not at all
+export const PUSH_MAX_ANCESTORS = 8; // indent ancestors per hit line
+export const PUSH_LAMBDA = 0.7; // MMR relevance weight
+export const PUSH_MIN_REL = 0.3; // items under this share of the top relevance are never picked
+export const PUSH_OPEN_TAG = "<context_mode_push>";
+export const PUSH_CLOSE_TAG = "</context_mode_push>";
+export const PUSH_KEY = "push";
 // §4.3 step 3 text; {prefix} is row.toolNamePrefix so it names the platform tool (GP6/hint-names-platform-tool, D-M3-H2-2).
 export const RESUME_HINT = "This session may have run before. Call {prefix}ctx_resume for a summary of what happened.";
 export const SUBAGENT_SOURCE_PREFIX = "subagent:"; // §4.6 step 5 source label: + canonical name + ":" + turn
