@@ -25,20 +25,22 @@ const SHAPE_CATEGORICAL_MAX = 8; // a key or position with at most this many dis
 const SHAPE_DOMINANT = 0.9; // the common value of a skewed key or position holds 90% of the rows
 const SHAPE_SIMILARITY = 0.5; // Drain similarity threshold
 const SHAPE_MAX_CLUSTERS = 64; // more templates than this: free text or code, not a log
+const SHAPE_EXTREME_KEYS = 2; // D-M2-JSON-2: a query that names more numeric keys than this is not asking for one extreme
 const SHAPE_COMMON_MAX = 4; // more common templates than this: not a uniform log
 const SEP = "\n";
 const ABSENT = "(absent)";
 
 interface Unit { pos: number; rank: string; render: (budget: number) => string | null }
-interface Shape { header: string; units: Unit[] }
+// direct (D-M2-JSON-2): the units were chosen by a statistic over the rows, not by the query; every one is kept.
+interface Shape { header: string; units: Unit[]; direct?: boolean }
 
 const bytes = (s: string): number => Buffer.byteLength(s, "utf8");
 
 /** The digest of `text` within `budget` bytes, or null when no shape or no rare unit the query names. */
 export function shapeDigest(text: string, query: string, budget: number): string | null {
-  const shape = jsonShape(text, query) ?? lineShape(text);
+  const shape = jsonShape(text, query) ?? jsonExtremes(text, query) ?? lineShape(text);
   if (shape === null || query.trim() === "") return null;
-  const scores = rankTexts(shape.units.map((u) => u.rank), query, "any");
+  const scores = shape.direct === true ? shape.units.map(() => 1) : rankTexts(shape.units.map((u) => u.rank), query, "any");
   const order = shape.units.map((_, i) => i).filter((i) => scores[i] > 0).sort((a, b) => scores[b] - scores[a] || shape.units[a].pos - shape.units[b].pos);
   const picked: Array<{ pos: number; text: string }> = [];
   let used = 0;
@@ -86,7 +88,8 @@ function rareOfSkewed(n: number, counts: Map<string, number[]>, totals: Map<stri
   return oneOff.flatMap(([v]) => counts.get(v) ?? []);
 }
 
-export function jsonShape(text: string, query: string): Shape | null {
+/** The rows of a JSON array of SHAPE_MIN_ROWS+ objects, with every key in first-seen order; else null. */
+export function jsonRows(text: string): { objs: Record<string, unknown>[]; keys: string[] } | null {
   if (firstNonSpace(text) !== "[") return null;
   let rows: unknown;
   try {
@@ -99,6 +102,15 @@ export function jsonShape(text: string, query: string): Shape | null {
   const keys: string[] = [];
   const seen = new Set<string>();
   for (const o of objs) for (const k of Object.keys(o)) if (!seen.has(k)) { seen.add(k); keys.push(k); }
+  return { objs, keys };
+}
+
+const schemaOf = (n: number, keys: string[]): string => n + " objects {" + keys.join(",") + "}";
+
+export function jsonShape(text: string, query: string): Shape | null {
+  const parsedRows = jsonRows(text);
+  if (parsedRows === null) return null;
+  const { objs, keys } = parsedRows;
   const outliers = new Map<number, string[]>(); // row index -> skewed keys it breaks
   for (const k of keys) {
     const counts = new Map<string, number[]>();
@@ -127,19 +139,25 @@ export function jsonShape(text: string, query: string): Shape | null {
     rank: JSON.stringify(objs[i]),
     render: (budget: number) => renderRow(i, objs[i], skewed, named, budget),
   }));
-  return { header: objs.length + " objects, " + outliers.size + " rare:", units };
+  return { header: schemaOf(objs.length, keys) + ", " + outliers.size + " rare:", units };
 }
 
 function renderRow(i: number, row: Record<string, unknown>, skewed: string[], named: Set<string>, budget: number): string | null {
   const prefix = "[" + i + "] ";
-  const whole = prefix + JSON.stringify(row);
+  const body = fitRow(row, skewed, named, budget - bytes(prefix));
+  return body === null ? null : prefix + body;
+}
+
+/** One row as JSON within `budget` bytes: whole, else whole fields (skewed keys, keys the query names, scalars). */
+export function fitRow(row: Record<string, unknown>, skewed: string[], named: Set<string>, budget: number): string | null {
+  const whole = JSON.stringify(row);
   if (bytes(whole) <= budget) return whole;
   const own = Object.keys(row);
   const tier = (k: string): number => (skewed.includes(k) ? 0 : named.has(k) ? 1 : typeof row[k] !== "object" || row[k] === null ? 2 : 3);
   const order = [...own].sort((a, b) => tier(a) - tier(b) || own.indexOf(a) - own.indexOf(b));
   const field = (k: string): string => JSON.stringify(k) + ":" + JSON.stringify(row[k]);
   const chosen = new Set<string>();
-  let used = bytes(prefix) + 2; // "{" + "}"
+  let used = 2; // "{" + "}"
   for (const k of order) {
     const cost = bytes(field(k)) + (chosen.size > 0 ? 1 : 0);
     if (used + cost > budget) continue;
@@ -147,7 +165,45 @@ function renderRow(i: number, row: Record<string, unknown>, skewed: string[], na
     used += cost;
   }
   if (!skewed.every((k) => chosen.has(k))) return null; // the field that makes the row rare must show
-  return prefix + "{" + own.filter((k) => chosen.has(k)).map(field).join(",") + "}";
+  return "{" + own.filter((k) => chosen.has(k)).map(field).join(",") + "}";
+}
+
+/** Keys of `keys` the query names (BM25, any word). */
+export function namedKeys(keys: string[], query: string): Set<string> {
+  const score = rankTexts(keys, query, "any");
+  return new Set(keys.filter((_, i) => score[i] > 0));
+}
+
+// D-M2-JSON-2: no skewed key, but the query names a key whose value is a number in every row ("the highest
+// score"): the rows at its extremes (largest and smallest), whole. The statistic is the order of the values;
+// the query only names the key. Up to SHAPE_EXTREME_KEYS named keys; a constant key has no extremes.
+export function jsonExtremes(text: string, query: string): Shape | null {
+  const parsedRows = jsonRows(text);
+  if (parsedRows === null) return null;
+  const { objs, keys } = parsedRows;
+  const named = namedKeys(keys, query);
+  const picks = new Map<number, string>();
+  let used = 0;
+  for (const k of keys) {
+    if (!named.has(k) || used >= SHAPE_EXTREME_KEYS) continue;
+    if (!objs.every((o) => typeof o[k] === "number" && Number.isFinite(o[k] as number))) continue;
+    let hi = 0, lo = 0;
+    for (let i = 1; i < objs.length; i++) {
+      if ((objs[i][k] as number) > (objs[hi][k] as number)) hi = i;
+      if ((objs[i][k] as number) < (objs[lo][k] as number)) lo = i;
+    }
+    if (hi === lo) continue;
+    used++;
+    picks.set(hi, k);
+    picks.set(lo, k);
+  }
+  if (picks.size === 0) return null;
+  const units: Unit[] = [...picks.entries()].map(([i, k]) => ({
+    pos: i,
+    rank: "",
+    render: (budget: number) => renderRow(i, objs[i], [k], named, budget),
+  }));
+  return { header: schemaOf(objs.length, keys) + ", extremes of " + [...new Set(picks.values())].join(",") + ":", units, direct: true };
 }
 
 // ---------- lines (Drain-style) ----------
