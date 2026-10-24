@@ -274,3 +274,40 @@ test("D-CR3-HANDLE-1: ctx_search source accepts the short id, the full label and
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// D-CR3-HANDLE-3: a source argument of the form s<base36> is an id only when that id row exists in this
+// project's store; otherwise it is a label (exact, then without "#" suffix), so a label like "s9z" still works.
+test("D-CR3-HANDLE-3: short-id collision guard: s<base36> with no such row falls through to labels", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-se-c-"));
+  try {
+    const { openDb, closeDb } = await import("../../../src/core/store/db.ts");
+    const { indexText } = await import("../../../src/core/index/text.ts");
+    const { resolveSourceLabel, sourceHandle, parseSourceHandle } = await import("../../../src/core/store/fts.ts");
+    const c = ctxFor(root);
+    const db = await openDb(c.project);
+    const a = indexText(db, c.project, "s1", "Bash:cat a.json#toolu_a", "alpha region eu-west-3", "text").sourceId;
+    indexText(db, c.project, "s1", "s9z", "zulu region ap-south-1", "text");
+    indexText(db, c.project, "s1", "szz#toolu_b", "yankee region sa-east-1", "text");
+    assert.equal(parseSourceHandle("s9z"), 359, "s9z parses as an id");
+    assert.equal(resolveSourceLabel(db, sourceHandle(a)), "Bash:cat a.json#toolu_a", "an existing id row wins");
+    assert.equal(resolveSourceLabel(db, "s9z"), "s9z", "no row 359: the exact label");
+    assert.equal(resolveSourceLabel(db, "szz"), "szz#toolu_b", "no row: the label without its # suffix");
+    assert.equal(resolveSourceLabel(db, "s7y"), "s7y", "no row, no label: the argument as given");
+    closeDb(db);
+    const out = await ctxSearch.handler({ queries: ["region"], source: "s9z" }, c);
+    assert.ok(out.text.includes("ap-south-1") && !out.text.includes("eu-west-3"), out.text);
+    const other = mkdtempSync(join(tmpdir(), "cm-se-c2-"));
+    try {
+      const c2 = ctxFor(other);
+      const db2 = await openDb(c2.project);
+      indexText(db2, c2.project, "s1", "Bash:cat b.json#toolu_c", "bravo", "text");
+      closeDb(db2);
+      const miss = await ctxSearch.handler({ queries: ["region"], source: sourceHandle(a + 5) }, c);
+      assert.ok(miss.text.includes("across 0 source(s)"), "an id with no row in this project finds nothing: " + miss.text);
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
