@@ -118,7 +118,7 @@ export function jsonShape(text: string, query: string): Shape | null {
     rank: JSON.stringify(objs[i]),
     render: (budget: number) => renderRow(i, objs[i], skewed, named, budget),
   }));
-  return { header: objs.length + " objects, rare rows:", units };
+  return { header: objs.length + " objects, " + outliers.size + " rare:", units };
 }
 
 function renderRow(i: number, row: Record<string, unknown>, skewed: string[], named: Set<string>, budget: number): string | null {
@@ -196,7 +196,8 @@ export function lineShape(text: string): Shape | null {
   const rare = new Set(clusters.filter((c) => c.count <= SHAPE_RARE_MAX).flatMap((c) => c.lines));
   for (const c of common) for (const p of c.pos) if (p !== null) for (const n of rareOfSkewed(c.count, p.counts, p.totals)) rare.add(n);
   if (rare.size === 0 || rare.size > SHAPE_RARE_UNITS_MAX) return null;
-  const header = all.length + " lines, " + common.map((c) => c.count + "x " + JSON.stringify(c.tpl.join(" "))).join(", ") + "; rare:";
+  // Counts only: the templates stay in the index (the more line reaches them); the budget goes to rare lines.
+  const header = all.length + " lines, " + rare.size + " rare:";
   const units: Unit[] = [...rare].sort((a, b) => a - b).map((n) => {
     const line = n + 1 + ": " + all[n];
     return { pos: n, rank: all[n], render: (budget: number) => (bytes(line) <= budget ? line : null) };
