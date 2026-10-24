@@ -176,3 +176,25 @@ function fakeProjectUnderConfig(configDir, projectKey) {
     source: "env:CLAUDE_PROJECT_DIR",
   };
 }
+
+// D-R4-RETENTION-1: the size cap counts the line units' bytes too, not only sources.bytes_total.
+test("D-R4-RETENTION-1: RETENTION_SIZE_CAP_BYTES counts line_units bytes: a source with big units is deleted", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-cleanup-units-"));
+  try {
+    const project = fakeProject(root, "d".repeat(16));
+    const db = await openDb(project);
+    const now = Date.now();
+    insertSource(db, { session_id: "s1", bytes_total: 1000, accessed_ts: now - 1000 });
+    const srcId = db.raw.prepare("SELECT id FROM sources").get().id;
+    const big = "x".repeat(C.RETENTION_SIZE_CAP_BYTES + 10);
+    db.raw.prepare("INSERT INTO line_units(body, source_id, session_id, ord) VALUES (?, ?, 's1', 0)").run(big, srcId);
+    insertSource(db, { session_id: "s1", bytes_total: 1000, accessed_ts: now });
+    const result = cleanupProject(db, join(root, "cm-config"));
+    assert.ok(result.deletedSources >= 1, "the cap is exceeded by the units, so a source is deleted");
+    const units = db.raw.prepare("SELECT COUNT(*) AS n FROM line_units WHERE source_id = ?").get(srcId).n;
+    assert.equal(units, 0, "the deleted source's line units are gone too");
+    closeDb(db);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
