@@ -7,10 +7,10 @@
   },
   "shas": {
     "v1": "90af14e34bf35120c3310f7a75f54fa99d2cabba",
-    "v2": "d5c1302c559618850313bb9c7a4de72364001039"
+    "v2": "0a4a77de59a4c095702a81a4b1c1b6a9f9824eeb"
   },
   "v1_source": "v1 numbers measured today by running v1 own scripts (npx tsx tests/ecosystem-benchmark.ts and npx tsx tests/live-benchmark.ts) on a clean checkout of origin/main. run.mjs reads this file; it does not install v1.",
-  "run_ms": 2267,
+  "run_ms": 2159,
   "totals": {
     "part1": {
       "raw_bytes": 322419,
@@ -37,8 +37,8 @@
       "v2_tool_context_bytes": 277,
       "v2_hook_context_bytes": 215,
       "v2_hook_replaced": true,
-      "v2_ms": 58,
-      "v2_hook_ms": 45,
+      "v2_ms": 57,
+      "v2_hook_ms": 44,
       "code_blocks": null,
       "error": null
     },
@@ -53,8 +53,8 @@
       "v2_tool_context_bytes": 265,
       "v2_hook_context_bytes": 217,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
-      "v2_hook_ms": 44,
+      "v2_ms": 43,
+      "v2_hook_ms": 43,
       "code_blocks": null,
       "error": null
     },
@@ -69,8 +69,8 @@
       "v2_tool_context_bytes": 202,
       "v2_hook_context_bytes": 222,
       "v2_hook_replaced": true,
-      "v2_ms": 45,
-      "v2_hook_ms": 45,
+      "v2_ms": 43,
+      "v2_hook_ms": 43,
       "code_blocks": null,
       "error": null
     },
@@ -85,8 +85,8 @@
       "v2_tool_context_bytes": 315,
       "v2_hook_context_bytes": 218,
       "v2_hook_replaced": true,
-      "v2_ms": 47,
-      "v2_hook_ms": 65,
+      "v2_ms": 43,
+      "v2_hook_ms": 64,
       "code_blocks": null,
       "error": null
     },
@@ -101,8 +101,8 @@
       "v2_tool_context_bytes": 365,
       "v2_hook_context_bytes": 400,
       "v2_hook_replaced": false,
-      "v2_ms": 49,
-      "v2_hook_ms": 39,
+      "v2_ms": 46,
+      "v2_hook_ms": 37,
       "code_blocks": null,
       "error": null
     },
@@ -118,7 +118,7 @@
       "v2_hook_context_bytes": 182,
       "v2_hook_replaced": true,
       "v2_ms": 44,
-      "v2_hook_ms": 47,
+      "v2_hook_ms": 48,
       "code_blocks": null,
       "error": null
     },
@@ -133,8 +133,8 @@
       "v2_tool_context_bytes": 1156,
       "v2_hook_context_bytes": 175,
       "v2_hook_replaced": true,
-      "v2_ms": 45,
-      "v2_hook_ms": 83,
+      "v2_ms": 44,
+      "v2_hook_ms": 84,
       "code_blocks": null,
       "error": null
     },
@@ -149,7 +149,7 @@
       "v2_tool_context_bytes": 353,
       "v2_hook_context_bytes": 199,
       "v2_hook_replaced": true,
-      "v2_ms": 45,
+      "v2_ms": 42,
       "v2_hook_ms": 44,
       "code_blocks": null,
       "error": null
@@ -165,7 +165,7 @@
       "v2_tool_context_bytes": 363,
       "v2_hook_context_bytes": 199,
       "v2_hook_replaced": true,
-      "v2_ms": 47,
+      "v2_ms": 42,
       "v2_hook_ms": 43,
       "code_blocks": null,
       "error": null
@@ -181,8 +181,8 @@
       "v2_tool_context_bytes": 421,
       "v2_hook_context_bytes": 202,
       "v2_hook_replaced": true,
-      "v2_ms": 43,
-      "v2_hook_ms": 48,
+      "v2_ms": 41,
+      "v2_hook_ms": 49,
       "code_blocks": null,
       "error": null
     },
@@ -197,7 +197,7 @@
       "v2_tool_context_bytes": 758,
       "v2_hook_context_bytes": 191,
       "v2_hook_replaced": true,
-      "v2_ms": 44,
+      "v2_ms": 42,
       "v2_hook_ms": 46,
       "code_blocks": null,
       "error": null
@@ -245,7 +245,7 @@
       "v2_tool_context_bytes": 238,
       "v2_hook_context_bytes": 197,
       "v2_hook_replaced": true,
-      "v2_ms": 33,
+      "v2_ms": 30,
       "v2_hook_ms": 67,
       "code_blocks": null,
       "error": null
@@ -265,8 +265,8 @@
       "v2_tool_context_bytes": 4218,
       "v2_hook_context_bytes": 3988,
       "v2_hook_replaced": false,
-      "v2_ms": 17,
-      "v2_hook_ms": 37,
+      "v2_ms": 16,
+      "v2_hook_ms": 38,
       "queries_with_hits": {
         "v2": 1,
         "v1": null,
@@ -296,8 +296,8 @@
       "v2_tool_context_bytes": 6407,
       "v2_hook_context_bytes": 215,
       "v2_hook_replaced": true,
-      "v2_ms": 15,
-      "v2_hook_ms": 45,
+      "v2_ms": 10,
+      "v2_hook_ms": 44,
       "queries_with_hits": {
         "v2": 2,
         "v1": null,
@@ -328,7 +328,7 @@
       "v2_hook_context_bytes": 217,
       "v2_hook_replaced": true,
       "v2_ms": 11,
-      "v2_hook_ms": 45,
+      "v2_hook_ms": 42,
       "queries_with_hits": {
         "v2": 1,
         "v1": null,
@@ -357,7 +357,7 @@
       "v2_tool_context_bytes": 4273,
       "v2_hook_context_bytes": 222,
       "v2_hook_replaced": true,
-      "v2_ms": 10,
+      "v2_ms": 9,
       "v2_hook_ms": 44,
       "queries_with_hits": {
         "v2": 1,
@@ -388,7 +388,7 @@
       "v2_tool_context_bytes": 11570,
       "v2_hook_context_bytes": 212,
       "v2_hook_replaced": true,
-      "v2_ms": 19,
+      "v2_ms": 18,
       "v2_hook_ms": 49,
       "queries_with_hits": {
         "v2": 3,
@@ -419,8 +419,8 @@
       "v2_tool_context_bytes": 15919,
       "v2_hook_context_bytes": 211,
       "v2_hook_replaced": true,
-      "v2_ms": 17,
-      "v2_hook_ms": 55,
+      "v2_ms": 16,
+      "v2_hook_ms": 54,
       "queries_with_hits": {
         "v2": 3,
         "v1": null,
