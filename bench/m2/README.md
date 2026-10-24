@@ -22,6 +22,10 @@ Live: real `claude` binary, model claude-sonnet-5-5, effort low, n=3 per arm, `-
 fresh `CLAUDE_CONFIG_DIR` and `HOME` per session with only the login credential copied (no API key, ADR-0012).
 `--keep <dir>` keeps the raw transcripts (keep them outside the repo).
 
+## Round 2 (v2-design at 18e4a6cd)
+
+main 92.5, heldout 97.44 (sonnet-5-5, n=3); mcp-1 40012->177, grep-1 16890->297; node-tests-1 stays 0 (PostToolUseFailure). See `docs/v2/spikes/m2/RESULT.md`.
+
 ## Baseline (v2-design at f0e4ca00, Claude Code 2.1.303)
 
 | Set | Score | Per workload (off bytes -> v2 bytes, saving %) |

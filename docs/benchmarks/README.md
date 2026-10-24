@@ -83,6 +83,8 @@ Reproduce: `node bench/saving-score.mjs`. Cost: not recorded.
 
 Re-measure on `980272a5`, 2026-10-21, 3 runs: M1 94.21 in all; M2 89.32, 85.83, 87.23 (median 87.23). Target 90: M1 met, M2 not met. `guardsOk` was false in all 3 runs because the gate layer `check-removed` failed.
 
+M2 eval round 2 (`bench/m2/eval.mjs`, v2-design 18e4a6cd, 2026-10-24, claude-sonnet-5-5 low, n=3): main 92.5 (was 87.6), heldout 97.44 (was 96.52); claude-opus-5-5 main 92.53. See `docs/v2/spikes/m2/RESULT.md`.
+
 Re-measure on `c3275a1e` (v2-design), 2026-10-21, 3 runs, lock OK (score files match `bench/saving-score.lock`), `guardsOk` true in all 3: M1 94.26 in all; M2 87.53, 88.02, 88.25 (median 88.02); smallTok 38157.5, 38201.5, 38187.5. Per task (run 1 / 2 / 3): json-1 83.94 / 82.84 / 76.15; multi-1 91.12 / 91.77 / 92.03; big-tests 99.23 in all; big-json 77.93 / 84.27 / 84.48. Target 90: M1 met, M2 not met (88.02). Earlier levers on the same score: `text` M2 85.25 (3 runs, 78.28 to 86), `trigger` M2 85.96; neither merged.
 
 ## 4. Offline replay, before and after
