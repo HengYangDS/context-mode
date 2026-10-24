@@ -34,7 +34,8 @@ function drop(dir) {
   fs.rmSync(path.join(os.homedir(), ".context-mode", "projects", key), { recursive: true, force: true });
   fs.rmSync(dir, { recursive: true, force: true });
 }
-const readDeniedOf = (calls) => calls.some((x) => x.name === "Read" && x.text.includes("16384 byte limit"));
+// D-DU-DENY-1: the old Read deny text named "16384 byte limit"; the new one says "over the one-read limit".
+const readDeniedOf = (calls) => calls.some((x) => x.name === "Read" && (x.text.includes("over the one-read limit") || x.text.includes("16384 byte limit")));
 function score(t, p) {
   const calls = p.calls.map((c) => ({ name: c.name, bytes: c.bytes }));
   const correct = p.final.includes(t.answer);
