@@ -3,7 +3,7 @@
 // is a word char, so every other code point separates words, as the old /[^\p{L}\p{N}_]+/u split did.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isWordChar, wordTokens } from "../../../src/core/store/words.ts";
+import { blankTokens, isWordChar, wordTokens } from "../../../src/core/store/words.ts";
 
 test("ASCII: lowercase words split on punctuation and spaces; _ joins", () => {
   assert.deepEqual(wordTokens("hello, world! foo-bar_baz 42".toLowerCase()), ["hello", "world", "foo", "bar_baz", "42"]);
@@ -49,4 +49,11 @@ test("isWordChar matches /[\\p{L}\\p{N}_]/u on every code point", () => {
     const ch = String.fromCodePoint(cp);
     assert.equal(isWordChar(cp), re.test(ch), "code point U+" + cp.toString(16));
   }
+});
+
+test("blankTokens splits on NUL and whitespace only; punctuation stays inside a token", () => {
+  assert.deepEqual(blankTokens("foo.bar, baz"), ["foo.bar,", "baz"]);
+  assert.deepEqual(blankTokens("a\u0000b　c﻿d"), ["a", "b", "c", "d"]);
+  assert.deepEqual(blankTokens("ışİğ  snake_case"), ["ışİğ", "snake_case"]);
+  assert.deepEqual(blankTokens(" \t\n "), []);
 });
