@@ -16,10 +16,20 @@ const CLOSE_TIMEOUT_MS = 2000;
  * @param {string[]} [args] - argv after the bundle path, e.g. ["--agent", "vscode"] (DEVIATIONS D-M1-F1-1)
  * @returns {{request:Function, notify:Function, close:Function, kill:Function}}
  */
+// D-CR2-SID-2: the server reads the host session id from CLAUDE_CODE_SESSION_ID (D-CR2-SID-1). A case
+// run from inside a Claude Code session inherits that session's id; it is not the id of the host the case
+// models, so it is dropped. A case that sets its own value keeps it.
+const HOST_SESSION_VARS = ["CLAUDE_CODE_SESSION_ID"];
+function childEnv(env) {
+  const out = { ...(env ?? process.env) };
+  for (const k of HOST_SESSION_VARS) if (out[k] !== undefined && out[k] === process.env[k]) delete out[k];
+  return out;
+}
+
 export function spawnBundle(bundlePath, env, args = []) {
   const child = spawn(process.execPath, [bundlePath, ...args], {
     stdio: ["pipe", "pipe", "pipe"],
-    env: env ?? process.env,
+    env: childEnv(env),
   });
 
   let buf = "";
