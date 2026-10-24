@@ -18,6 +18,8 @@ export const SYNC_INDEX_MAX_BYTES = 65536; // DECISIONS-r9 F1
 // whole BM25-selected chunks of at most REPLACE_CHUNK_BYTES each, within REPLACE_RETURN_BYTES, plus the more line.
 export const REPLACE_TRIGGER_BYTES = 4096;
 export const REPLACE_RETURN_BYTES = 96; // D-M7-SV-3: was 512 (D-M7-SV-2), 1024 before; sweeps in DEVIATIONS
+// D-M2-JSON-1: a parser-found shape digest (schema, counts, whole rows) has its own budget, independent of the handle line.
+export const SHAPE_RETURN_BYTES = 256;
 export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks fit in the return budget
 // D-CR3-HANDLE-1: the last line of every replacement (it replaces the more line and the D-CR2-HANDLE-1 line).
 // One short line: the exact call over the stored source by its short id, then the full size.
