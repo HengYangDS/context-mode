@@ -13,7 +13,7 @@ import {
   SUBAGENT_RUN_DENY,
 } from "../contracts/constants.ts";
 import type {
-  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall, ToolResultInfo,
+  AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, SourceRow, ToolCall, ToolResultInfo,
 } from "../contracts/types.ts";
 import { getAdapter, hasRecall, hasReplace } from "../../adapters/table.ts";
 import { decide } from "../policy/decide.ts";
@@ -23,7 +23,7 @@ import { resolveProject } from "../project/resolve.ts";
 import { metaGet, metaSet, metaTake, openDb } from "../store/db.ts";
 import { appendEvent, canonicalKey } from "../journal/append.ts";
 import { hasAgentRows, hasSessionRows, readFirstPrompt, readLastPrompt, readRecallRows, readSessionEvents } from "../journal/read.ts";
-import { insertUnits, queryUnits, sourceHandle } from "../store/fts.ts";
+import { insertChunks, insertUnits, queryUnits, reserveSource, sourceHandle } from "../store/fts.ts";
 import { buildUnits } from "../index/units.ts";
 import { renderState } from "../compaction/render.ts";
 import { pickRecall } from "../compaction/recall.ts";
@@ -404,17 +404,19 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // One chunk pass for both forms (D-M7-FT-2): the stored chunks and the selected chunks are the same
   // array, so the in-memory selection equals selectChunks over the stored source without reading it back.
   const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES); // D-M7-SV-1: small chunks, line-aligned cuts
-  // D-CR3-HANDLE-1: the sync write gives the row id, so the handle is the short id; the detached write
-  // (F1) never blocks, so its handle is the full label (ctx_search resolves both).
-  let handle = label;
+  // D-CR3-HANDLE-1: the handle is the short id of the stored row. Up to SYNC_INDEX_MAX_BYTES the whole write
+  // is sync; above it (F1) only the source row is written now (one small row, D-CR3-HANDLE-2) and the
+  // chunks and line units follow detached under that id, so the handle never falls back to the long label.
+  const db = await openDb(project);
+  let sourceId: number;
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
-    const db = await openDb(project);
-    const { sourceId } = indexText(db, project, ev.sessionId, label, text, "text", chunks);
+    sourceId = indexText(db, project, ev.sessionId, label, text, "text", chunks).sourceId;
     insertUnits(db, sourceId, ev.sessionId, buildUnits(text)); // r3-ledger
-    handle = sourceHandle(sourceId);
   } else {
-    indexDetached(project, ev.sessionId, label, text, chunks);
+    sourceId = reserveSource(db, sourceRowOf(project, ev.sessionId, label), chunks);
+    indexDetached(project, ev.sessionId, sourceId, label, text, chunks);
   }
+  const handle = sourceHandle(sourceId);
   // D-M7-SV-5: rank by the intent and the session's last user prompt (any word), so a bare cat still
   // returns the line the user asked for. The more line keeps the intent. No prompt -> intent alone.
   const prompt = await lastPrompt(project, ev.sessionId);
@@ -461,16 +463,22 @@ function mainLabel(tool: ToolCall, ev: CanonicalHookEvent): string {
   return head + "#" + (tool.callId ?? String(ev.turn ?? 0));
 }
 
-// F1: above SYNC_INDEX_MAX_BYTES the FTS5 write never blocks the decision; same rules as appendDetached.
-function indexDetached(project: ProjectContext, sessionId: string, label: string, text: string, chunks: Chunk[]): void {
+// F1: above SYNC_INDEX_MAX_BYTES the FTS5 chunk write never blocks the decision; same rules as appendDetached.
+// The source row is already reserved (D-CR3-HANDLE-2); chunks and line units land under its id.
+function indexDetached(project: ProjectContext, sessionId: string, sourceId: number, label: string, text: string, chunks: Chunk[]): void {
   void openDb(project)
     .then((db) => {
-      const { sourceId } = indexText(db, project, sessionId, label, text, "text", chunks);
+      insertChunks(db, sourceId, sourceRowOf(project, sessionId, label), chunks);
       insertUnits(db, sourceId, sessionId, buildUnits(text)); // r3-ledger
     })
     .catch((err: unknown) => {
       process.stderr.write("hooks: index write failed: " + message(err) + "\n");
     });
+}
+
+// The source row fields indexText stores for a hook output (kind "content").
+function sourceRowOf(project: ProjectContext, sessionId: string, label: string): Omit<SourceRow, "id"> {
+  return { projectKey: project.projectKey, sessionId, worktree: project.worktree, agent: project.agent, kind: "content", label, bytes: 0, chunkCount: 0, createdAt: Date.now() };
 }
 
 // ---------- §4.7 PreCompact ----------

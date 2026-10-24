@@ -79,8 +79,37 @@ export const TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title
 // most INDEX_WRITE_CHUNK bytes of chunk text (ADR-0002 decision 2). The source row rides the first
 // batch; its new id is returned.
 export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chunk[]): number {
+  const id = reserveSource(db, src, chunks);
+  insertChunks(db, id, src, chunks);
+  return id;
+}
+
+/**
+ * D-CR3-HANDLE-2: write the source row alone (one small transaction) and return its id, so a caller can name
+ * the source by its short id before the chunks are written (the detached F1 path). bytes_total and
+ * chunk_count come from `chunks`, as ftsInsert stores them.
+ */
+export function reserveSource(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chunk[]): number {
   let total = 0;
   for (const c of chunks) total += c.bytes;
+  return withWrite(db, (h) => {
+    const row = h.raw.prepare(INSERT_SOURCE).get({
+      session_id: src.sessionId,
+      worktree: src.worktree,
+      agent: src.agent,
+      kind: src.kind,
+      label: src.label,
+      bytes_total: total,
+      chunk_count: chunks.length,
+      created_ts: src.createdAt,
+      created_at: new Date(src.createdAt).toISOString(),
+    }) as { id: number };
+    return Number(row.id);
+  });
+}
+
+/** The chunks of a reserved source, batched at INDEX_WRITE_CHUNK bytes per withWrite (porter + trigram). */
+export function insertChunks(db: DbHandle, id: number, src: Omit<SourceRow, "id">, chunks: Chunk[]): void {
   const batches: Chunk[][] = [];
   let batch: Chunk[] = [];
   let batchBytes = 0;
@@ -93,25 +122,9 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
     batch.push(c);
     batchBytes += c.bytes;
   }
-  batches.push(batch);
-
-  let id = 0;
-  batches.forEach((rows, i) => {
+  if (batch.length > 0) batches.push(batch);
+  for (const rows of batches) {
     withWrite(db, (h) => {
-      if (i === 0) {
-        const row = h.raw.prepare(INSERT_SOURCE).get({
-          session_id: src.sessionId,
-          worktree: src.worktree,
-          agent: src.agent,
-          kind: src.kind,
-          label: src.label,
-          bytes_total: total,
-          chunk_count: chunks.length,
-          created_ts: src.createdAt,
-          created_at: new Date(src.createdAt).toISOString(),
-        }) as { id: number };
-        id = Number(row.id);
-      }
       const ins = h.raw.prepare(INSERT_CHUNK);
       const tri = h.raw.prepare(INSERT_TRI);
       for (const c of rows) {
@@ -120,8 +133,7 @@ export function ftsInsert(db: DbHandle, src: Omit<SourceRow, "id">, chunks: Chun
         tri.run(rid, c.text, title);
       }
     });
-  });
-  return id;
+  }
 }
 
 // D-SEARCH-4: one source's chunks leave both tables (porter and trigram). Returns the chunk rows deleted.
