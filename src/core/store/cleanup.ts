@@ -45,8 +45,11 @@ export function cleanupProject(db: DbHandle, configDir: string): { deletedSource
     }
 
     // Step 4: size cap, oldest accessed_ts first.
+    // D-R4-RETENTION-1: the cap counts the source bytes and the line units' bytes (the units are stored text too).
     const sum = h.raw.prepare("SELECT SUM(bytes_total) AS n FROM sources").get() as { n: number | null };
-    let totalBytes = sum.n ?? 0;
+    const units = h.raw.prepare("SELECT source_id, SUM(LENGTH(CAST(body AS BLOB))) AS n FROM line_units GROUP BY source_id").all() as Array<{ source_id: number; n: number }>;
+    const unitBytes = new Map(units.map((u) => [Number(u.source_id), Number(u.n)]));
+    let totalBytes = (sum.n ?? 0) + [...unitBytes.values()].reduce((a, b) => a + b, 0);
     if (totalBytes > RETENTION_SIZE_CAP_BYTES) {
       const byAge = h.raw
         .prepare("SELECT id, bytes_total FROM sources ORDER BY accessed_ts ASC, id ASC")
@@ -54,7 +57,7 @@ export function cleanupProject(db: DbHandle, configDir: string): { deletedSource
       for (const row of byAge) {
         if (totalBytes <= RETENTION_SIZE_CAP_BYTES) break;
         deleteSource(h.raw, row.id);
-        totalBytes -= row.bytes_total;
+        totalBytes -= row.bytes_total + (unitBytes.get(Number(row.id)) ?? 0);
         deletedSources += 1;
       }
     }
