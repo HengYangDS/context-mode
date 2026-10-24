@@ -629,3 +629,15 @@ test("D-M2-JSON-1: a 200 KB JSON cat returns the rare row whole next to a long h
   const nl = replaced.lastIndexOf("\nctx_search(");
   assert.ok(Buffer.byteLength(replaced.slice(0, nl)) <= 256, "digest within SHAPE_RETURN_BYTES");
 });
+
+// D-R4-BUDGET-1: the handle line can be longer than the replace budget. The selection budget is clamped at 0,
+// and the replace is then the handle line alone (no leading newline, no body).
+test("D-R4-BUDGET-1: a long intent leaves the selection budget at 0: the replace is the handle line alone", async () => {
+  const text = bigText(40000);
+  const intent = "needle target " + "x".repeat(400);
+  const p = mainBashPost(text, intent);
+  const out = parsed(await handleHook("claude-code", p, env));
+  const replaced = replacedText(out.updatedToolOutput);
+  assert.ok(replaced.startsWith("ctx_search({"), "no body and no leading newline: " + JSON.stringify(replaced.slice(0, 80)));
+  assert.equal(replaced.split("\nctx_search(").length, 1, "one line only");
+});
