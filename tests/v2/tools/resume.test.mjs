@@ -162,3 +162,57 @@ test("[M4] resume/read-only: the handler writes no row (the server writes the on
   await ctxResume.handler({ seq }, ctx);
   assert.equal(await eventCount(ctx), before);
 }));
+
+// D-CR3-RESUME-1: ctx_resume lists this session's stored sources by short id and adds the top line units for
+// the session goal (same ranked query as the post-compact recall), whole lines, inside RESUME_CAP.
+async function storeOutput(ctx, sessionId, label, text) {
+  const { indexText } = await import("../../../src/core/index/text.ts");
+  const { insertUnits } = await import("../../../src/core/store/fts.ts");
+  const { buildUnits } = await import("../../../src/core/index/units.ts");
+  const db = await openDb(ctx.project);
+  try {
+    const { sourceId } = indexText(db, ctx.project, sessionId, label, text, "text");
+    insertUnits(db, sourceId, sessionId, buildUnits(text));
+    return sourceId;
+  } finally { closeDb(db); }
+}
+
+function deployJson() {
+  const lines = ["{", '  "services": {'];
+  for (let i = 0; i < 300; i++) lines.push('    "svc' + i + '": { "replicas": ' + (i % 7) + ', "zone": "z' + (i % 5) + '" },');
+  lines.push('    "billing": {', '      "deploy_region": "eu-west-3",', '      "replicas": 4', "    }", "  }", "}");
+  return lines.join("\n");
+}
+
+test("D-CR3-RESUME-1: ctx_resume lists stored sources by short id and the goal's line units, inside RESUME_CAP", () => withRoot(async (root) => {
+  const ctx = ctxFor(root);
+  await add(ctx, [["s1", { body: "which deploy_region does billing use", turn: 1 }], ["s1", { kind: "cmd", tool: "Bash", key: "Bash:cat deploy.json", turn: 2 }]]);
+  const text = deployJson();
+  assert.ok(bytes(text) > RESUME_CAP);
+  const id = await storeOutput(ctx, "s1", "Bash:cat deploy.json#toolu_1", text);
+  await storeOutput(ctx, "other", "Bash:cat foreign.json#toolu_2", '{\n  "deploy_region": "FOREIGN"\n}');
+  const out = await ctxResume.handler({}, ctx);
+  const handle = "s" + id.toString(36);
+  const lines = out.text.split("\n");
+  assert.equal(out.isError, false);
+  assert.ok(out.text.startsWith('<context_mode_state session="s1" upto="'), out.text);
+  assert.ok(out.text.endsWith("\n</context_mode_state>"), out.text);
+  assert.ok(bytes(out.text) <= RESUME_CAP, bytes(out.text) + " B");
+  assert.ok(lines.includes("source " + handle + ": Bash:cat deploy.json#toolu_1 (" + bytes(text) + " B)"), out.text);
+  const at = lines.findIndex((l) => l.startsWith("@" + handle + " line "));
+  assert.ok(at > 0, "a line unit names the source by its short id: " + out.text);
+  assert.ok(out.text.includes('"billing": {\n      "deploy_region": "eu-west-3",'), "the unit keeps its parent: " + out.text);
+  assert.ok(!out.text.includes("FOREIGN") && !out.text.includes("foreign.json"), "no foreign session source");
+}));
+
+test("D-CR3-RESUME-1: a 10,000-row journal plus stored sources stays <= RESUME_CAP, whole lines", () => withRoot(async (root) => {
+  const ctx = ctxFor(root);
+  const rows = [["s1", { body: "which deploy_region does billing use", turn: 0 }]];
+  for (let i = 1; i <= 10000; i++) rows.push(["s1", i % 2 === 0 ? { body: "request " + i, turn: i } : { kind: "edit", tool: "Edit", path: "src/f" + (i % 300) + ".ts", turn: i }]);
+  await add(ctx, rows);
+  for (let i = 0; i < 20; i++) await storeOutput(ctx, "s1", "Bash:cat deploy" + i + ".json#toolu_" + i, deployJson());
+  const out = await ctxResume.handler({}, ctx);
+  assert.equal(out.isError, false);
+  assert.ok(bytes(out.text) <= RESUME_CAP, "got " + bytes(out.text) + " B");
+  assert.ok(out.text.endsWith("\n</context_mode_state>"));
+}));
