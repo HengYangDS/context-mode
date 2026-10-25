@@ -62,6 +62,18 @@ Date: 2026-10-23. A docs pass compared `docs/v2` with the code on v2-design (`sr
 | S5 | Older ADR and impl text still says "no npm for v2" in history and decision-log lines (ADR-0002 migration list, ADR-0011 steps, DEVIATIONS rows). These were left as the record; each live rule was amended and links to ADR-0019. | accepted | `rg "no npm" docs/v2` | None. |
 | S6 | The release has not run. `release.yml` is not on `main`, `publish-npm` has never run, and no `npm view context-mode@2` result exists. Docs say "not published yet". | owner | `docs/v2/NPM-OWNER-STEPS.md`; `docs/v2/LAUNCH.md` "Release state" | See items 9 and 10. |
 
+## Prompt cache (2026-10-25)
+
+Result: `docs/v2/spikes/cache/RESULT.md`. Rules: ADR-0021.
+
+| # | Item | Status | Next step |
+|---|---|---|---|
+| C1 | Cross-session prefix read below 0.9 on Claude Code (off min 0.72, v2 min 0.87) and Codex (0.847 both arms) | open, host side, not v2-only | Find if the tail differs per session |
+| C2 | One v2 Claude Code cross pair read 0 | open | Repeat the pair |
+| C3 | No live Pi or opencode cache run | open | Run when a login exists |
+| C4 | Gemini, qwen, copilot-cli, vscode, kiro, zcode unknown | open | Live two-turn run per host |
+| C5 | No prefix-determinism test or dynamic-token lint in the gate | open | Add to `scripts/gate.mjs` |
+
 ## Method limits
 
 - Test evidence is a name match between the map and test files. I did not read each assertion.
