@@ -1,0 +1,17 @@
+Manual setup for zcode. Put this in <HOME>/.zcode/cli/config.json
+(if the file exists, add the context-mode entry and keep the rest):
+
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "<NODE>",
+      "args": [
+        "<PKG>/server.mjs",
+        "--agent",
+        "zcode"
+      ]
+    }
+  }
+}
+
+Then restart zcode and check it: context-mode doctor --agents zcode

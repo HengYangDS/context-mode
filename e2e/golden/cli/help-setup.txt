@@ -8,6 +8,7 @@ Options:
   --dry-run          Show the plan; change nothing
   --remove           Undo every setup run: put each touched file back
   --repair           Apply again and verify (upgrade runs this)
+  --print <id>       Print the manual step for one agent, paths filled in; change nothing
   --agents <ids>     Only these agents, comma-separated (ids: context-mode setup --list)
   -y, --yes          Do not ask; apply
   --no-input         Never prompt; exit 2 if an answer is needed
@@ -28,3 +29,4 @@ Examples:
   context-mode setup
   context-mode setup --yes --agents codex,claude-code
   context-mode setup --dry-run --json
+  context-mode setup --print codex

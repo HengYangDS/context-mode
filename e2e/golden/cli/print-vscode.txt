@@ -1,0 +1,17 @@
+Manual setup for vscode. Put this in <HOME>/.vscode/mcp.json
+(if the file exists, add the context-mode entry and keep the rest):
+
+{
+  "servers": {
+    "context-mode": {
+      "command": "<NODE>",
+      "args": [
+        "<PKG>/server.mjs",
+        "--agent",
+        "vscode"
+      ]
+    }
+  }
+}
+
+Then restart vscode and check it: context-mode doctor --agents vscode

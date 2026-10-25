@@ -1,0 +1,8 @@
+Manual setup for codex. Put this in <HOME>/.codex/config.toml
+(if the file exists, add the context-mode entry and keep the rest):
+
+[mcp_servers.context-mode]
+command = "<NODE>"
+args = ["<PKG>/server.mjs", "--agent", "codex"]
+
+Then restart codex and check it: context-mode doctor --agents codex

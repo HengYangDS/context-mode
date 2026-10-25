@@ -390,3 +390,86 @@ test("[M7] cli/pty-ctrl-c: Ctrl-C mid-apply exits 130 and leaves files byte-iden
   assert.ok(now === CODEX_V1 || now.includes(path.join(s.pkg, "server.mjs")), `half-applied file:\n${now}`);
   assert.equal(existsSync(path.join(s.home, ".context-mode", "setup.lock")), false, "lock released");
 });
+
+// ---------- setup --print (owner 2026-10-25: users never type paths, JSON or scripts) ----------
+
+/** Absolute paths in --print output become <NODE>, <PKG>, <HOME> so one golden fits every machine. */
+function normPaths(text, s) {
+  let t = text;
+  for (const [p, tag] of [[s.pkg, "<PKG>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
+    t = t.replaceAll(JSON.stringify(p).slice(1, -1), tag).replaceAll(p, tag);
+  }
+  return t;
+}
+
+/** A fake agent CLI: logs every call; `... list` prints context-mode once an install command ran. */
+function fakeAgentBin(s, name) {
+  fakeBin(s, name, `echo "${name} $*" >> "$LOG"\ncase "$*" in *list*) [ -f "$LOG.done" ] && echo context-mode;; *) touch "$LOG.done";; esac\nexit 0`);
+}
+
+for (const a of ADAPTERS) {
+  test(`[M7] cli/print-golden: setup --print ${a.id} equals e2e/golden/cli/print-${a.id}.txt and writes nothing`, (t) => {
+    const s = sandbox(t);
+    const before = snapshot(s.home);
+    const r = run(s, ["setup", "--print", a.id]);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(r.stderr, "");
+    assert.equal(normPaths(r.stdout, s), readFileSync(path.join(GOLDEN, `print-${a.id}.txt`), "utf8"));
+    assert.deepEqual(snapshot(s.home), before, "--print must not write");
+    assert.equal(existsSync(path.join(s.home, ".context-mode")), false, "no state dir");
+  });
+
+  test(`[M7] cli/print-apply: the --print --json step for ${a.id}, applied by hand, makes doctor PASS`, { skip: process.platform === "win32" && "fake agent CLIs are sh scripts" }, (t) => {
+    const s = sandbox(t);
+    const r = run(s, ["setup", "--print", a.id, "--json"]);
+    assert.equal(r.status, 0, r.stderr);
+    const j = JSON.parse(r.stdout);
+    assert.equal(j.command, "setup");
+    assert.equal(j.print.agent, a.id);
+    assert.equal(j.print.verify, `context-mode doctor --agents ${a.id}`);
+    assert.ok(j.print.steps.length >= 1);
+    assert.equal(existsSync(path.join(s.home, ".context-mode")), false, "--json --print writes nothing");
+    for (const step of j.print.steps) {
+      if (step.kind === "config") {
+        assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
+        mkdirSync(path.dirname(step.file), { recursive: true });
+        writeFileSync(step.file, step.block);
+      } else {
+        assert.equal(step.kind, "run");
+        fakeAgentBin(s, step.argv[0]);
+        const c = spawnSync(step.argv[0], step.argv.slice(1), { env: s.env, input: step.input ?? "", encoding: "utf8" });
+        assert.equal(c.status, 0, c.stderr);
+      }
+    }
+    const d = run(s, ["doctor", "--agents", a.id, "--json"]);
+    assert.equal(d.status, 0, d.stdout + d.stderr);
+    assert.equal(JSON.parse(d.stdout).agents.find((x) => x.id === a.id).status, "PASS");
+  });
+}
+
+test("[M7] cli/print-same-source: --print run steps equal the commands setup runs (one registry row)", { skip: process.platform === "win32" && "fake agent CLIs are sh scripts" }, (t) => {
+  for (const a of ADAPTERS) {
+    const s = sandbox(t);
+    const steps = JSON.parse(run(s, ["setup", "--print", a.id, "--json"]).stdout).print.steps.filter((x) => x.kind === "run");
+    if (!steps.length) continue;
+    fakeAgentBin(s, steps[0].argv[0]);
+    const r = run(s, ["setup", "--yes", "--agents", a.id]);
+    assert.equal(r.status, 0, r.stdout + r.stderr);
+    const ran = readFileSync(s.env.LOG, "utf8").trim().split("\n").filter((l) => !/ list$/.test(l));
+    assert.deepEqual(ran, steps.map((x) => x.argv.join(" ")), a.id);
+  }
+});
+
+test("[M7] cli/print-usage: --print needs a known agent and cannot mix with other setup modes (exit 2)", (t) => {
+  const s = sandbox(t);
+  const typo = run(s, ["setup", "--print", "codx"]);
+  assert.equal(typo.status, 2);
+  assert.match(typo.stderr, /unknown agent "codx"\. Did you mean "codex"\?/);
+  assert.equal(run(s, ["setup", "--print"]).status, 2);
+  for (const extra of [["--remove"], ["--list"], ["--dry-run"], ["--repair"], ["--agents", "codex"]]) {
+    const r = run(s, ["setup", "--print", "codex", ...extra]);
+    assert.equal(r.status, 2, extra.join(" "));
+    assert.match(r.stderr, /--print cannot be used with/);
+  }
+  assert.equal(existsSync(path.join(s.home, ".context-mode")), false);
+});

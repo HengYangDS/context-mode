@@ -1,0 +1,17 @@
+Manual setup for kiro. Put this in <HOME>/.kiro/settings/mcp.json
+(if the file exists, add the context-mode entry and keep the rest):
+
+{
+  "mcpServers": {
+    "context-mode": {
+      "command": "<NODE>",
+      "args": [
+        "<PKG>/server.mjs",
+        "--agent",
+        "kiro"
+      ]
+    }
+  }
+}
+
+Then restart kiro and check it: context-mode doctor --agents kiro

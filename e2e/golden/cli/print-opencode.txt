@@ -1,0 +1,19 @@
+Manual setup for opencode. Put this in <HOME>/.config/opencode/opencode.json
+(if the file exists, add the context-mode entry and keep the rest):
+
+{
+  "mcp": {
+    "context-mode": {
+      "type": "local",
+      "command": [
+        "<NODE>",
+        "<PKG>/server.mjs",
+        "--agent",
+        "opencode"
+      ],
+      "enabled": true
+    }
+  }
+}
+
+Then restart opencode and check it: context-mode doctor --agents opencode
