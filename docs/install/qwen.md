@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents qwen
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents qwen`. Without it, setup stops with exit 2.
+
 Restart Qwen Code after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print qwen` and follow what it prints.

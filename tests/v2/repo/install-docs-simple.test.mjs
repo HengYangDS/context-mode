@@ -64,3 +64,21 @@ test("install-docs-simple: the real docs pass (install pages, README, top-level 
   pages["README.md"] = readFileSync(path.join(REPO, "README.md"), "utf8");
   assert.deepEqual(checkSimplePages(pages), []);
 });
+
+// New-user test round 2 (D-INST-7): a script or CI run has no TTY, so setup exits 2 unless --yes is given.
+test("install-docs-simple: every agent page says --yes for a run with no terminal, before 'What setup changes'", () => {
+  const ids = readdirSync(DIR).filter((f) => f.endsWith(".md") && f !== "README.md").map((f) => f.replace(/\.md$/, ""));
+  assert.ok(ids.length >= 10, ids.join(","));
+  for (const id of ids) {
+    const text = readFileSync(path.join(DIR, `${id}.md`), "utf8");
+    const install = text.slice(0, text.indexOf("## What setup changes"));
+    assert.ok(/no terminal/i.test(install) && install.includes("`--yes`"), `${id}.md: Install section must say --yes for a run with no terminal`);
+  }
+  const readme = readFileSync(path.join(DIR, "README.md"), "utf8");
+  assert.ok(/no terminal/i.test(readme.slice(0, readme.indexOf("## What setup does"))), "README.md Install section must say --yes for a run with no terminal");
+});
+
+test("install-docs-simple: the codex page explains the Auth 'Unsupported' column of codex mcp list", () => {
+  const text = readFileSync(path.join(DIR, "codex.md"), "utf8");
+  assert.ok(/Unsupported/.test(text.slice(text.indexOf("## Verify"), text.indexOf("## Remove"))));
+});

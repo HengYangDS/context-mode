@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents kiro
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents kiro`. Without it, setup stops with exit 2.
+
 Restart Kiro after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print kiro` and follow what it prints.

@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents pi
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents pi`. Without it, setup stops with exit 2.
+
 Restart Pi after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print pi` and follow what it prints.

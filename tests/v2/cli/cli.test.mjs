@@ -480,3 +480,26 @@ test("[M7] cli/print-usage: --print needs a known agent and cannot mix with othe
   }
   assert.equal(existsSync(path.join(s.home, ".context-mode")), false);
 });
+
+// D-INST-7: new-user test round 2. A PASS row says what was checked; the plan line for a report-only finding says
+// nothing is to be done; --print says the agent, not its id, restarts.
+test("[M7] cli/pass-detail: a PASS row in the setup and doctor table names the checks that ran", (t) => {
+  const s = sandbox(t);
+  codexHome(s, `model = "o3"\n`);
+  const r = run(s, ["setup", "--yes", "--agents", "codex"]);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /codex\s+PASS\s+checked: .*mcp.*hook/);
+  const d = run(s, ["doctor", "--agents", "codex"]);
+  assert.equal(d.status, 0, d.stderr + d.stdout);
+  assert.match(d.stdout, /codex\s+PASS\s+checked: .*mcp.*hook/);
+});
+
+test("[M7] cli/print-text: --print never names a bare agent id as the thing to restart, and says what to do with a missing file", (t) => {
+  const s = sandbox(t);
+  const cfg = run(s, ["setup", "--print", "codex"]);
+  assert.match(cfg.stdout, /Then restart the agent and check it: context-mode doctor --agents codex/);
+  assert.match(cfg.stdout, /If the folder or file is missing, create it/);
+  assert.match(cfg.stdout, /These paths are for this machine/);
+  const cmd = run(s, ["setup", "--print", "claude-code"]);
+  assert.doesNotMatch(cmd.stdout, /restart claude-code/);
+});

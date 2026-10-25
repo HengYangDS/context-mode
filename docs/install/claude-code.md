@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents claude-code
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents claude-code`. Without it, setup stops with exit 2.
+
 Restart Claude Code after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print claude-code` and follow what it prints.

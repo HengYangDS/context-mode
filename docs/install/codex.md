@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents codex
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents codex`. Without it, setup stops with exit 2.
+
 Restart Codex after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print codex` and follow what it prints.
@@ -25,7 +27,7 @@ context-mode doctor --agents codex
 codex mcp list
 ```
 
-`context-mode` must show as enabled. Then run `/ctx-doctor` in Codex.
+`context-mode` must show as enabled. The Auth column may say `Unsupported`: that is normal, because the server needs no login. Then run `/ctx-doctor` in Codex.
 
 ## Remove
 

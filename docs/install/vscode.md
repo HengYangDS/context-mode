@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents vscode
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents vscode`. Without it, setup stops with exit 2.
+
 Restart VS Code (Copilot) after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print vscode` and follow what it prints.

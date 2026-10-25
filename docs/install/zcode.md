@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents zcode
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents zcode`. Without it, setup stops with exit 2.
+
 Restart ZCode after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print zcode` and follow what it prints.

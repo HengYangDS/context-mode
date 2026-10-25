@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents gemini
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents gemini`. Without it, setup stops with exit 2.
+
 Restart Gemini CLI after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print gemini` and follow what it prints.

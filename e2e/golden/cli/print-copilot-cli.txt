@@ -2,4 +2,4 @@ Manual setup for copilot-cli. Run:
 
 copilot mcp add context-mode -- <NODE> <PKG>/server.mjs --agent copilot-cli
 
-Then restart copilot-cli and check it: context-mode doctor --agents copilot-cli
+Then restart the agent and check it: context-mode doctor --agents copilot-cli

@@ -17,6 +17,8 @@ context-mode setup
 
 `@next` is the v2 preview. After the owner moves the `latest` tag, you run `npm i -g context-mode && context-mode setup` without `@next`. Until then a plain `npm i -g context-mode` does not install this version.
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes`. Setup asks one question, and with no terminal it stops with exit 2 instead.
+
 Restart your agent after setup. Then run `/ctx-doctor` in the agent, or `context-mode doctor` in a shell.
 
 ## What setup does

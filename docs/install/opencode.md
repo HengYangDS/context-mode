@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents opencode
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents opencode`. Without it, setup stops with exit 2.
+
 Restart OpenCode after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print opencode` and follow what it prints.

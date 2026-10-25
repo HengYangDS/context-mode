@@ -37,8 +37,13 @@ function progress(ui: Ui, s: string): void {
 }
 const fixFor = (id: AgentId): string => `context-mode setup --agents ${id}`;
 
+/** D-INST-7: a PASS row names the checks that ran, so a user sees what was verified. */
+function passDetail(a: AgentResult): string {
+  return a.status === "PASS" && a.checks.length ? `checked: ${a.checks.map((c) => c.name).join(", ")}` : "";
+}
+
 function table(agents: readonly AgentResult[]): string {
-  const rows = agents.map((a) => `${a.id.padEnd(13)} ${a.status.padEnd(7)} ${a.reason ?? ""}${a.rolledBack ? " (rolled back)" : ""}`.trimEnd());
+  const rows = agents.map((a) => `${a.id.padEnd(13)} ${a.status.padEnd(7)} ${a.reason ?? passDetail(a)}${a.rolledBack ? " (rolled back)" : ""}`.trimEnd());
   return [`${"AGENT".padEnd(13)} STATUS  DETAIL`, ...rows].join("\n");
 }
 

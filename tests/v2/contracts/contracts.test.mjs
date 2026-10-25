@@ -486,3 +486,8 @@ test("[M5] wave-2 doctor and upgrade split-file constants (D-M5-U1-6)", () => {
   assert.equal(C.UPGRADE_DATA_DELETED, "user data deleted");
   assert.deepEqual([...C.OPS_SPLIT_FILES].sort(), ["doctor-config.ts", "doctor-db.ts", "doctor-env.ts", "doctor-heal.ts", "doctor-hook.ts", "host-write.ts", "plugin-swap.ts", "release-fetch.ts", "uninstall.ts", "v1-remove.ts", "verify-sums.ts"]);
 });
+
+test("[M5] D-INST-7: the temp-file finding text says it is report only and nothing needs doing", () => {
+  assert.match(C.V1_REASON.tmpFile, /context-mode-\*/);
+  assert.match(C.V1_REASON.tmpFile, /report only, no action needed/);
+});

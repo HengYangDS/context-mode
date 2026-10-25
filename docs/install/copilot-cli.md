@@ -7,6 +7,8 @@ npm i -g context-mode@next
 context-mode setup --agents copilot-cli
 ```
 
+With no terminal (a script or CI), add `--yes`: `context-mode setup --yes --agents copilot-cli`. Without it, setup stops with exit 2.
+
 Restart Copilot CLI after setup.
 
 Prefer to do it by hand? Run `context-mode setup --print copilot-cli` and follow what it prints.

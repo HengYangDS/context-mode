@@ -1,5 +1,6 @@
 Manual setup for vscode. Put this in <HOME>/.vscode/mcp.json
-(if the file exists, add the context-mode entry and keep the rest):
+(If the folder or file is missing, create it. If the file exists, add the context-mode entry
+and keep the rest. These paths are for this machine.)
 
 {
   "servers": {
@@ -14,4 +15,4 @@ Manual setup for vscode. Put this in <HOME>/.vscode/mcp.json
   }
 }
 
-Then restart vscode and check it: context-mode doctor --agents vscode
+Then restart the agent and check it: context-mode doctor --agents vscode

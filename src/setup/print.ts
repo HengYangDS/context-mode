@@ -27,10 +27,10 @@ export function printPlan(row: CheckRow): PrintPlan {
 }
 
 export function printText(p: PrintPlan): string {
-  const tail = `\nThen restart ${p.agent} and check it: ${p.verify}\n`;
+  const tail = `\nThen restart the agent and check it: ${p.verify}\n`;
   const cfg = p.steps.find((s) => s.kind === "config");
   if (cfg && cfg.kind === "config") {
-    return `Manual setup for ${p.agent}. Put this in ${cfg.file}\n(if the file exists, add the context-mode entry and keep the rest):\n\n${cfg.block}${tail}`;
+    return `Manual setup for ${p.agent}. Put this in ${cfg.file}\n(If the folder or file is missing, create it. If the file exists, add the context-mode entry\nand keep the rest. These paths are for this machine.)\n\n${cfg.block}${tail}`;
   }
   const runs = p.steps.filter((s): s is Extract<PrintStep, { kind: "run" }> => s.kind === "run");
   if (!runs.length) return `${p.agent} has no manual step. Run: context-mode setup --agents ${p.agent}\n`;

@@ -1,5 +1,6 @@
 Manual setup for opencode. Put this in <HOME>/.config/opencode/opencode.json
-(if the file exists, add the context-mode entry and keep the rest):
+(If the folder or file is missing, create it. If the file exists, add the context-mode entry
+and keep the rest. These paths are for this machine.)
 
 {
   "mcp": {
@@ -16,4 +17,4 @@ Manual setup for opencode. Put this in <HOME>/.config/opencode/opencode.json
   }
 }
 
-Then restart opencode and check it: context-mode doctor --agents opencode
+Then restart the agent and check it: context-mode doctor --agents opencode

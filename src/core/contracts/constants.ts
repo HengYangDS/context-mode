@@ -591,7 +591,7 @@ export const V1_REASON = Object.freeze({
   dataDir: "old context-mode data dir <agent home>/context-mode/",
   dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
   dataRoot: "old context-mode content under ~/.context-mode/",
-  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir",
+  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, no action needed",
 } as const);
 // ADR-0011 "reported with a fix, not removed" rows, Gemini data "only after a prompt" (a tool cannot prompt), and
 // tmp context-mode-* (a live v1 server may own them), and the Kiro steering doc (A37: manual review): report only
