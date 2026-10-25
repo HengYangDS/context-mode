@@ -65,7 +65,10 @@ test("nativeTools and execReadOnlyHint follow impl/10 §1.3a and DECISIONS-r9 R4
   assert.deepEqual(getAdapter("qwen").nativeTools, {
     shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"],
   });
-  for (const id of ["gemini", "copilot-cli", "vscode", "kiro", "pi", "opencode"]) {
+  assert.deepEqual(getAdapter("gemini").nativeTools, { // D-HA-GEMINI-NAMES-1: gemini-cli 0.65.0 *_TOOL_NAME
+    shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"],
+  });
+  for (const id of ["copilot-cli", "vscode", "kiro", "pi", "opencode"]) {
     assert.deepEqual(getAdapter(id).nativeTools, { shell: [] }, id);
   }
   for (const r of ADAPTERS) assert.equal(r.execReadOnlyHint, r.id === "codex", r.id);

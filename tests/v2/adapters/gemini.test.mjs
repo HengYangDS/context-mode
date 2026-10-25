@@ -71,7 +71,7 @@ test("decode another MCP server's tool from mcp_context to mcp:<server>:<tool> (
 test("decode AfterTool reads tool_response size and error", () => {
   const ok = decode(FX.AfterTool);
   assert.equal(ok.event, "PostToolUse");
-  assert.equal(ok.tool.canonicalName, "run_shell_command");
+  assert.equal(ok.tool.canonicalName, "Bash"); // D-HA-GEMINI-NAMES-1
   const text = JSON.stringify(FX.AfterTool.tool_response);
   assert.deepEqual(ok.result, { isError: false, bytes: Buffer.byteLength(text), text });
   const bad = decode({ ...FX.AfterTool, tool_response: { llmContent: "", returnDisplay: "", error: { message: "boom" } } });
