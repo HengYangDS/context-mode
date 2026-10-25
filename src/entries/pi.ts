@@ -75,7 +75,10 @@ export default function piExtension(pi: PiApi): void {
   let project: ProjectContext | undefined;
   let turn = 0;
   let compactPending = false; // ADR-0009 §6 Pi row: session_compact flag, then before_agent_start, once
-  let instructionsDelivered = false; // impl/12 §3.3 step 8: set on a successful delivery only
+  // D-CACHE-PI-1: the fixed text this session adds after Pi's base prompt. Pi 0.73.1 resets the system
+  // prompt to base on a turn that returns no systemPrompt (agent-session.js:791-797), so every turn returns
+  // base + payload, byte-identical between compactions. "" until a successful delivery (§3.3 step 8).
+  let payload = "";
   let toolsRegistered = false; // #1098: a failed registration retries on the next before_agent_start
 
   function identify(ctx: PiContext | undefined): void {
@@ -138,21 +141,26 @@ export default function piExtension(pi: PiApi): void {
     identify(ctx);
     turn += 1;
     registerTools();
+    const base = str(event.systemPrompt);
+    const withPayload = (): { systemPrompt: string } => ({ systemPrompt: base === "" ? payload : base + "\n\n" + payload });
     let out: HookOutput;
     try {
       out = await hook({ type: compactPending ? "session_compact" : "session_start" }, turn);
     } catch {
-      return {}; // §3.3 step 8: retry next turn, instructions not marked delivered
+      // §3.3 step 8: retry next turn. Before a first delivery there is nothing to keep; after it, the same
+      // payload keeps the prefix stable (D-CACHE-PI-1), and compactPending stays set for the retry.
+      return payload === "" ? {} : withPayload();
     }
+    const compactTurn = compactPending;
     compactPending = false; // A27: the very next before_agent_start reads and clears the flag
-    const parts: string[] = [];
-    const base = str(event.systemPrompt);
-    if (base !== "") parts.push(base);
-    if (!instructionsDelivered) parts.push(INSTRUCTIONS); // §3.3 step 6, A24; D-M5-P1-1
-    if (out.stdout !== "") parts.push(out.stdout); // system role, never user (#1264, #1263)
-    instructionsDelivered = true;
-    if (parts.length === (base === "" ? 0 : 1)) return {}; // §3.3 step 7
-    return { systemPrompt: parts.join("\n\n") };
+    if (payload === "" || compactTurn) {
+      // First delivery, or a compact turn (the history is new, so the prefix is written anyway): the
+      // payload is INSTRUCTIONS plus this hook's text, in system role, never user (#1264, #1263).
+      payload = [INSTRUCTIONS, out.stdout].filter((s) => s !== "").join("\n\n");
+    } else if (out.stdout !== "") {
+      payload += "\n\n" + out.stdout; // appended once, never edits earlier bytes
+    }
+    return withPayload();
   });
 
   // impl/10 §10 UserPromptSubmit: the prompt row belongs to the turn it starts.

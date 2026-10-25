@@ -11,6 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import piExtension from "../../../src/entries/pi.ts";
+import { INSTRUCTIONS } from "../../../src/entries/server.ts";
 
 let root;
 let repo;
@@ -73,13 +74,19 @@ test("before_agent_start: every ctx_* tool registers through pi.registerTool and
   assert.ok(out.systemPrompt.startsWith("base"), "the host prompt stays first");
 });
 
-test("before_agent_start: instructions are delivered once, a second turn returns nothing new (A24)", async () => {
+// D-CACHE-PI-1 replaces A24's "a second turn returns nothing": Pi 0.73.1 resets the system prompt to base on
+// a turn without systemPrompt (agent-session.js:791-797), so "nothing" dropped INSTRUCTIONS on turn 2 and
+// broke the cache. Pi replaces, never appends, so the prompt the model sees must hold INSTRUCTIONS exactly once
+// and be the same bytes on every turn.
+test("before_agent_start: instructions appear exactly once in the system prompt, the same bytes on a second turn (D-CACHE-PI-1)", async () => {
   const { pi, handlers } = fakePi();
   piExtension(pi);
   const first = await handlers.get("before_agent_start")({ systemPrompt: "" }, ctxFor("s2"));
   const second = await handlers.get("before_agent_start")({ systemPrompt: "" }, ctxFor("s2"));
   assert.ok(first.systemPrompt.length > 0);
-  assert.ok(!("systemPrompt" in second) || !second.systemPrompt.includes(first.systemPrompt));
+  assert.equal(first.systemPrompt.split(INSTRUCTIONS).length - 1, 1, "INSTRUCTIONS exactly once on turn 1");
+  assert.equal(second.systemPrompt, first.systemPrompt, "turn 2 system prompt is byte-identical to turn 1");
+  assert.equal(second.systemPrompt.split(INSTRUCTIONS).length - 1, 1, "INSTRUCTIONS exactly once on turn 2");
 });
 
 test("before_agent_start: a registerTool failure is retried on the next turn (#1098)", async () => {
