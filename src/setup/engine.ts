@@ -556,7 +556,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     if (res.status === "PASS") {
       // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
       if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
-      else if (res.changes.length) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
+      else if (res.changes.length && !onlyTrust(row, res.changes)) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
       else {
         res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
@@ -567,6 +567,12 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     opts.onAgent?.(id, "done", res);
   }
   return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents };
+}
+
+/** D-HA-CODEX-TRUST-1: the only planned change is a trust entry, so the hooks are there and hook-registered names it. */
+function onlyTrust(row: CheckRow, changes: Change[]): boolean {
+  const h = row.hookInstall;
+  return h.kind === "file" && h.trust !== undefined && changes.every((c) => c.file === h.trust);
 }
 
 /** setup --remove: undo every recorded run, newest first, so each touched file gets its pre-setup bytes back. */
