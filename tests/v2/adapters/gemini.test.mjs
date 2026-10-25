@@ -72,8 +72,12 @@ test("decode AfterTool reads tool_response size and error", () => {
   const ok = decode(FX.AfterTool);
   assert.equal(ok.event, "PostToolUse");
   assert.equal(ok.tool.canonicalName, "Bash"); // D-HA-GEMINI-NAMES-1
-  const text = JSON.stringify(FX.AfterTool.tool_response);
+  // D-HA-GEMINI-REPLACE-1: a string llmContent is the text the model sees, so it is the result text.
+  const text = FX.AfterTool.tool_response.llmContent;
   assert.deepEqual(ok.result, { isError: false, bytes: Buffer.byteLength(text), text });
+  const parts = { llmContent: [{ text: "a" }], returnDisplay: "a" };
+  const pj = JSON.stringify(parts);
+  assert.deepEqual(decode({ ...FX.AfterTool, tool_response: parts }).result, { isError: false, bytes: Buffer.byteLength(pj), text: pj });
   const bad = decode({ ...FX.AfterTool, tool_response: { llmContent: "", returnDisplay: "", error: { message: "boom" } } });
   assert.equal(bad.result.isError, true);
   const nullErr = decode({ ...FX.AfterTool, tool_response: { llmContent: "x", error: null } });
@@ -133,10 +137,11 @@ test("encode deny on SessionStart, AfterTool, PreCompress is a no-op (no deny ch
   }
 });
 
-test("encode replace is a no-op (no replace field on Gemini)", () => {
-  for (const e of ["PreToolUse", "PostToolUse"]) {
-    assert.deepEqual(encode(ev(e), { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
-  }
+// gemini-cli 0.65.0 docs/hooks/reference.md AfterTool: decision "deny" + reason, the reason replaces the tool result
+// sent to the model (D-HA-GEMINI-REPLACE-1). BeforeTool has no replace.
+test("encode replace on AfterTool is decision deny with the output as reason; no-op on BeforeTool", () => {
+  assert.deepEqual(encode(ev("PostToolUse"), { kind: "replace", output: "x" }), { stdout: JSON.stringify({ decision: "deny", reason: "x" }), exitCode: 0 });
+  assert.deepEqual(encode(ev("PreToolUse"), { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
 });
 
 test("GP3 synthetic round trip: every payload decodes and encodes allow to the native empty shape", () => {

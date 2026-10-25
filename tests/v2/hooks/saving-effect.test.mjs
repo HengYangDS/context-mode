@@ -4,7 +4,7 @@
 // the ctx tool on PreToolUse everywhere else. One effect per host, no fallback.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -12,7 +12,7 @@ import { ADAPTERS, getAdapter, hasReplace } from "../../../src/adapters/table.ts
 import { decide } from "../../../src/core/policy/decide.ts";
 
 const SAVING = {
-  "claude-code": "R", codex: "D", gemini: "D", qwen: "D", "copilot-cli": "D",
+  "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "D",
   vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "D",
 };
 const CURL = "curl -s https://x.io/a.json";
@@ -44,17 +44,26 @@ for (const id of Object.keys(SAVING)) {
   });
 }
 
-// D-HA-GEMINI-NAMES-1: a real Gemini BeforeTool payload (native run_shell_command) reaches the shell rules and is denied
-// with the redirect, so the large output never enters the model.
-test("ADR-0020: gemini BeforeTool run_shell_command with a large-output call is denied with the redirect", async (t) => {
-  const dir = mkdtempSync(path.join(tmpdir(), "cm-saving-"));
-  t.after(() => rmSync(dir, { recursive: true, force: true }));
-  const row = getAdapter("gemini");
-  const ev = row.decode({ session_id: "s1", transcript_path: "/tmp/t.json", cwd: dir, hook_event_name: "BeforeTool",
-    timestamp: "2026-10-25T00:00:00.000Z", tool_name: "run_shell_command", tool_input: { command: CURL } });
-  const d = decide(ev, row, []);
-  assert.equal(d.kind, "deny");
-  const out = row.encode(ev, d);
-  assert.equal(JSON.parse(out.stdout).decision, "deny");
-  assert.ok(out.stdout.includes(row.toolNamePrefix + "ctx_execute"));
+// D-HA-GEMINI-NAMES-1 + D-HA-GEMINI-REPLACE-1: a real Gemini AfterTool payload (native run_shell_command, large
+// llmContent) goes through the hook entry and comes back as decision deny whose reason replaces the result: a short
+// selection plus the ctx_search line, far below the raw size, with the whole output indexed.
+test("ADR-0020: gemini AfterTool run_shell_command with a large output is replaced (decision deny + reason)", async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), "cm-saving-"));
+  const oldHome = process.env.HOME;
+  process.env.HOME = root;
+  t.after(() => { process.env.HOME = oldHome; rmSync(root, { recursive: true, force: true }); });
+  const repo = path.join(root, "repo");
+  mkdirSync(path.join(repo, ".git"), { recursive: true });
+  const lines = [];
+  for (let i = 0; i < 4000; i++) lines.push("line " + i + (i === 3001 ? " FATAL disk quota code=QX-7731-ZETA" : " filler words here"));
+  const big = lines.join("\n") + "\n";
+  const { handleHook } = await import("../../../src/core/hooks/dispatch.ts");
+  const out = await handleHook("gemini", { session_id: "g1", transcript_path: "/tmp/t.json", cwd: repo, hook_event_name: "AfterTool",
+    timestamp: "2026-10-25T00:00:00.000Z", tool_name: "run_shell_command", tool_input: { command: "cat logs/app.log", description: "FATAL" },
+    tool_response: { llmContent: big, returnDisplay: big } }, { HOME: root, PATH: process.env.PATH });
+  assert.equal(out.exitCode, 0);
+  const j = JSON.parse(out.stdout);
+  assert.equal(j.decision, "deny");
+  assert.ok(Buffer.byteLength(j.reason) < Buffer.byteLength(big) / 2, "replaced text is under half the raw output");
+  assert.ok(j.reason.includes("ctx_search("), "the replace names ctx_search for the rest");
 });
