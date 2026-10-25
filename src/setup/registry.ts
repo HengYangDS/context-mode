@@ -3,8 +3,6 @@
 // Every write path is absolute and listed; every command is absolute node + absolute bundle file (never npx).
 import path from "node:path";
 
-import { pathToFileURL } from "node:url";
-
 import { ADAPTERS, getAdapter } from "../adapters/table.ts";
 import { OWN_MCP_ENTRY, SERVER_KEY, TOOL_ORDER } from "../core/contracts/constants.ts";
 import type { AgentId, AdapterRow, HostConfigFormat } from "../core/contracts/types.ts";
@@ -158,7 +156,7 @@ function hookInstallFor(ctx: SetupContext, row: AdapterRow, command: string): Ho
   }
   if (row.id === "opencode") {
     return { kind: "plugin-list", file: path.join(ctx.home, ".config", "opencode", "opencode.json"), key: ["plugin"],
-      entry: pathToFileURL(path.join(ctx.pkgDir, ...OPENCODE_PLUGIN)).href };
+      entry: path.join(ctx.pkgDir, ...OPENCODE_PLUGIN) }; // OpenCode reads an absolute path as is (binary 1.x resolver)
   }
   return { kind: "package", via: ch.path };
 }
