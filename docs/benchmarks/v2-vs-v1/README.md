@@ -2,6 +2,8 @@
 
 On six short Opus 5.5 tasks, v1 cost **34.6% more** than Claude Code alone and v2 cost **2.2% more**; v2 cost less than v1 on all six tasks ([v1-v2-gateway/ab.json](../v1-v2-gateway/ab.json)). On a held-out search set, v2 finds the right chunk in the top 5 for **0.98** of queries against **0.84** for v1 ([DIAGNOSIS section 8](../../v2/spikes/search/DIAGNOSIS.md#8-verbatim-fence-aware-snippets-d-search-7-2026-10-23-node-26-macos)). Install is **2 commands** ([CLI-REPORT.md](../../v2/CLI-REPORT.md#the-user-journey-2-commands)). v2 still costs more than no plugin on short tasks, and its hook misses one latency budget by 1 ms. The paid Context Mode Gateway cost **24.5% less** than direct on the same six tasks ([published file](../v1-v2-gateway/published/v3-opus55-short.json)).
 
+Published page: [context-mode.com/benchmarks/gw-v2-v1](https://context-mode.com/benchmarks/gw-v2-v1) (Gateway, v2, v1 and direct, built from these files).
+
 ## Key facts
 
 - **What it is:** one page that puts the v1 and v2 results side by side. It adds no new run. Every number comes from a file in this repo; each row links to it.
@@ -64,6 +66,7 @@ Use v2 for local, private context handling at no cost. Move to the gateway when 
 
 ## Sources
 
+- Published page: [context-mode.com/benchmarks/gw-v2-v1](https://context-mode.com/benchmarks/gw-v2-v1)
 - [v1-v2-gateway/](../v1-v2-gateway/), [try-it/](../try-it/), [fixtures/](../fixtures/), [data/](../data/)
 - [docs/v2/spikes/search/DIAGNOSIS.md](../../v2/spikes/search/DIAGNOSIS.md)
 - [docs/v2/ISSUE-COVERAGE.md](../../v2/ISSUE-COVERAGE.md), [docs/v2/OPEN-ITEMS.md](../../v2/OPEN-ITEMS.md), [docs/v2/CLI-REPORT.md](../../v2/CLI-REPORT.md)
