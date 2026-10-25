@@ -31,6 +31,7 @@ export function parseSession(text) {
     } else if (e.type === "assistant" && e.message?.usage && !e.parent_tool_use_id) {
       const u = e.message.usage;
       const id = e.message.id ?? `u${turns.length}`;
+      if (!(u.input_tokens || u.cache_creation_input_tokens || u.cache_read_input_tokens)) continue; // synthetic message, no API call
       const row = { id, in: u.input_tokens ?? 0, cc: u.cache_creation_input_tokens ?? 0, cr: u.cache_read_input_tokens ?? 0, out: u.output_tokens ?? 0 };
       const seen = byId.get(id);
       if (seen) { Object.assign(seen, row, { kind: seen.kind }); continue; }

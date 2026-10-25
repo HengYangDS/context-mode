@@ -79,3 +79,10 @@ test("summarize: per arm and workload, breaks listed with path and turn", () => 
   assert.deepEqual(out.arms.v2.breakList, [{ path: "w/a/x-v2-0.jsonl", turn: 2, rewritten: 5000 }]);
   assert.equal(out.arms.v2.byWorkload["w/a"].sessions, 1);
 });
+
+test("zero-usage assistant message (synthetic, no API call) is not a turn and never a break", () => {
+  const s = parseSession([init, asst("a", usage(0, 5000, 0)), asst("b", usage(0, 300, 5000)), init, asst("z", usage(0, 0, 0)), asst("c", usage(0, 200, 5300))].join("\n"));
+  const r = analyzeSession(s);
+  assert.equal(r.turns.length, 3);
+  assert.deepEqual(r.turns.map((t) => t.break), [false, false, false]);
+});
