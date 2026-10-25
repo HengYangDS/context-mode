@@ -90,7 +90,7 @@ Read more: [docs/how-it-works.md](docs/how-it-works.md), [docs/algorithms.md](do
 ## Benchmarks
 
 Every number links to a data file and a reproduce command: [docs/benchmarks/](docs/benchmarks/README.md).
-Gateway, v2 and v1 side by side: [context-mode.com/benchmarks/gw-v2-v1](https://context-mode.com/benchmarks/gw-v2-v1).
+Gateway and plugin side by side: [context-mode.com/benchmarks](https://context-mode.com/benchmarks).
 
 ## Context Mode Gateway (paid)
 
