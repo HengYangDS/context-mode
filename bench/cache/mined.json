@@ -717,10 +717,10 @@
     "v2": {
       "total": {
         "sessions": 1738,
-        "turns": 8794,
-        "resumeTurns": 117,
-        "breaks": 8,
-        "breakRate": 0.0011337868480725624,
+        "turns": 8786,
+        "resumeTurns": 109,
+        "breaks": 0,
+        "breakRate": 0,
         "hitTurn": {
           "median": 0.9662492039906602,
           "p90": 0.9845433668963081
@@ -958,10 +958,10 @@
         },
         "compact-m2/r2-cmp": {
           "sessions": 154,
-          "turns": 1084,
-          "resumeTurns": 22,
-          "breaks": 7,
-          "breakRate": 0.007526881720430108,
+          "turns": 1077,
+          "resumeTurns": 15,
+          "breaks": 0,
+          "breakRate": 0,
           "hitTurn": {
             "median": 0.9660297239915074,
             "p90": 0.9830685817559213
@@ -998,10 +998,10 @@
         },
         "compact-m2/r3-check": {
           "sessions": 124,
-          "turns": 662,
-          "resumeTurns": 6,
-          "breaks": 1,
-          "breakRate": 0.0018587360594795538,
+          "turns": 661,
+          "resumeTurns": 5,
+          "breaks": 0,
+          "breakRate": 0,
           "hitTurn": {
             "median": 0.9597922181709205,
             "p90": 0.9838056680161943
@@ -1417,48 +1417,7 @@
           }
         }
       },
-      "breakList": [
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-log-e4471-line-0.jsonl",
-          "turn": 7,
-          "rewritten": 10995
-        },
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-tests-fail1-got-1.jsonl",
-          "turn": 9,
-          "rewritten": 13012
-        },
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-tests-fail1-got-2.jsonl",
-          "turn": 8,
-          "rewritten": 11100
-        },
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-tests-fail2-loc-0.jsonl",
-          "turn": 10,
-          "rewritten": 13181
-        },
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-tests-fail2-loc-1.jsonl",
-          "turn": 8,
-          "rewritten": 12812
-        },
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-tests-seed-1.jsonl",
-          "turn": 10,
-          "rewritten": 11554
-        },
-        {
-          "path": "compact-m2/r2-cmp/s1-main/main-v2-tests-seed-2.jsonl",
-          "turn": 8,
-          "rewritten": 11127
-        },
-        {
-          "path": "compact-m2/r3-check/n2/comb-held/heldout-v2-h-cfg-mailer-digest-0.jsonl",
-          "turn": 10,
-          "rewritten": 12172
-        }
-      ]
+      "breakList": []
     },
     "gateway": {
       "total": {
