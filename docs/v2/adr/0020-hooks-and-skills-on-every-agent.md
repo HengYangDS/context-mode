@@ -32,7 +32,7 @@ dispatch uses for a large output on that host.
 |---|---|---|---|---|---|
 | claude-code | plugin `hooks/claude-code.json` via `.claude-plugin/plugin.json` `hooks` (marketplace install) | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse | R D W I | R (`updatedToolOutput`) | plugin `skills/<name>/SKILL.md` (shipped in the package) |
 | codex | `$CODEX_HOME/hooks.json` (merge, user groups kept) + `[hooks.state."<key>"] trusted_hash` in `config.toml` | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse | D W I (R for MCP tools only) | D + redirect | `$CODEX_HOME/skills/<name>/SKILL.md` |
-| gemini | extension `hooks/hooks.json` (linked package dir) | BeforeAgent, BeforeTool, AfterTool, PreCompress | D I | D + redirect | extension `skills/<name>/SKILL.md` (linked package dir) |
+| gemini | extension `hooks/hooks.json` (linked package dir) | BeforeAgent, BeforeTool, AfterTool, PreCompress | R D I | R (AfterTool `decision: "deny"` + `reason`) | extension `skills/<name>/SKILL.md` (linked package dir) |
 | qwen | extension `config.hooks` -> `hooks/qwen.json` (linked package dir) | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse | D I | D + redirect | `~/.qwen/skills/<name>/SKILL.md` |
 | copilot-cli | `~/.copilot/hooks/context-mode.json` | sessionStart, userPromptSubmitted, preToolUse, postToolUse | D I (W via `modifiedArgs`, unverified) | D + redirect | `~/.copilot/skills/<name>/SKILL.md` |
 | vscode | `~/.copilot/hooks/context-mode-vscode.json` | SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact | D I | D + redirect | `~/.copilot/skills/<name>/SKILL.md` (shared with copilot-cli, one file set) |
