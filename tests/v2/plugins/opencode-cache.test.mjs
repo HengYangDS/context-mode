@@ -28,10 +28,19 @@ before(() => {
   delete process.env.CLAUDE_PROJECT_DIR;
 });
 
+// Windows keeps the plugin's store files open until the process ends; same cleanup as opencode-ported.test.mjs.
+function rmTemp(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) {
+    if (process.platform !== "win32" || err.code !== "EPERM") throw err;
+  }
+}
+
 after(() => {
   process.env.HOME = oldHome;
   if (oldProject !== undefined) process.env.CLAUDE_PROJECT_DIR = oldProject;
-  rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  rmTemp(root);
 });
 
 async function systemOf(hooks, sessionID) {
