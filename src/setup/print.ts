@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 
 import { editHostConfigText } from "../core/ops/host-config.ts";
+import { codexTrustEntries } from "./codex-trust.ts";
 import { renderSkill } from "./registry.ts";
 import type { CheckRow } from "./registry.ts";
 
@@ -21,14 +22,16 @@ export function shellWord(s: string): string {
 
 export function printPlan(row: CheckRow): PrintPlan {
   const steps: PrintStep[] = [];
+  const h = row.hookInstall;
   if (row.config) {
     const c = row.config;
-    const block = editHostConfigText(row.id, c.file, "", c.format, [[c.key, c.value]]).text;
+    // D-HA-CODEX-TRUST-1: codex trusts its hooks in the same config.toml, so the printed block carries the trust tables.
+    const trust = h.kind === "file" && h.trust === c.file ? codexTrustEntries(h.file, h.shape, h.command) : [];
+    const block = editHostConfigText(row.id, c.file, "", c.format, [[c.key, c.value], ...trust]).text;
     steps.push({ kind: "config", file: c.file, format: c.format, key: c.key, block });
   } else if (row.cli) {
     for (const args of row.cli.install) steps.push({ kind: "run", argv: [row.cli.bin, ...args], ...(row.cli.input ? { input: row.cli.input } : {}) });
   }
-  const h = row.hookInstall;
   if (h.kind === "file") steps.push({ kind: "hook", file: h.file, block: JSON.stringify(h.shape, null, 2) + "\n" });
   else if (h.kind === "plugin-list") steps.push({ kind: "hook", file: h.file, block: JSON.stringify({ [h.key[0]]: [h.entry] }, null, 2) + "\n" });
   const sk = row.skillInstall;
