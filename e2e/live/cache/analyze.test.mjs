@@ -114,3 +114,10 @@ test("verdict: the worst cross-session share under 0.9 fails; turn 1 is not in t
   assert.equal(v.crossOk, false);
   assert.equal(v.pass, false);
 });
+
+test("analyzeSession: a compact turn with no model call still exempts the first call of the next turn", () => {
+  const compactTurn = { calls: [], compacted: true };
+  const r = analyzeSession([turn([0, 0, 9000, 0]), compactTurn, turn([0, 4000, 5000, 0], [0, 9000, 40, 0])]);
+  assert.deepEqual(r.breaks, []);
+  assert.equal(r.postCompact.length, 1);
+});
