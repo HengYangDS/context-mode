@@ -68,7 +68,7 @@ Result: `docs/v2/spikes/cache/RESULT.md`. Rules: ADR-0021.
 
 | # | Item | Status | Next step |
 |---|---|---|---|
-| C1 | Cross-session prefix read below 0.9 on Claude Code (off min 0.72, v2 min 0.87) and Codex (0.847 both arms) | open, host side, not v2-only | Find if the tail differs per session |
+| C1 | Cross-session prefix read below 0.9 on Claude Code (after-fix n=9: off min 0.718, v2 min 0.876 without the zero pair; all n=12: off 0.715, v2 0.874) and Codex (0.847 both arms) | open, host side, not v2-only | Find if the tail differs per session |
 | C2 | One v2 Claude Code cross pair read 0 | open | Repeat the pair |
 | C3 | No live Pi or opencode cache run | open | Run when a login exists |
 | C4 | Gemini, qwen, copilot-cli, vscode, kiro, zcode unknown | open | Live two-turn run per host |

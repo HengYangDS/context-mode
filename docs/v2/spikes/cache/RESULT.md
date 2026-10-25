@@ -21,7 +21,7 @@ Does v2 break the prompt cache? Four sub-questions: (1) does hook text edit or r
 
 ## Mined numbers (2474 transcripts, Claude Code 2.1.303)
 
-Breaks: 0 in every arm. Source: `bench/cache/mined.json`, `bench/cache/mined.md`.
+Breaks: 0 in every arm. Source: `bench/cache/mined.json`, `bench/cache/mined.md`. Input set: `/private/tmp/cm-v2-impl-private/**` without `cache/`. A re-run over the whole root now also reads the 188 per-turn files of this spike under `cache/` (Claude Code 2.1.310) and gives 2662 files; the 2474 numbers come from the set without `cache/`.
 
 | arm | sessions | turns | hit/turn median | hit/session median | compact turns | compact hit median |
 |---|---|---|---|---|---|---|
@@ -38,14 +38,14 @@ Claude Code 2.1.310, claude-sonnet-5-5, effort low, n=3 per arm, 6 turns, turn 2
 
 Breaks per session: off 0,0,0; v2 0,0,0 (both runs). Pass.
 
-Mean hit ratio per turn (turns 1 to 6):
+Mean hit ratio per turn (turns 1 to 6), mean of the per-session `analysis.perTurn[i].hitRatio`, 3 decimals:
 
 | run | arm | t1 | t2 | t3 | t4 | t5 | t6 |
 |---|---|---|---|---|---|---|---|
-| first | off | 0.885 | 0.634 | 0.990 | 0.986 | 0.991 | 0.994 |
-| first | v2 | 0.944 | 0.670 | 0.990 | 0.963 | 0.988 | 0.995 |
+| first | off | 0.885 | 0.634 | 0.990 | 0.985 | 0.991 | 0.994 |
+| first | v2 | 0.943 | 0.670 | 0.990 | 0.963 | 0.988 | 0.995 |
 | after | off | 0.885 | 0.634 | 0.990 | 0.985 | 0.992 | 0.994 |
-| after | v2 | 0.855 | 0.670 | 0.991 | 0.962 | 0.989 | 0.995 |
+| after | v2 | 0.855 | 0.669 | 0.991 | 0.962 | 0.989 | 0.995 |
 
 Pooled turns 2-6: off 0.930, v2 0.931. Pass (v2 >= off - 0.02). Turn 2 is low in both arms because the file is written to cache.
 
@@ -53,10 +53,11 @@ First-turn prefix, median: off 6.3k tokens, v2 9.1k. v2 adds about 2.8k (9 tools
 
 Compact in mid-session (no break in either arm). First call after compact, off: read 5435, wrote 2739. v2: read 7064, wrote 4380. The compact turn is exempt. Post-compact hit: off 0.82, v2 0.77 (turn 5), then 0.95 and above.
 
-Cross-session share (second session back to back), all runs, n=9 pairs per arm:
+Cross-session share (second session back to back), after-fix runs only (`claude-code-after.json` 3 pairs + `claude-code-after-cross.json` 6 pairs), n=9 pairs per arm. The runner does not record the gap between the two sessions (`gapMs` is null); they run one after the other, so the gap is seconds, but the 4-minute rule is not proven from the JSON:
 
 - off: 0.718 to 0.9997, median 0.954, 3 of 9 below 0.9.
 - v2: 0.876 to 0.9998 in 8 of 9, median 0.974, 2 of 9 below 0.9. One pair read 0 (after-fix run, pair 2). I did not find the cause. The first run's three v2 shares were 0.897, 0.874, 0.935.
+- All runs (add the first run, n=12 pairs per arm): off min 0.715 (first run 0.7152), 4 of 12 below 0.9; v2 min 0.874 without the zero pair, 4 of 12 below 0.9 (one of them 0).
 - Verdict flag `crossOk` is false in both files because of the 0.9 bar. off fails it too. This is the host and provider, not only v2. Tail of ~1.2k tokens is written again in some v2 pairs; cause not proven.
 
 ## Live Codex A/B
@@ -66,7 +67,8 @@ codex-cli 0.156.1, gpt-6-astra, effort low, 5 turns via `codex exec` then `resum
 - Breaks per session: off 1,0,1,1,1 (mean 0.8). v2 2,0,0,0,2 (mean 0.8). Pass.
 - Hit ratio turns 2-5, pooled: off 0.913, v2 0.927. Pass.
 - First request input: off 14364-14372, v2 14372-14380.
-- Cross-session: off 12160 of 14350 = 0.847. v2 12160 of 14358 = 0.847. Fail the 0.9 bar, identical in both arms. The cached part stops at 12160 in every first request. Cause not found.
+- Cross-session, one pair per arm per file: `codex.json` off 12160 of 14342 = 0.848, v2 12160 of 14350 = 0.847; `codex-r3.json` off 12160 of 14350 = 0.847, v2 12160 of 14358 = 0.847. Fail the 0.9 bar, the same in both arms.
+- Per-file verdict: `codex.json` (n=2) has `pass.breaks` false (v2 2 breaks, off 1). The pooled n=5 mean (0.8 both arms) passes. The cached part stops at 12160 in every first request. Cause not found.
 
 ## Host table
 
