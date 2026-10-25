@@ -41,7 +41,8 @@ export function printPlan(row: CheckRow): PrintPlan {
 function extraText(p: PrintPlan): string {
   let out = "";
   for (const s of p.steps) {
-    if (s.kind === "hook") out += `\nHooks: put this in ${s.file} (keep your own entries):\n\n${s.block}`;
+    // The hook block is a host file format (kiro writes "version": "v1"); the text names it, --json carries it.
+    if (s.kind === "hook") out += `\nHooks: add the hook block from \`context-mode setup --print ${p.agent} --json\` to ${s.file}\n(keep your own entries).\n`;
     if (s.kind === "skill") out += `\nSkill: put this in ${s.file}:\n\n${s.block}`;
   }
   return out;

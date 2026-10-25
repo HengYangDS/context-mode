@@ -15,45 +15,8 @@ and keep the rest. These paths are for this machine.)
   }
 }
 
-Hooks: put this in <HOME>/.zcode/cli/config.json (keep your own entries):
-
-{
-  "hooks": {
-    "enabled": true,
-    "events": {
-      "SessionStart": [
-        {
-          "type": "command",
-          "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent zcode",
-          "timeoutMs": 5000
-        }
-      ],
-      "UserPromptSubmit": [
-        {
-          "type": "command",
-          "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent zcode",
-          "timeoutMs": 5000
-        }
-      ],
-      "PreToolUse": [
-        {
-          "type": "command",
-          "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent zcode",
-          "timeoutMs": 5000,
-          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
-        }
-      ],
-      "PostToolUse": [
-        {
-          "type": "command",
-          "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent zcode",
-          "timeoutMs": 5000,
-          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
-        }
-      ]
-    }
-  }
-}
+Hooks: add the hook block from `context-mode setup --print zcode --json` to <HOME>/.zcode/cli/config.json
+(keep your own entries).
 
 Skill: put this in <HOME>/.zcode/skills/ctx-doctor/SKILL.md:
 

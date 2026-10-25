@@ -15,48 +15,8 @@ and keep the rest. These paths are for this machine.)
   }
 }
 
-Hooks: put this in <HOME>/.copilot/hooks/context-mode-vscode.json (keep your own entries):
-
-{
-  "version": 1,
-  "hooks": {
-    "SessionStart": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent vscode",
-        "timeout": 5
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent vscode",
-        "timeout": 5
-      }
-    ],
-    "PreToolUse": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent vscode",
-        "timeout": 5
-      }
-    ],
-    "PostToolUse": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent vscode",
-        "timeout": 5
-      }
-    ],
-    "PreCompact": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent vscode",
-        "timeout": 5
-      }
-    ]
-  }
-}
+Hooks: add the hook block from `context-mode setup --print vscode --json` to <HOME>/.copilot/hooks/context-mode-vscode.json
+(keep your own entries).
 
 Skill: put this in <HOME>/.copilot/skills/ctx-doctor/SKILL.md:
 

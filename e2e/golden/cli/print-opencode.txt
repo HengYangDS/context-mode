@@ -17,13 +17,8 @@ and keep the rest. These paths are for this machine.)
   }
 }
 
-Hooks: put this in <HOME>/.config/opencode/opencode.json (keep your own entries):
-
-{
-  "plugin": [
-    "<PKG>/opencode/plugin.js"
-  ]
-}
+Hooks: add the hook block from `context-mode setup --print opencode --json` to <HOME>/.config/opencode/opencode.json
+(keep your own entries).
 
 Skill: put this in <HOME>/.config/opencode/skills/ctx-doctor/SKILL.md:
 

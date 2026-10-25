@@ -122,7 +122,7 @@ test("ADR-0020: user hooks in a shared hook file are kept; second run changes no
 });
 
 test("ADR-0020: --print lists the hook step and the skill step for every agent", () => {
-  for (const row of buildRegistry({ home: "/h", pkgDir: "/p", env: {} })) {
+  for (const row of buildRegistry({ home: "/h", pkgDir: REPO, env: {} })) { // REPO holds skills/ like the package
     const kinds = printPlan(row).steps.map((s) => s.kind);
     assert.ok(row.hookInstall, row.id + " hookInstall");
     assert.ok(row.skillInstall, row.id + " skillInstall");

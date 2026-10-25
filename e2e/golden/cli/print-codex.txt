@@ -6,58 +6,8 @@ and keep the rest. These paths are for this machine.)
 command = "<NODE>"
 args = ["<PKG>/server.mjs", "--agent", "codex"]
 
-Hooks: put this in <HOME>/.codex/hooks.json (keep your own entries):
-
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent codex",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent codex",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent codex",
-            "timeout": 5
-          }
-        ],
-        "matcher": "^(Bash|apply_patch|mcp__context_mode__ctx_.*)$"
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent codex",
-            "timeout": 5
-          }
-        ],
-        "matcher": "^(Bash|apply_patch|mcp__context_mode__ctx_.*)$"
-      }
-    ]
-  }
-}
+Hooks: add the hook block from `context-mode setup --print codex --json` to <HOME>/.codex/hooks.json
+(keep your own entries).
 
 Skill: put this in <HOME>/.codex/skills/ctx-doctor/SKILL.md:
 

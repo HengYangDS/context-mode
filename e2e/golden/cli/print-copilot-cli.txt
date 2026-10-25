@@ -2,41 +2,8 @@ Manual setup for copilot-cli. Run:
 
 copilot mcp add context-mode -- <NODE> <PKG>/server.mjs --agent copilot-cli
 
-Hooks: put this in <HOME>/.copilot/hooks/context-mode.json (keep your own entries):
-
-{
-  "version": 1,
-  "hooks": {
-    "sessionStart": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent copilot-cli",
-        "timeoutSec": 5
-      }
-    ],
-    "userPromptSubmitted": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent copilot-cli",
-        "timeoutSec": 5
-      }
-    ],
-    "preToolUse": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent copilot-cli",
-        "timeoutSec": 5
-      }
-    ],
-    "postToolUse": [
-      {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent copilot-cli",
-        "timeoutSec": 5
-      }
-    ]
-  }
-}
+Hooks: add the hook block from `context-mode setup --print copilot-cli --json` to <HOME>/.copilot/hooks/context-mode.json
+(keep your own entries).
 
 Skill: put this in <HOME>/.copilot/skills/ctx-doctor/SKILL.md:
 

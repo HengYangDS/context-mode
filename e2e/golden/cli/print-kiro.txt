@@ -15,55 +15,8 @@ and keep the rest. These paths are for this machine.)
   }
 }
 
-Hooks: put this in <HOME>/.kiro/hooks/context-mode.json (keep your own entries):
-
-{
-  "version": "v1",
-  "hooks": [
-    {
-      "name": "context-mode-SessionStart",
-      "trigger": "SessionStart",
-      "action": {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent kiro"
-      },
-      "timeout": 5,
-      "enabled": true
-    },
-    {
-      "name": "context-mode-UserPromptSubmit",
-      "trigger": "UserPromptSubmit",
-      "action": {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent kiro"
-      },
-      "timeout": 5,
-      "enabled": true
-    },
-    {
-      "name": "context-mode-PreToolUse",
-      "trigger": "PreToolUse",
-      "action": {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent kiro"
-      },
-      "timeout": 5,
-      "enabled": true,
-      "matcher": "@mcp"
-    },
-    {
-      "name": "context-mode-PostToolUse",
-      "trigger": "PostToolUse",
-      "action": {
-        "type": "command",
-        "command": "\"<NODE>\" \"<PKG>/hook.mjs\" --agent kiro"
-      },
-      "timeout": 5,
-      "enabled": true,
-      "matcher": "@mcp"
-    }
-  ]
-}
+Hooks: add the hook block from `context-mode setup --print kiro --json` to <HOME>/.kiro/hooks/context-mode.json
+(keep your own entries).
 
 Skill: put this in <HOME>/.kiro/skills/ctx-doctor/SKILL.md:
 
