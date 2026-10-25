@@ -180,3 +180,60 @@ test("ADR-0020: doctor fails hook-registered when the hook file lost the entry, 
   assert.equal(d.exitCode, 1);
   assert.equal(d.agents[0].status, "FAIL");
 });
+
+// Codex 0.164.0 runs a hooks.json hook only when config.toml holds [hooks.state."<realpath>:<snake_event>:<group>:<handler>"]
+// trusted_hash = "sha256:<hex>" (probe: codex app-server hooks/list gives trustStatus trusted / modified / untrusted).
+// The hash is sha256 of the sorted-key JSON {event_name, matcher?, hooks:[{type, command, timeout, async:false}]}
+// (checked against currentHash from hooks/list for five hooks, D-HA-CODEX-TRUST-1).
+import { createHash } from "node:crypto";
+import { realpathSync } from "node:fs";
+const sortKeys = (v) => Array.isArray(v) ? v.map(sortKeys)
+  : v && typeof v === "object" ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v;
+const SNAKE = { PreToolUse: "pre_tool_use", PostToolUse: "post_tool_use", SessionStart: "session_start", UserPromptSubmit: "user_prompt_submit" };
+function codexTrust(file) {
+  const doc = JSON.parse(readFileSync(file, "utf8"));
+  const out = {};
+  for (const [ev, groups] of Object.entries(doc.hooks)) groups.forEach((g, gi) => g.hooks.forEach((h, hi) => {
+    const id = { event_name: SNAKE[ev], hooks: [{ ...h, async: false }] };
+    if (g.matcher !== undefined) id.matcher = g.matcher;
+    out[`${realpathSync(file)}:${SNAKE[ev]}:${gi}:${hi}`] = { cmd: h.command, hash: "sha256:" + createHash("sha256").update(JSON.stringify(sortKeys(id))).digest("hex") };
+  }));
+  return out;
+}
+
+test("ADR-0020: codex setup trusts each own hook in config.toml; user hooks are not trusted; remove restores", async (t) => {
+  const s = sandbox(t);
+  const hooks = path.join(s.home, ".codex", "hooks.json");
+  mkdirSync(path.dirname(hooks), { recursive: true });
+  writeFileSync(hooks, JSON.stringify({ hooks: { PreToolUse: [{ matcher: "Edit", hooks: [{ type: "command", command: "my-lint" }] }] } }));
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "a" });
+  assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+  const toml = readFileSync(path.join(s.home, ".codex", "config.toml"), "utf8");
+  const want = codexTrust(hooks);
+  let own = 0;
+  for (const [key, { cmd, hash }] of Object.entries(want)) {
+    const block = `[hooks.state.${JSON.stringify(key)}]\ntrusted_hash = ${JSON.stringify(hash)}\n`;
+    if (cmd === hookCmd(s.pkgDir, "codex")) { own += 1; assert.ok(toml.includes(block), "trusted: " + key); }
+    else assert.ok(!toml.includes(JSON.stringify(key)), "user hook not trusted: " + key);
+  }
+  assert.equal(own, 4);
+  assert.ok(toml.includes("[mcp_servers.context-mode]"), "server entry kept");
+  const second = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "b" });
+  assert.deepEqual(second.agents.map((a) => a.changes), [[]], "idempotent");
+  assert.equal(runRemove({ home: s.home }).exitCode, 0);
+  assert.equal(existsSync(path.join(s.home, ".codex", "config.toml")), false, "created config.toml removed");
+});
+
+test("ADR-0020: codex doctor fails hook-registered when a trusted_hash does not match the hook", async (t) => {
+  const s = sandbox(t);
+  const { runDoctor } = await import("../../../src/setup/index.ts");
+  await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r1" });
+  const cfg = path.join(s.home, ".codex", "config.toml");
+  const toml = readFileSync(cfg, "utf8");
+  const first = Object.values(codexTrust(path.join(s.home, ".codex", "hooks.json")))[0].hash;
+  writeFileSync(cfg, toml.split(first).join("sha256:" + "0".repeat(64)));
+  const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+  const reg = d.agents[0].checks.find((c) => c.name === "hook-registered");
+  assert.equal(reg.ok, false);
+  assert.match(reg.detail, /not trusted/);
+});
