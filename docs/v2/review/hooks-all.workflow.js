@@ -47,6 +47,8 @@ Gateway repo /Users/mksglu/Server/Mert/context-mode-sandbox: READ ONLY.
 Own temp space only: /private/tmp/cm-v2-ha-${id} (clone with --depth 1 or full as needed, temp HOME, temp npm prefix). NEVER edit the real ~/.claude, ~/.codex, ~/.gemini, ~/.qwen, ~/.copilot, ~/.config, ~/.pi, ~/.vscode, ~/.kiro, ~/.zcode. To use a login, copy only the credential file into the temp HOME. Delete the temp space before you return.
 Owner rule (2026-10-25): every agent gets hooks, no exception, or saving does not work. Never write instruction files (CLAUDE.md, AGENTS.md, GEMINI.md ...). No fallback paths: one defined channel per agent. No regex/truncation as a mechanism. Tests first (red commit before green); never weaken an assertion; never raise a budget; DEVIATIONS.md row per behaviour change; frozen evals e2e/live/compact-hard and bench/m2 never edited. No personal names, tenant ids or secrets.`
 
+const PACE = `Pace (owner 2026-10-25): commit + push about every minute of work: after every file you change and after every test run, small WIP commits are fine ("wip: ..."). Never hold unpushed work. On start, fetch the branch first and continue from what is already pushed; never redo pushed commits.`
+
 phase('Verify')
 const ver = (await parallel(AGENTS.map((a) => () => agent(`${base('v-' + a)}\n\nRole: host researcher for ${a}. Do not commit.
 Find, from PRIMARY sources only (the host's official docs/changelog/source repo, and the CLI you install into a temp prefix and run with --help / a probe), for the CURRENT version:
@@ -62,7 +64,7 @@ const noHooks = ver.filter((v) => !v.hookEvents.length)
 log(`verified ${ver.length}/${AGENTS.length}; hosts with no hook channel found: ${noHooks.map((v) => v.agent).join(', ') || 'none'}`)
 
 phase('Build')
-const BUILD = `${base('build')}\n\nBranch exp/hooks-all from v2-design head. Commit + push to that branch after each step (pull --rebase on reject).
+const BUILD = `${base('build')}\n\nBranch exp/hooks-all from v2-design head. Commit + push to that branch after each step (pull --rebase on reject). ${PACE}
 Host facts (verified): ${JSON.stringify(ver).slice(0, 14000)}
 Do:
 1. ADR-0020 "Hooks and skills on every agent": per agent the hook channel, events, effects, skill channel, sources, and how saving works there (which of deny/rewrite/replace/inject the dispatch uses for that host). No exception rows.
@@ -95,7 +97,7 @@ phase('Fix')
 for (let round = 1; round <= 2; round++) {
   const failed = AGENTS.filter((a) => !(live.find((l) => l.agent === a) || {}).pass)
   if (!failed.length) break
-  await agent(`${base('fix' + round)}\n\nBranch exp/hooks-all. Commit + push after each step. Live test failures: ${JSON.stringify(live.filter((l) => failed.includes(l.agent))).slice(0, 10000)}. Host facts: ${JSON.stringify(ver.filter((v) => failed.includes(v.agent))).slice(0, 6000)}.
+  await agent(`${base('fix' + round)}\n\nBranch exp/hooks-all. Commit + push after each step. ${PACE} Live test failures: ${JSON.stringify(live.filter((l) => failed.includes(l.agent))).slice(0, 10000)}. Host facts: ${JSON.stringify(ver.filter((v) => failed.includes(v.agent))).slice(0, 6000)}.
 Fix each at the root (tests first). If a failure is only a missing login or a host that cannot run headless, do not fake it: find a headless path from the host's own docs (e.g. its CLI or test harness) and use it; if none exists, record it in ADR-0020 open items. node --test tests/v2/ and gate --all --quick green. Return done, sha, commits, numbers, summary.`,
     { label: `ha-fix-${round}`, phase: 'Fix', schema: RESULT, ...OPH })
   const again = (await parallel(failed.map((a) => () => liveTest(a, `-r${round}`)))).filter(Boolean)
@@ -105,9 +107,10 @@ Fix each at the root (tests first). If a failure is only a missing login or a ho
 
 phase('Ship')
 const m = await agent(`${base('merge')}\n\nLive results: ${JSON.stringify(live.map((l) => ({ agent: l.agent, pass: l.pass, off: l.bytesOff, v2: l.bytesV2, problems: l.problems.slice(0, 2) }))).slice(0, 6000)}.
+${PACE}
 Merge rule: merge exp/hooks-all into v2-design (no force-push) if node --test tests/v2/ 0 fail, gate --all --quick green, and no agent that passed setup+doctor on v2-design head fails it on the branch. Merge at once when the rule holds, even if some hosts still fail live (they stay listed as open). Then update every docs/install/<agent>.md "What setup changes" (hooks and skills it installs, effects used) and docs/install/README.md with a table: agent, hook channel, skills, live saving result (bytes off -> v2, date, host version). Write docs/v2/spikes/hooks-all/RESULT.md with every live run. Update OPEN-ITEMS.md. Commit, push. Return done, sha, commits, numbers, summary.`,
   { label: 'ha-merge', phase: 'Ship', schema: RESULT, ...OPH })
-const rv = await agent(`${base('review')}\n\nRole: one review of the merged hooks-all work. Merge report: ${JSON.stringify(m).slice(0, 2500)}. Fresh clone of v2-design. Check: every adapter row has hookChannel and skillChannel and the CI test enforces it; setup writes only allow-listed files and no instruction files; --remove restores byte for byte; doctor's registered/runs/seen checks are real (not just running the bundle); skills rendered with each host's tool prefix from one source; no fallback branches; red before green; DEVIATIONS rows; docs table matches RESULT.md. Fix small defects (tests first), list big ones. Return pass, problems, summary.`,
+const rv = await agent(`${base('review')}\n\nRole: one review of the merged hooks-all work. Merge report: ${JSON.stringify(m).slice(0, 2500)}. Fresh clone of v2-design. Check: every adapter row has hookChannel and skillChannel and the CI test enforces it; setup writes only allow-listed files and no instruction files; --remove restores byte for byte; doctor's registered/runs/seen checks are real (not just running the bundle); skills rendered with each host's tool prefix from one source; no fallback branches; red before green; DEVIATIONS rows; docs table matches RESULT.md. Fix small defects (tests first), list big ones. ${PACE} Return pass, problems, summary.`,
   { label: 'ha-review', phase: 'Ship', schema: CHECK, ...SNH })
 const g = await agent(`${base('gate')}\n\nRole: gate on v2-design. Fresh clone, install, build, node scripts/gate.mjs --all twice, build/check-install-docs.mjs, build/check-secrets.mjs, node bench/fixtures/run.mjs --check. Do not fix. Return green, failing, summary.`,
   { label: 'ha-gate', phase: 'Ship', schema: GATE, ...HKM })
