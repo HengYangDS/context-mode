@@ -78,3 +78,28 @@ export function crossSession(a, b) {
   const bRead = b.calls[0].cacheRead;
   return { aPrefix, bRead, bCreation: b.calls[0].cacheCreation, share: aPrefix === 0 ? 0 : bRead / aPrefix };
 }
+
+const mean = (xs) => (xs.length === 0 ? 0 : xs.reduce((n, x) => n + x, 0) / xs.length);
+
+/** Pooled hit ratio of turns 2-6 (index 1..5) over all sessions of an arm. */
+export function pooledHit(arm) {
+  let read = 0, all = 0;
+  for (const s of arm.sessions) for (const t of s.perTurn.slice(1, 6)) { read += t.cacheRead; all += t.cacheRead + t.cacheCreation + t.input; }
+  return all === 0 ? 0 : read / all;
+}
+
+/**
+ * Owner pass rule. off and v2 are { sessions: analyzeSession[], cross: crossSession[] }.
+ * breaksOk: v2 mean breaks per session <= off. hitOk: v2 pooled hit ratio on turns 2-6 >= off - 0.02.
+ * crossOk: the lowest v2 cross-session share >= 0.9.
+ */
+export function verdict(off, v2) {
+  const offBreaks = mean(off.sessions.map((s) => s.breaks.length));
+  const v2Breaks = mean(v2.sessions.map((s) => s.breaks.length));
+  const offHit = pooledHit(off), v2Hit = pooledHit(v2);
+  const minShare = v2.cross.length === 0 ? 0 : Math.min(...v2.cross.map((c) => c.share));
+  const breaksOk = v2Breaks <= offBreaks;
+  const hitOk = v2Hit >= offHit - 0.02 - 1e-12;
+  const crossOk = minShare >= 0.9;
+  return { offBreaks, v2Breaks, offHit, v2Hit, minShare, breaksOk, hitOk, crossOk, pass: breaksOk && hitOk && crossOk };
+}
