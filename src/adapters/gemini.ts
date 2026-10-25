@@ -1,7 +1,7 @@
 // impl/10 §4 + shared decode/encode pseudocode. Gemini CLI (gemini-cli@51617c1, spike-hooks-verified.md Gemini row).
 // Native events: SessionStart (decoded, but no hook entry since D-FU-GCH-1) / BeforeAgent / BeforeTool / AfterTool, plus PreCompress -> aux PreCompact (impl/10 §1.4).
 // Own prefix mcp_context-mode_ (single underscore, TECH-SPEC §3.8). No subagent field, no BeforeTool hint field,
-// no replace field. Deny is the JSON `decision` field on exit 0 (DEVIATIONS D-M3-A1-1).
+// replace is AfterTool decision deny + reason (D-HA-GEMINI-REPLACE-1). Deny is the JSON `decision` field on exit 0 (DEVIATIONS D-M3-A1-1).
 import type { CanonicalHookEvent, Decision, HookOutput, ToolResultInfo } from "../core/contracts/types.ts";
 
 export const TOOL_NAME_PREFIX = "mcp_context-mode_"; // impl/10 §1.3, TECH-SPEC §3.8 Gemini row
@@ -55,9 +55,13 @@ function canonicalName(name: string, mcp: unknown): string {
 }
 
 // tool_response is Gemini's {llmContent, returnDisplay, error?}; a non-null `error` marks failure (DEVIATIONS D-M3-A1-3).
+// D-HA-GEMINI-REPLACE-1: a string llmContent is the text the model sees, so it is the result text a replace selects
+// from; any other shape (Part list) stays the JSON text, as before.
 function readResult(resp: unknown): ToolResultInfo {
-  const text = resp === undefined ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
-  const err = typeof resp === "object" && resp !== null ? own(resp as Record<string, unknown>, "error") : undefined;
+  const obj = typeof resp === "object" && resp !== null ? (resp as Record<string, unknown>) : undefined;
+  const llm = obj === undefined ? undefined : own(obj, "llmContent");
+  const text = resp === undefined ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : JSON.stringify(resp);
+  const err = obj === undefined ? undefined : own(obj, "error");
   return { isError: err !== undefined && err !== null, bytes: Buffer.byteLength(text), text };
 }
 
@@ -97,6 +101,9 @@ export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): Ho
       if (!DENY_EVENTS.includes(ev.event)) return EMPTY;
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === undefined ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
-      return EMPTY; // no replace field on Gemini (impl/10 §4); case C has no substitute here
+      // gemini-cli 0.65.0 docs/hooks/reference.md AfterTool: decision "deny" + reason, the reason replaces the tool
+      // result sent to the model (D-HA-GEMINI-REPLACE-1).
+      if (ev.event !== "PostToolUse") return EMPTY;
+      return { stdout: JSON.stringify({ decision: "deny", reason: d.output }), exitCode: 0 };
   }
 }

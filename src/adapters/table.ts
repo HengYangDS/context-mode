@@ -116,7 +116,8 @@ const BY_ID = new Map<AgentId, AdapterRow>(ADAPTERS.map((r) => [r.id, r]));
 // D-M7-RR-1 (DECISIONS-r10): rows whose encode writes a PostToolUse replace (claude-code updatedToolOutput,
 // pi tool_result rewrite). On these rows the main agent gets "run, then replace" and no Bash size-guess deny;
 // every other row keeps its one path (ADR-0001).
-const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "pi"]);
+// gemini: AfterTool decision deny + reason replaces the result (D-HA-GEMINI-REPLACE-1).
+const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "pi"]);
 
 export function hasReplace(row: AdapterRow): boolean {
   return REPLACE_ROWS.has(row.id);
