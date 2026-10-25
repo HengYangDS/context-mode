@@ -1,7 +1,7 @@
 // src/setup/engine.ts
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
-import { codexTrustEntries } from "./codex-trust.ts";
+import { CODEX_TRUST_PATH, codexTrustEntries } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -344,7 +344,7 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   const edits: FileEdit[] = [];
   try { planHookInstall(row, edits); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
   if (!edits.length) return { name: "hook-registered", ok: true };
-  if (h.trust && edits.every((e) => e.file === h.trust)) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${h.trust}; re-run setup` };
+  if (h.trust && edits.every((e) => e.file === h.trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${h.trust}; re-run setup` };
   return { name: "hook-registered", ok: false, detail: `${h.file} lacks the context-mode hook entry` };
 }
 
@@ -511,7 +511,9 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
     const listed = needsBin ? listCheck(row, ctx.env)?.ok === true : false;
     plan = planRow(row, listed);
   } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
-  res.v1 = detectV1(row.id, ctx.home).filter((f) => !(row.config && f.file === row.config.file && !plan.edits.some((e) => e.file === f.file)));
+  // The config entry is current when the plan changes nothing in that file but codex trust entries.
+  const configEdited = (file: string): boolean => plan.edits.some((e) => e.file === file && e.changes.some((c) => !isTrust(row, c)));
+  res.v1 = detectV1(row.id, ctx.home).filter((f) => !(row.config && f.file === row.config.file && !configEdited(f.file)));
   res.changes = [...plan.edits.flatMap((e) => e.changes), ...plan.cli.map((args) => ({ command: [row.cli!.bin, ...args] }))];
   if (dryRun) return res;
   try {
@@ -570,9 +572,10 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
 }
 
 /** D-HA-CODEX-TRUST-1: the only planned change is a trust entry, so the hooks are there and hook-registered names it. */
-function onlyTrust(row: CheckRow, changes: Change[]): boolean {
+function onlyTrust(row: CheckRow, changes: Change[]): boolean { return changes.every((c) => isTrust(row, c)); }
+function isTrust(row: CheckRow, c: Change): boolean {
   const h = row.hookInstall;
-  return h.kind === "file" && h.trust !== undefined && changes.every((c) => c.file === h.trust);
+  return h.kind === "file" && h.trust !== undefined && c.file === h.trust && typeof c.path === "string" && c.path.startsWith(CODEX_TRUST_PATH);
 }
 
 /** setup --remove: undo every recorded run, newest first, so each touched file gets its pre-setup bytes back. */

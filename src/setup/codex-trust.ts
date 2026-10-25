@@ -10,6 +10,8 @@ import path from "node:path";
 type Json = Record<string, unknown>;
 const isObj = (v: unknown): v is Json => typeof v === "object" && v !== null && !Array.isArray(v);
 const TRUST_KEY = ["hooks", "state"] as const;
+/** The change path every trust edit starts with (editHostConfigText joins the key path with "."). */
+export const CODEX_TRUST_PATH = TRUST_KEY.join(".") + ".";
 const HASH_FIELD = "trusted_hash";
 const HASH_PREFIX = "sha256:";
 
