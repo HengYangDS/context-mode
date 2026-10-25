@@ -1,20 +1,22 @@
 # Install context-mode v2 on VS Code (Copilot)
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for VS Code (Copilot), the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for VS Code (Copilot): Writes the `context-mode` entry (key `servers`) to `.vscode/mcp.json` under your home folder, with the absolute `node` and `server.mjs` paths.
-
-It writes `~/.vscode/mcp.json`. Hooks: not written. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
-
-Manual fallback. Writes the same entry with one `node` command. For one project, run it from a copy that points `f` at that project's `.vscode/mcp.json`.
-
 ```sh
-node -e 'const fs=require("fs"),p=require("path"),cp=require("child_process"),h=require("os").homedir(),f=p.join(h,".vscode","mcp.json"),s=p.join(cp.execSync("npm root -g").toString().trim(),"context-mode","server.mjs");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}(c.servers??={})["context-mode"]=({command:process.execPath,args:[s,"--agent","vscode"]});fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2))'
+npm i -g context-mode@next
+context-mode setup --agents vscode
 ```
 
-Restart VS Code (Copilot) after the install.
+Restart VS Code (Copilot) after setup.
+
+Prefer to do it by hand? Run `context-mode setup --print vscode` and follow what it prints.
+
+## What setup changes
+
+- Adds the `context-mode` entry (key `servers`) to `~/.vscode/mcp.json`. Other servers stay.
+- Writes no hooks.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -24,28 +26,19 @@ context-mode doctor --agents vscode
 
 Open VS Code, open the MCP server list, and run `/ctx-doctor` in Copilot agent mode.
 
-## Update
+## Remove
 
 ```sh
-npm i -g context-mode@next && context-mode setup --repair --agents vscode
+context-mode setup --remove --agents vscode
 ```
 
-Or run `context-mode upgrade --agents vscode`. After the owner moves the `latest` tag, drop `@next`.
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Known limits
 
 - Setup writes no hook file. VS Code reads hooks from `.github/hooks/` in a project; that is not part of the setup run.
 - VS Code itself was not run, so no run showed that VS Code reads `.vscode/mcp.json` under the home folder.
 - The shipped `hooks/vscode.json` is a template: the writer fills the path; do not copy hooks/vscode.json by hand.
-
-
-## Uninstall
-
-```sh
-context-mode setup --remove --agents vscode
-```
-
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 

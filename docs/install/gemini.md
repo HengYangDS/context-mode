@@ -1,20 +1,29 @@
 # Install context-mode v2 on Gemini CLI
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Gemini CLI, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for Gemini CLI: Runs `gemini extensions link <package folder> --consent`. The extension ships the MCP server (`gemini-extension.json`) and the hooks (`hooks/hooks.json`). Setup uses `link`, not `install`, because `install <folder>` waits on a trust prompt and hangs (D-INST-1). It checks the result with `gemini extensions list`, which prints to stderr in 0.65.0 (D-INST-2). It drops old context-mode hook commands from `~/.gemini/settings.json`.
+```sh
+npm i -g context-mode@next
+context-mode setup --agents gemini
+```
 
-It writes `~/.gemini/extensions/context-mode/` (link), `extension-enablement.json`. Hooks: shipped by the extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+Restart Gemini CLI after setup.
 
-Manual fallback. The git route installs the extension from the `release` branch. It updates by itself.
+Prefer to do it by hand? Run `context-mode setup --print gemini` and follow what it prints.
+
+Gemini CLI can also install the extension from git, from the `release` branch. It updates by itself:
 
 ```sh
 gemini extensions install https://github.com/mksglu/context-mode --ref release --consent
 ```
 
-Restart Gemini CLI after the install.
+## What setup changes
+
+- Runs `gemini extensions link` on the installed package folder, with `--consent`. It uses `link`, because `install` on a folder hangs on a trust prompt (D-INST-1).
+- The extension brings the MCP server and the hooks.
+- Removes old context-mode hook commands from `~/.gemini/settings.json`.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -25,29 +34,21 @@ GEMINI_CLI_TRUST_WORKSPACE=true gemini mcp list
 
 `gemini mcp list` does not ask about trust, so in an untrusted folder it shows `Disabled`. The variable above checks the server without that step. `context-mode` must show Connected. Then run `/ctx-doctor` in Gemini CLI.
 
-## Update
+## Remove
 
 ```sh
-npm i -g context-mode@next && context-mode setup --repair --agents gemini
+context-mode setup --remove --agents gemini
 ```
 
-Or run `context-mode upgrade --agents gemini`. After the owner moves the `latest` tag, drop `@next`.
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+
+If you used the git route, run `gemini extensions uninstall context-mode`.
 
 ## Known limits
 
 - `gemini extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
 - `hooks/hooks.json` has no SessionStart (D-FU-GCH-1). The resume hint comes on the first BeforeAgent of a session (D-FU-GCH-2).
 - No live, logged-in Gemini session loaded the hooks in any run.
-
-
-## Uninstall
-
-```sh
-context-mode setup --remove --agents gemini
-gemini extensions uninstall context-mode
-```
-
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 

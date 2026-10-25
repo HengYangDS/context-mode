@@ -75,7 +75,7 @@ will not fit whole becomes a one-line pointer into `ctx_search` instead (`docs/a
 
 ## Data flow, end to end
 
-```
+```text
 agent asks for something
         |
         v
@@ -95,7 +95,7 @@ agent asks for something
                        agent sees: best-matching whole chunks (<= 96 B) + "ctx_search(...) for more"
 ```
 
-```
+```text
 agent runs ctx_search(queries, scope)
         |
         v

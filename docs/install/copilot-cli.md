@@ -1,20 +1,22 @@
 # Install context-mode v2 on Copilot CLI
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Copilot CLI, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for Copilot CLI: Runs `copilot mcp add context-mode -- node <package>/server.mjs --agent copilot-cli`. It rewrites old context-mode hook commands in `~/.copilot/hooks/context-mode.json` to the absolute v2 form, but only if that file exists.
-
-It writes `~/.copilot/mcp-config.json`. Hooks: not written on a fresh HOME. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
-
-Manual fallback. Same command that setup runs, with the package path filled by `npm root -g`.
-
 ```sh
-copilot mcp add context-mode -- node "$(npm root -g)/context-mode/server.mjs" --agent copilot-cli
+npm i -g context-mode@next
+context-mode setup --agents copilot-cli
 ```
 
-Restart Copilot CLI after the install.
+Restart Copilot CLI after setup.
+
+Prefer to do it by hand? Run `context-mode setup --print copilot-cli` and follow what it prints.
+
+## What setup changes
+
+- Runs `copilot mcp add context-mode`, which writes `~/.copilot/mcp-config.json`.
+- Updates old context-mode hook commands in `~/.copilot/hooks/context-mode.json`, only if that file exists.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -25,29 +27,19 @@ copilot mcp list
 
 `context-mode` must be listed. Then run `/ctx-doctor` in Copilot CLI.
 
-## Update
+## Remove
 
 ```sh
-npm i -g context-mode@next && context-mode setup --repair --agents copilot-cli
+context-mode setup --remove --agents copilot-cli
 ```
 
-Or run `context-mode upgrade --agents copilot-cli`. After the owner moves the `latest` tag, drop `@next`.
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Known limits
 
 - On a fresh HOME setup writes `~/.copilot/mcp-config.json` only; no hook file.
 - The plugin install does not work yet: the release branch has no `marketplace.json` for Copilot.
 - The shipped `hooks/copilot-cli.json` is a template: the writer fills the path; do not copy hooks/copilot-cli.json by hand.
-
-
-## Uninstall
-
-```sh
-context-mode setup --remove --agents copilot-cli
-copilot mcp remove context-mode
-```
-
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 

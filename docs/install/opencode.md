@@ -1,20 +1,22 @@
 # Install context-mode v2 on OpenCode
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for OpenCode, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for OpenCode: Writes `mcp.context-mode` (`type: local`, the absolute command, `enabled: true`) to `~/.config/opencode/opencode.json`. Other keys stay.
-
-It writes `~/.config/opencode/opencode.json`. Hooks: not written (plugin does not load). A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
-
-Manual fallback. Writes the same entry with one `node` command.
-
 ```sh
-node -e 'const fs=require("fs"),p=require("path"),cp=require("child_process"),h=require("os").homedir(),f=p.join(h,".config","opencode","opencode.json"),s=p.join(cp.execSync("npm root -g").toString().trim(),"context-mode","server.mjs");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}(c.mcp??={})["context-mode"]=({type:"local",command:[process.execPath,s,"--agent","opencode"],enabled:true});fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2))'
+npm i -g context-mode@next
+context-mode setup --agents opencode
 ```
 
-Restart OpenCode after the install.
+Restart OpenCode after setup.
+
+Prefer to do it by hand? Run `context-mode setup --print opencode` and follow what it prints.
+
+## What setup changes
+
+- Adds `mcp.context-mode` (`type: local`, `enabled: true`) to `~/.config/opencode/opencode.json`. Other keys stay.
+- Writes no hooks.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -25,26 +27,17 @@ opencode mcp list
 
 `context-mode` must show as connected. Then run `/ctx-doctor` in OpenCode.
 
-## Update
-
-```sh
-npm i -g context-mode@next && context-mode setup --repair --agents opencode
-```
-
-Or run `context-mode upgrade --agents opencode`. After the owner moves the `latest` tag, drop `@next`.
-
-## Known limits
-
-- The context-mode hooks plugin is not part of setup: no OpenCode build loads the release `opencode/plugin.js` ("Plugin export is not a function"). Setup adds the MCP server only.
-
-
-## Uninstall
+## Remove
 
 ```sh
 context-mode setup --remove --agents opencode
 ```
 
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+
+## Known limits
+
+- The context-mode hooks plugin is not part of setup: no OpenCode build loads the release `opencode/plugin.js` ("Plugin export is not a function"). Setup adds the MCP server only.
 
 ## Report a problem
 

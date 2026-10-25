@@ -21,12 +21,14 @@ Context Mode stops the big output before it lands, keeps it on disk, and gives b
 Two commands. You need Node 24.15.0 or later (v2 uses the built-in `node:sqlite`).
 
 ```sh
-npm i -g context-mode@next && context-mode setup
+npm i -g context-mode@next
+context-mode setup
 ```
 
 `@next` is the preview tag. A plain `npm i -g context-mode` does not install it until it moves to `latest`.
 Setup finds your agents, shows a plan, applies it, and checks each agent. It rolls back an agent that fails.
 Restart the agent, then run `/ctx-doctor` in it. Each check prints PASS, or FAIL with the command that fixes it.
+To set up one agent by hand, run `context-mode setup --print <agent>`. It prints the step with your paths filled in.
 Uninstall: `context-mode setup --remove && npm rm -g context-mode`. Details: [docs/install/README.md](docs/install/README.md).
 
 **full** = setup installs the hooks and the MCP server. **MCP only** = setup adds the MCP server; the agent page says why there are no hooks.

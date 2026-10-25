@@ -1,20 +1,22 @@
 # Install context-mode v2 on Kiro
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Kiro, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for Kiro: Writes the `context-mode` entry to `~/.kiro/settings/mcp.json` with the absolute `node` and `server.mjs` paths. Other servers stay.
-
-It writes `~/.kiro/settings/mcp.json`. Hooks: not written. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
-
-Manual fallback. Writes the same entry with one `node` command (Kiro has no `mcp add`).
-
 ```sh
-node -e 'const fs=require("fs"),p=require("path"),cp=require("child_process"),h=require("os").homedir(),f=p.join(h,".kiro","settings","mcp.json"),s=p.join(cp.execSync("npm root -g").toString().trim(),"context-mode","server.mjs");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}(c.mcpServers??={})["context-mode"]=({command:process.execPath,args:[s,"--agent","kiro"]});fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2))'
+npm i -g context-mode@next
+context-mode setup --agents kiro
 ```
 
-Restart Kiro after the install.
+Restart Kiro after setup.
+
+Prefer to do it by hand? Run `context-mode setup --print kiro` and follow what it prints.
+
+## What setup changes
+
+- Adds the `context-mode` entry to `~/.kiro/settings/mcp.json`. Other servers stay.
+- Writes no hooks.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -24,27 +26,18 @@ context-mode doctor --agents kiro
 
 Run `/ctx-doctor` in Kiro. Run `kiro-cli doctor -a` if the tools do not show.
 
-## Update
-
-```sh
-npm i -g context-mode@next && context-mode setup --repair --agents kiro
-```
-
-Or run `context-mode upgrade --agents kiro`. After the owner moves the `latest` tag, drop `@next`.
-
-## Known limits
-
-- Setup writes no hook file. The hook file `~/.kiro/hooks/context-mode.json` is not part of the setup run.
-- Kiro has no npm package, so no run showed Kiro load the server or fire a hook.
-
-
-## Uninstall
+## Remove
 
 ```sh
 context-mode setup --remove --agents kiro
 ```
 
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+
+## Known limits
+
+- Setup writes no hook file. The hook file `~/.kiro/hooks/context-mode.json` is not part of the setup run.
+- Kiro has no npm package, so no run showed Kiro load the server or fire a hook.
 
 ## Report a problem
 

@@ -1,20 +1,22 @@
 # Install context-mode v2 on Pi
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Pi, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for Pi: Runs `pi install <package folder>`. Pi reads the `pi` key in the package `package.json` (`pi/index.js` and `skills`), so Pi gets the extension and the skills. Pi does not need an MCP entry.
-
-It writes `~/.pi/agent/settings.json` (`packages`). Hooks: in-process extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
-
-Manual fallback. The git route installs from the `release` branch. `pi update --extensions` updates it.
-
 ```sh
-pi install git:github.com/mksglu/context-mode@release
+npm i -g context-mode@next
+context-mode setup --agents pi
 ```
 
-Restart Pi after the install.
+Restart Pi after setup.
+
+Prefer to do it by hand? Run `context-mode setup --print pi` and follow what it prints.
+
+## What setup changes
+
+- Runs `pi install` on the installed package folder. It writes `~/.pi/agent/settings.json`.
+- Pi gets the extension, its hooks and the skills. Pi needs no MCP entry.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -25,28 +27,18 @@ pi list
 
 The package must be listed. In a run with no login, Pi loads the extension and its hooks print a `hooks: no project: NO_PROJECT` line before the "No API key" error. That line shows the extension loaded.
 
-## Update
+## Remove
 
 ```sh
-npm i -g context-mode@next && context-mode setup --repair --agents pi
+context-mode setup --remove --agents pi
 ```
 
-Or run `context-mode upgrade --agents pi`. After the owner moves the `latest` tag, drop `@next`.
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Known limits
 
 - Pi has no `/ctx-doctor` or `/ctx-upgrade` command (D-FU-RM-DOCS-1). Use `context-mode doctor` in a shell.
-- No logged-in Pi session (needs an API key) fired a hook. The git-route runs below used commit 05e97724.
-
-
-## Uninstall
-
-```sh
-context-mode setup --remove --agents pi
-pi remove git:github.com/mksglu/context-mode@release
-```
-
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+- No logged-in Pi session (needs an API key) fired a hook. The git-route runs below used commit 05e97724; setup no longer uses that route.
 
 ## Report a problem
 

@@ -1,20 +1,22 @@
 # Install context-mode v2 on ZCode
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for ZCode, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for ZCode: Writes the `context-mode` entry to `~/.zcode/cli/config.json` with the absolute `node` and `server.mjs` paths.
-
-It writes `~/.zcode/cli/config.json`. Hooks: not written. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
-
-Manual fallback. Writes the same entry with one `node` command.
-
 ```sh
-node -e 'const fs=require("fs"),p=require("path"),cp=require("child_process"),h=require("os").homedir(),f=p.join(h,".zcode","cli","config.json"),s=p.join(cp.execSync("npm root -g").toString().trim(),"context-mode","server.mjs");let c={};try{c=JSON.parse(fs.readFileSync(f,"utf8"))}catch{}(c.mcpServers??={})["context-mode"]=({command:process.execPath,args:[s,"--agent","zcode"]});fs.mkdirSync(p.dirname(f),{recursive:true});fs.writeFileSync(f,JSON.stringify(c,null,2))'
+npm i -g context-mode@next
+context-mode setup --agents zcode
 ```
 
-Restart ZCode after the install.
+Restart ZCode after setup.
+
+Prefer to do it by hand? Run `context-mode setup --print zcode` and follow what it prints.
+
+## What setup changes
+
+- Adds the `context-mode` entry to `~/.zcode/cli/config.json`. Other servers stay.
+- Writes no hooks.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -24,27 +26,18 @@ context-mode doctor --agents zcode
 
 Run `/ctx-doctor` in ZCode.
 
-## Update
-
-```sh
-npm i -g context-mode@next && context-mode setup --repair --agents zcode
-```
-
-Or run `context-mode upgrade --agents zcode`. After the owner moves the `latest` tag, drop `@next`.
-
-## Known limits
-
-- Setup writes no hooks for ZCode.
-- ZCode has no npm package, so no run showed ZCode load the server. The ZCode desktop app is not covered.
-
-
-## Uninstall
+## Remove
 
 ```sh
 context-mode setup --remove --agents zcode
 ```
 
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+
+## Known limits
+
+- Setup writes no hooks for ZCode.
+- ZCode has no npm package, so no run showed ZCode load the server. The ZCode desktop app is not covered.
 
 ## Report a problem
 

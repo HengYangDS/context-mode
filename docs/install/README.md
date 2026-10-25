@@ -11,7 +11,8 @@ Two commands install context-mode v2 for every agent on your machine. Setup find
 ## Install
 
 ```sh
-npm i -g context-mode@next && context-mode setup
+npm i -g context-mode@next
+context-mode setup
 ```
 
 `@next` is the v2 preview. After the owner moves the `latest` tag, you run `npm i -g context-mode && context-mode setup` without `@next`. Until then a plain `npm i -g context-mode` does not install this version.
@@ -36,6 +37,8 @@ Run it again at any time. A second run changes nothing (checked in [Verified](#v
 |---|---|
 | `context-mode setup --list` | Print every supported agent and whether it is found. Changes nothing. |
 | `context-mode setup --dry-run` | Show the plan. Changes nothing. |
+| `context-mode setup --agents codex` | Set up only this agent. |
+| `context-mode setup --print codex` | Print the manual step for one agent, with paths filled in. Changes nothing. |
 | `context-mode setup --yes --agents codex,claude-code` | Do not ask; only these agents. |
 | `context-mode setup --json` | JSON only on stdout, for scripts. |
 | `context-mode doctor` | Check every agent. Changes nothing. |
@@ -45,7 +48,7 @@ Exit codes: 0 success, 1 a check or step failed, 2 usage error or an answer is n
 
 ## Agents
 
-Each page lists what setup does for that agent, the manual fallback, known limits and what was checked.
+Each page gives one command, what setup changes, how to check it, how to remove it, known limits and what was checked. To do it by hand, run `context-mode setup --print <id>`: it prints the exact step, with your paths filled in.
 
 | Agent | Page | What setup runs | Checked in a clean HOME |
 |---|---|---|---|
@@ -68,7 +71,8 @@ The git `release` branch stays for two routes: the Claude Code marketplace (ADR-
 ## Uninstall
 
 ```sh
-context-mode setup --remove && npm rm -g context-mode
+context-mode setup --remove
+npm rm -g context-mode
 ```
 
 `setup --remove` puts each touched file back. It reports what it restored.

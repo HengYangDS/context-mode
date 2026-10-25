@@ -1,20 +1,29 @@
 # Install context-mode v2 on Qwen Code
 
-Run the two commands on the [install page](./README.md). This page lists what `context-mode setup` does for Qwen Code, the manual fallback, the known limits and what was checked.
-
 ## Install
 
-What setup does for Qwen Code: Runs `qwen extensions link <package folder>` and answers its risk prompt with `y` on stdin, because Qwen has no consent flag. The extension ships the MCP server and four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse). Setup drops old context-mode hook commands from `~/.qwen/settings.json`.
+```sh
+npm i -g context-mode@next
+context-mode setup --agents qwen
+```
 
-It writes `~/.qwen/extensions/context-mode/` (link), `extension-store/state.json`. Hooks: shipped by the extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
+Restart Qwen Code after setup.
 
-Manual fallback. The git route installs the extension from the `release` branch. Keep the `:context-mode` suffix: without `--consent` a URL with no suffix opens a plugin picker.
+Prefer to do it by hand? Run `context-mode setup --print qwen` and follow what it prints.
+
+Qwen Code can also install the extension from git, from the `release` branch. It updates by itself:
 
 ```sh
 qwen extensions install https://github.com/mksglu/context-mode:context-mode --ref release --consent
 ```
 
-Restart Qwen Code after the install.
+## What setup changes
+
+- Runs `qwen extensions link` on the installed package folder and answers its prompt with `y`.
+- The extension brings the MCP server and four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse).
+- Removes old context-mode hook commands from `~/.qwen/settings.json`.
+- Backs up each file first. A failed step is rolled back byte for byte.
+- Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
 ## Verify
 
@@ -25,28 +34,20 @@ qwen extensions list
 
 `context-mode` must be listed. `qwen mcp list` must show it Connected. Then run `/ctx-doctor` in Qwen Code, and `/hooks` to see the four context-mode hooks.
 
-## Update
+## Remove
 
 ```sh
-npm i -g context-mode@next && context-mode setup --repair --agents qwen
+context-mode setup --remove --agents qwen
 ```
 
-Or run `context-mode upgrade --agents qwen`. After the owner moves the `latest` tag, drop `@next`.
+It puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
+
+If you used the git route, run `qwen extensions uninstall context-mode`.
 
 ## Known limits
 
 - `qwen extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
 - No logged-in Qwen session ran `/ctx-doctor`, `/hooks` or the other three hooks.
-
-
-## Uninstall
-
-```sh
-context-mode setup --remove --agents qwen
-qwen extensions uninstall context-mode
-```
-
-`setup --remove` puts each touched file back. To remove the package too, see [Uninstall](./README.md#uninstall).
 
 ## Report a problem
 
