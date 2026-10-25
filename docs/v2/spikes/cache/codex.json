@@ -1,0 +1,583 @@
+{
+  "codexVersion": "codex-cli 0.156.1",
+  "model": "gpt-6-astra",
+  "effort": "low",
+  "n": 2,
+  "definitions": "cache_read = cached_input_tokens; cache_creation = input_tokens - cached_input_tokens; break = prev request input - cached > 1024",
+  "usage": "per request from rollout token_usage_record; per turn exec JSON turn.completed.usage is the SUM over the requests of a turn",
+  "sessions": [
+    {
+      "arm": "off",
+      "label": "off-1",
+      "threadId": "01a17403-9cc3-7470-8126-d4c20fb3f688",
+      "setup": null,
+      "requests": [
+        {
+          "turnId": "01a17403-9d06-7723-b653-08dd68af2226",
+          "input": 14364,
+          "cached": 12160,
+          "output": 82
+        },
+        {
+          "turnId": "01a17403-9d06-7723-b653-08dd68af2226",
+          "input": 16136,
+          "cached": 14208,
+          "output": 17
+        },
+        {
+          "turnId": "01a17403-d5a7-76e2-8b59-9a03a54c7f32",
+          "input": 16179,
+          "cached": 16000,
+          "output": 63
+        },
+        {
+          "turnId": "01a17403-d5a7-76e2-8b59-9a03a54c7f32",
+          "input": 19547,
+          "cached": 16000,
+          "output": 44
+        },
+        {
+          "turnId": "01a17404-469e-7440-a004-9f5420b88583",
+          "input": 19620,
+          "cached": 19456,
+          "output": 70
+        },
+        {
+          "turnId": "01a17404-469e-7440-a004-9f5420b88583",
+          "input": 19751,
+          "cached": 19456,
+          "output": 33
+        },
+        {
+          "turnId": "01a17404-7768-7162-93cc-09cbfeb3c999",
+          "input": 19800,
+          "cached": 19584,
+          "output": 27
+        },
+        {
+          "turnId": "01a17404-c2cc-7773-a929-37d29e82c216",
+          "input": 19847,
+          "cached": 19712,
+          "output": 46
+        },
+        {
+          "turnId": "01a17404-c2cc-7773-a929-37d29e82c216",
+          "input": 19951,
+          "cached": 19712,
+          "output": 10
+        }
+      ],
+      "turns": [
+        {
+          "n": 1,
+          "usage": {
+            "input": 30500,
+            "cached": 26368,
+            "output": 99
+          },
+          "mcp": [],
+          "shell": 2
+        },
+        {
+          "n": 2,
+          "usage": {
+            "input": 66226,
+            "cached": 58368,
+            "output": 206
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 3,
+          "usage": {
+            "input": 105597,
+            "cached": 97280,
+            "output": 309
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 4,
+          "usage": {
+            "input": 125397,
+            "cached": 116864,
+            "output": 336
+          },
+          "mcp": [],
+          "shell": 0
+        },
+        {
+          "n": 5,
+          "usage": {
+            "input": 165195,
+            "cached": 156288,
+            "output": 392
+          },
+          "mcp": [],
+          "shell": 1
+        }
+      ],
+      "breaks": [],
+      "hitRatioSession": 0.9460819032053028,
+      "hitRatioTurns2to5": 0.9645495378447604,
+      "firstRequestInput": 14364,
+      "firstRequestCached": 12160,
+      "mcpCalls": []
+    },
+    {
+      "arm": "v2",
+      "label": "v2-1",
+      "threadId": "01a17405-1dc5-7282-a673-677048b681cb",
+      "setup": "AGENT         STATUS  DETAIL\ncodex         PASS    checked: parse, list, mcp, hook\n",
+      "requests": [
+        {
+          "turnId": "01a17405-1dd1-7722-bf40-e35bb7518089",
+          "input": 14372,
+          "cached": 12160,
+          "output": 87
+        },
+        {
+          "turnId": "01a17405-1dd1-7722-bf40-e35bb7518089",
+          "input": 14516,
+          "cached": 14336,
+          "output": 12
+        },
+        {
+          "turnId": "01a17405-6d9b-78e1-b175-c08d7c8c5e41",
+          "input": 14554,
+          "cached": 14336,
+          "output": 63
+        },
+        {
+          "turnId": "01a17405-6d9b-78e1-b175-c08d7c8c5e41",
+          "input": 17922,
+          "cached": 14464,
+          "output": 37
+        },
+        {
+          "turnId": "01a17405-bda8-78e0-a3b9-a75618c4ff4f",
+          "input": 17988,
+          "cached": 17792,
+          "output": 70
+        },
+        {
+          "turnId": "01a17405-bda8-78e0-a3b9-a75618c4ff4f",
+          "input": 18118,
+          "cached": 17920,
+          "output": 34
+        },
+        {
+          "turnId": "01a17405-e956-7410-9c7b-33311145f28a",
+          "input": 18168,
+          "cached": 17920,
+          "output": 23
+        },
+        {
+          "turnId": "01a17406-0837-71b0-913e-74892712558a",
+          "input": 18211,
+          "cached": 18048,
+          "output": 42
+        },
+        {
+          "turnId": "01a17406-0837-71b0-913e-74892712558a",
+          "input": 18310,
+          "cached": 18048,
+          "output": 10
+        }
+      ],
+      "turns": [
+        {
+          "n": 1,
+          "usage": {
+            "input": 28888,
+            "cached": 26496,
+            "output": 99
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 2,
+          "usage": {
+            "input": 61364,
+            "cached": 55296,
+            "output": 199
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 3,
+          "usage": {
+            "input": 97470,
+            "cached": 91008,
+            "output": 303
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 4,
+          "usage": {
+            "input": 115638,
+            "cached": 108928,
+            "output": 326
+          },
+          "mcp": [],
+          "shell": 0
+        },
+        {
+          "n": 5,
+          "usage": {
+            "input": 152159,
+            "cached": 145024,
+            "output": 378
+          },
+          "mcp": [],
+          "shell": 1
+        }
+      ],
+      "breaks": [],
+      "hitRatioSession": 0.9531082617525088,
+      "hitRatioTurns2to5": 0.9615237971623496,
+      "firstRequestInput": 14372,
+      "firstRequestCached": 12160,
+      "mcpCalls": []
+    },
+    {
+      "arm": "off",
+      "label": "off-2",
+      "threadId": "01a17406-6ffe-78c2-8319-6a9d4d7e843d",
+      "setup": null,
+      "requests": [
+        {
+          "turnId": "01a17406-7009-7810-a458-6ee93df1d117",
+          "input": 14364,
+          "cached": 12160,
+          "output": 82
+        },
+        {
+          "turnId": "01a17406-7009-7810-a458-6ee93df1d117",
+          "input": 16138,
+          "cached": 14208,
+          "output": 17
+        },
+        {
+          "turnId": "01a17406-dbc1-7da0-bebc-80c58ec53af7",
+          "input": 16181,
+          "cached": 16000,
+          "output": 63
+        },
+        {
+          "turnId": "01a17406-dbc1-7da0-bebc-80c58ec53af7",
+          "input": 19549,
+          "cached": 12160,
+          "output": 37
+        },
+        {
+          "turnId": "01a17407-2ba7-7f43-b059-c8815b310abc",
+          "input": 19615,
+          "cached": 19456,
+          "output": 70
+        },
+        {
+          "turnId": "01a17407-2ba7-7f43-b059-c8815b310abc",
+          "input": 19745,
+          "cached": 19456,
+          "output": 33
+        },
+        {
+          "turnId": "01a17407-83e1-7f53-afe1-6de4633b49a5",
+          "input": 19794,
+          "cached": 19584,
+          "output": 25
+        },
+        {
+          "turnId": "01a17407-cb28-7f32-a614-347f46fc9e24",
+          "input": 19839,
+          "cached": 19584,
+          "output": 42
+        },
+        {
+          "turnId": "01a17407-cb28-7f32-a614-347f46fc9e24",
+          "input": 19941,
+          "cached": 19712,
+          "output": 10
+        }
+      ],
+      "turns": [
+        {
+          "n": 1,
+          "usage": {
+            "input": 30502,
+            "cached": 26368,
+            "output": 99
+          },
+          "mcp": [],
+          "shell": 2
+        },
+        {
+          "n": 2,
+          "usage": {
+            "input": 66232,
+            "cached": 54528,
+            "output": 199
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 3,
+          "usage": {
+            "input": 105592,
+            "cached": 93440,
+            "output": 302
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 4,
+          "usage": {
+            "input": 125386,
+            "cached": 113024,
+            "output": 327
+          },
+          "mcp": [],
+          "shell": 0
+        },
+        {
+          "n": 5,
+          "usage": {
+            "input": 165166,
+            "cached": 152320,
+            "output": 379
+          },
+          "mcp": [],
+          "shell": 1
+        }
+      ],
+      "breaks": [
+        {
+          "index": 3,
+          "turnId": "01a17406-dbc1-7da0-bebc-80c58ec53af7",
+          "rewritten": 4021
+        }
+      ],
+      "hitRatioSession": 0.9222237022147415,
+      "hitRatioTurns2to5": 0.935305649616824,
+      "firstRequestInput": 14364,
+      "firstRequestCached": 12160,
+      "mcpCalls": []
+    },
+    {
+      "arm": "v2",
+      "label": "v2-2",
+      "threadId": "01a17408-25f6-7390-b2e2-c9c5389ef5b2",
+      "setup": "AGENT         STATUS  DETAIL\ncodex         PASS    checked: parse, list, mcp, hook\n",
+      "requests": [
+        {
+          "turnId": "01a17408-2600-7402-83ad-96fee49d6261",
+          "input": 14372,
+          "cached": 12160,
+          "output": 87
+        },
+        {
+          "turnId": "01a17408-2600-7402-83ad-96fee49d6261",
+          "input": 14516,
+          "cached": 14336,
+          "output": 12
+        },
+        {
+          "turnId": "01a17408-8883-7fc0-98a4-76bd85a3e421",
+          "input": 14554,
+          "cached": 14336,
+          "output": 63
+        },
+        {
+          "turnId": "01a17408-8883-7fc0-98a4-76bd85a3e421",
+          "input": 17922,
+          "cached": 14464,
+          "output": 37
+        },
+        {
+          "turnId": "01a17408-d3aa-7522-8080-630a5384a439",
+          "input": 17988,
+          "cached": 17792,
+          "output": 69
+        },
+        {
+          "turnId": "01a17408-d3aa-7522-8080-630a5384a439",
+          "input": 18117,
+          "cached": 17920,
+          "output": 34
+        },
+        {
+          "turnId": "01a17409-2212-7513-aa04-73050a1fe40f",
+          "input": 18167,
+          "cached": 17920,
+          "output": 26
+        },
+        {
+          "turnId": "01a17409-471b-7d61-a980-5a1833b4d66e",
+          "input": 18213,
+          "cached": 18048,
+          "output": 42
+        },
+        {
+          "turnId": "01a17409-471b-7d61-a980-5a1833b4d66e",
+          "input": 18312,
+          "cached": 18048,
+          "output": 10
+        }
+      ],
+      "turns": [
+        {
+          "n": 1,
+          "usage": {
+            "input": 28888,
+            "cached": 26496,
+            "output": 99
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 2,
+          "usage": {
+            "input": 61364,
+            "cached": 55296,
+            "output": 199
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 3,
+          "usage": {
+            "input": 97469,
+            "cached": 91008,
+            "output": 302
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 4,
+          "usage": {
+            "input": 115636,
+            "cached": 108928,
+            "output": 328
+          },
+          "mcp": [],
+          "shell": 0
+        },
+        {
+          "n": 5,
+          "usage": {
+            "input": 152161,
+            "cached": 145024,
+            "output": 380
+          },
+          "mcp": [],
+          "shell": 1
+        }
+      ],
+      "breaks": [],
+      "hitRatioSession": 0.9530957341237242,
+      "hitRatioTurns2to5": 0.9615081972532509,
+      "firstRequestInput": 14372,
+      "firstRequestCached": 12160,
+      "mcpCalls": []
+    }
+  ],
+  "cross": [
+    {
+      "arm": "off",
+      "prefixA": 14342,
+      "cachedB": 12160,
+      "fraction": 0.847859433830707,
+      "gapMs": 0,
+      "sessionA": {
+        "turnId": "01a17409-8e88-7410-8608-f3543c185bbc",
+        "input": 14342,
+        "cached": 12160,
+        "output": 5
+      },
+      "sessionB": {
+        "turnId": "01a17409-aef6-7c42-8324-39da783ee3b9",
+        "input": 14342,
+        "cached": 12160,
+        "output": 5
+      }
+    },
+    {
+      "arm": "v2",
+      "prefixA": 14350,
+      "cachedB": 12160,
+      "fraction": 0.8473867595818816,
+      "gapMs": 0,
+      "sessionA": {
+        "turnId": "01a1740a-059e-7db1-bbf1-eb9c766a7441",
+        "input": 14350,
+        "cached": 12160,
+        "output": 5
+      },
+      "sessionB": {
+        "turnId": "01a1740a-5943-7680-8b64-024ebcfc0bca",
+        "input": 14350,
+        "cached": 12160,
+        "output": 5
+      }
+    }
+  ],
+  "arms": {
+    "off": {
+      "sessions": 2,
+      "breaksPerSession": [
+        0,
+        1
+      ],
+      "hitRatioTurns2to5": [
+        0.9645495378447604,
+        0.935305649616824
+      ],
+      "hitRatioTurns2to5Median": 0.9499275937307923,
+      "firstRequestInput": [
+        14364,
+        14364
+      ],
+      "mcpCalls": [
+        0,
+        0
+      ]
+    },
+    "v2": {
+      "sessions": 2,
+      "breaksPerSession": [
+        0,
+        0
+      ],
+      "hitRatioTurns2to5": [
+        0.9615237971623496,
+        0.9615081972532509
+      ],
+      "hitRatioTurns2to5Median": 0.9615159972078002,
+      "firstRequestInput": [
+        14372,
+        14372
+      ],
+      "mcpCalls": [
+        0,
+        0
+      ]
+    }
+  },
+  "pass": {
+    "breaks": true,
+    "hitRatio": true,
+    "crossSession": false
+  }
+}
