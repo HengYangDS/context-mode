@@ -34,7 +34,7 @@ export interface HookFile { file: string; mode: "rewrite" | "drop"; }
  *  plugin-list = an in-process plugin entry in a host config list (opencode); package = the installed package
  *  ships the hooks (claude-code, gemini, qwen, pi through its CLI install). */
 export type HookInstall =
-  | { kind: "file"; file: string; shape: JsonObject; command: string }
+  | { kind: "file"; file: string; shape: JsonObject; command: string; trust?: string }
   | { kind: "plugin-list"; file: string; key: readonly string[]; entry: string }
   | { kind: "package"; via: string };
 
@@ -47,6 +47,7 @@ export const COMMAND_SKILLS: readonly string[] = Object.freeze(["ctx-doctor", "c
 export const SKILLS_DIR = "skills";
 export const SKILL_FILE = "SKILL.md";
 const OPENCODE_PLUGIN = ["opencode", "plugin.js"];
+const CODEX_CONFIG_FILE = "config.toml";
 
 /** The skill text with every ctx tool name given the agent's tool name prefix (plain split/join, no regex). */
 export function renderSkill(text: string, prefix: string): string {
@@ -154,7 +155,10 @@ function hookInstallFor(ctx: SetupContext, row: AdapterRow, command: string): Ho
   if (ch.kind === "home-file") {
     const shape = HOOK_SHAPES[row.id];
     if (!shape) throw new Error(`setup: ${row.id} has a home-file hook channel and no hook shape`);
-    return { kind: "file", file: path.join(ctx.home, ch.path), shape: shape(row, command), command };
+    const file = path.join(ctx.home, ch.path);
+    // Codex 0.164.0 runs a hooks.json hook only once config.toml trusts it (D-HA-CODEX-TRUST-1).
+    if (row.id === "codex") return { kind: "file", file, shape: shape(row, command), command, trust: path.join(path.dirname(file), CODEX_CONFIG_FILE) };
+    return { kind: "file", file, shape: shape(row, command), command };
   }
   if (row.id === "opencode") {
     return { kind: "plugin-list", file: path.join(ctx.home, ".config", "opencode", "opencode.json"), key: ["plugin"],
@@ -183,6 +187,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     const writes = [
       ...(config ? [config.file] : []), ...hookFiles.map((h) => h.file),
       ...(hookInstall.kind === "package" ? [] : [hookInstall.file]),
+      ...(hookInstall.kind === "file" && hookInstall.trust ? [hookInstall.trust] : []),
       ...(skillInstall.kind === "dir" ? skillInstall.files.map((f) => f.file) : []),
     ];
     const out: CheckRow = {
