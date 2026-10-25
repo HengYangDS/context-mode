@@ -56,7 +56,7 @@ export function route(argv: readonly string[], version: string): Route {
     const agent = Object.hasOwn(V1_PLATFORM_AGENT, platform) ? V1_PLATFORM_AGENT[platform] : undefined;
     // A hook never blocks the host (impl/09 §5.2): an unknown v1 platform fails open, exit 0, empty stdout.
     if (agent === undefined) {
-      return { kind: "exit", code: EXIT_OK, stderr: `${SERVER_KEY}: unknown v1 hook platform ${JSON.stringify(platform)}. Fix: run context-mode setup.\n` };
+      return { kind: "exit", code: EXIT_OK, stderr: `${SERVER_KEY}: unknown hook platform ${JSON.stringify(platform)}. Fix: run context-mode setup.\n` };
     }
     return { kind: "run", file: HOOK_FILE, args: [AGENT_ARG, agent] };
   }

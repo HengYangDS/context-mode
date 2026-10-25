@@ -36,7 +36,7 @@ const FIXTURE_FALLBACK_AGENT = "claude-code"; // agents with no recorded fixture
 const INIT = { protocolVersion: "2024-11-05", capabilities: {}, clientInfo: { name: "e2e-v1-migration", version: "0" } };
 const HOOK_TIMEOUT_MS = 30000;
 const ROW_SEP = " | ";
-const DATA_DIR_REASON = "v1 data dir "; // V1_REASON.dataDir text start
+const DATA_DIR_REASON = "old context-mode data dir "; // V1_REASON.dataDir text start
 const D4_PREFIX = "| D4 "; // report.ts rowLine: "| " + id + " " + label
 const WORKSPACE_FOLDER_FLAG = "--workspace-folder"; // VS Code project source (D-M1-5)
 
@@ -64,7 +64,7 @@ function finish(tempDir) {
 
 const text = (r) => r?.content?.[0]?.text ?? "";
 
-/** The D4 row {status, detail, line} from the doctor table ("| D4 v1 leftovers | FAIL | <detail> | <fix> |"), or null. */
+/** The D4 row {status, detail, line} from the doctor table ("| D4 old entries | FAIL | <detail> | <fix> |"), or null. */
 function d4Row(report) {
   for (const line of report.split("\n")) {
     if (!line.startsWith(D4_PREFIX)) continue;
@@ -150,7 +150,7 @@ async function main() {
   }
   if (steps.some((s) => !s.ok)) return finish(temp);
 
-  // Step 4: D4 before lists v1 leftovers; after is clean except the report-only ones.
+  // Step 4: D4 before lists old entries; after is clean except the report-only ones.
   const d4Before = d4Row(before);
   step("doctor-before-d4-fail", d4Before?.status === "FAIL", d4Before?.line ?? before.split("\n")[0]);
   step("upgrade", !upgradeErr && upgrade.length > 0, upgrade.split("\n").slice(0, 3).join(" / "));

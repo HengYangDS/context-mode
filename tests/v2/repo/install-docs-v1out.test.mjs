@@ -17,7 +17,7 @@ test("v1-out: the word v1 fails in any case; v10, ev1 and @1 pass", () => {
 
 test("v1-out: the file list covers README, install docs, prompts and issue templates, not benchmarks or docs/v2", () => {
   const files = v1FreeFiles(REPO).map((f) => path.relative(REPO, f).split(path.sep).join("/"));
-  for (const must of ["README.md", "docs/install/README.md", "docs/install/codex.md", "src/prompt/instructions.md", ".github/ISSUE_TEMPLATE/bug.yml"]) assert.ok(files.includes(must), must);
+  for (const must of ["README.md", "docs/install/README.md", "docs/install/codex.md", "src/prompt/instructions.md", ".github/ISSUE_TEMPLATE/bug.yml", "e2e/golden/cli/help-main.txt"]) assert.ok(files.includes(must), must);
   assert.ok(files.every((f) => !f.startsWith("docs/benchmarks/") && !f.startsWith("docs/v2/")), files.join(","));
 });
 

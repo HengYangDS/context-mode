@@ -119,7 +119,7 @@ Commands:
   upgrade                     Install the newest context-mode from npm, then repair each agent
   server [--agent <id>]       Run the MCP server on stdio (alias: mcp)
   hook --agent <id>           Run one hook call: JSON on stdin, answer on stdout
-  hook <platform> <event>     v1 form of hook; still works, run context-mode setup to update it
+  hook <platform> <event>     Old form of hook; still works, run context-mode setup to update it
 
 Options:
   -h, --help                  Show this help (context-mode <command> --help for a command)
@@ -165,7 +165,7 @@ Examples:
 `,
   doctor: `Usage: context-mode doctor [options]
 
-Check each agent: config entry, v1 leftovers, MCP handshake, one hook call. Changes nothing.
+Check each agent: config entry, old context-mode entries, MCP handshake, one hook call. Changes nothing.
 On a TTY, a failed agent gets one question: fix now (runs context-mode setup for that agent).
 
 Options:

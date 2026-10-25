@@ -159,7 +159,7 @@ export function checkHostConfig(row: AdapterRow, env: NodeJS.ProcessEnv, worktre
   return fail("D3", read === null ? detail : detail + D4_REASON_JOIN + read, DOCTOR_FIX_UPGRADE);
 }
 
-/** D4 — v1 leftovers: every finding's reason in one row, joined "; ". */
+/** D4 — old entries: every finding's reason in one row, joined "; ". */
 export function checkV1Leftovers(agent: AgentId, home: string, scope: V1Scope = {}): DoctorRow {
   const findings = detectV1(agent, home, scope);
   if (findings.length === 0) return pass("D4");

@@ -280,14 +280,14 @@ test("[M7] cli/remove: setup --remove --yes puts every touched file back byte fo
 
 // ---------- doctor ----------
 
-test("[M7] cli/doctor: read-only; v1 form reported with the exact command; PASS after setup", (t) => {
+test("[M7] cli/doctor: read-only; old entry reported with the exact command; PASS after setup", (t) => {
   const s = sandbox(t);
   codexHome(s);
   const before = snapshot(s.home);
   const r = run(s, ["doctor"]);
   assert.equal(r.status, 1, r.stdout + r.stderr);
   assert.match(r.stdout, /codex\s+FAIL/);
-  assert.match(r.stdout + r.stderr, /v1 form, run context-mode setup/);
+  assert.match(r.stdout + r.stderr, /old context-mode entry, run: context-mode setup/);
   assert.match(r.stderr, /Fix: context-mode setup --agents codex/);
   assert.deepEqual(snapshot(s.home), before, "doctor must not write");
   assert.equal(run(s, ["setup", "--yes", "--agents", "codex"]).status, 0);

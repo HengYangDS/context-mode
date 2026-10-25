@@ -13,7 +13,7 @@
 // D-INST-4 (npm route): a fenced `context-mode setup|doctor|upgrade` line may use only flags that command has (checkLines);
 // checkPages: README.md names Node 24.15.0, the two-command install and the uninstall command; each agent page names `context-mode setup` (no upgrade section: D-V1OUT-1).
 // D-V1OUT-1 (owner 2026-10-25): the word "v1" must not appear in README.md, CONTRIBUTING.md, docs/*.md, docs/install/**, skills/**,
-// src/prompt/** or .github/ISSUE_TEMPLATE/** (checkNoV1, v1FreeFiles). docs/benchmarks/** and docs/v2/** are exempt. CLI help and output
+// src/prompt/**, e2e/golden/cli/** (CLI help goldens) or .github/ISSUE_TEMPLATE/** (checkNoV1, v1FreeFiles). docs/benchmarks/** and docs/v2/** are exempt. CLI help and output
 // are checked by tests/v2/repo/install-docs-v1out.test.mjs, which runs the CLI.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -117,7 +117,7 @@ export function v1FreeFiles(repo) {
   const top = ["README.md", "CONTRIBUTING.md"].map((f) => path.join(repo, f)).filter(existsSync);
   const docs = readdirSync(path.join(repo, "docs")).filter((f) => f.endsWith(".md")).sort().map((f) => path.join(repo, "docs", f));
   return [...top, ...docs, ...walk(path.join(repo, "docs", "install"), [".md"]), ...walk(path.join(repo, "skills"), [".md"]),
-    ...walk(path.join(repo, "src", "prompt"), [".md"]), ...walk(path.join(repo, ".github", "ISSUE_TEMPLATE"), [".yml", ".yaml", ".md"])];
+    ...walk(path.join(repo, "src", "prompt"), [".md"]), ...walk(path.join(repo, "e2e", "golden", "cli"), [".txt"]), ...walk(path.join(repo, ".github", "ISSUE_TEMPLATE"), [".yml", ".yaml", ".md"])];
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -59,7 +59,7 @@ function planText(res: SetupResult): string {
       if (c.command) lines.push(`  run  ${c.command.join(" ")}`);
       else lines.push(`  edit ${c.file ?? ""}${c.path ? `  ${c.path}` : ""}`);
     }
-    for (const v of a.v1) lines.push(`  v1   ${v.file}${v.path ? `  ${v.path}` : ""}: ${v.reason}`);
+    for (const v of a.v1) lines.push(`  old  ${v.file}${v.path ? `  ${v.path}` : ""}: ${v.reason}`);
   }
   return lines.length ? lines.join("\n") : "No agents found. Run context-mode setup --list.";
 }
@@ -132,7 +132,7 @@ export function buildIssueReport(command: string, res: SetupResult, ui: Ui): { t
     "",
     ...res.agents.flatMap((a) => a.checks.map((c) => `- ${a.id} ${c.ok ? "ok" : "FAIL"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`)),
     "",
-    "## v1 leftovers",
+    "## Old entries",
     "",
     ...res.agents.flatMap((a) => a.v1.map((v) => `- ${a.id} ${v.file} ${v.path}: ${v.reason}`)),
     "",

@@ -395,7 +395,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
 
 /** doctor (read-only): plan each agent without writing; pending changes or v1 entries are a FAIL that names the
  *  setup command; an agent with nothing to change runs the same verify checks as setup. */
-export const V1_FORM_REASON = "v1 form, run context-mode setup";
+export const V1_FORM_REASON = "old context-mode entry, run: context-mode setup";
 export const NOT_SET_UP_REASON = "not set up, run context-mode setup";
 export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
   const ctx: SetupContext = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };

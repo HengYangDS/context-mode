@@ -329,7 +329,7 @@ export const BUNDLE_SHA: string | undefined = typeof __CTX_BUNDLE_SHA__ === "str
 // ctx_doctor (impl/07 §4-§5, ADR-0010; DEVIATIONS D-M5-C2-1). Order is the fixed row order; labels are ADR-0010's check names.
 export const DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"] as const);
 export const DOCTOR_LABEL: Readonly<Record<(typeof DOCTOR_CHECK_ORDER)[number], string>> = Object.freeze({
-  D1: "version", D2: "node", D3: "host config", D4: "v1 leftovers", D5: "hook round trip", D5b: "double-fire",
+  D1: "version", D2: "node", D3: "host config", D4: "old entries", D5: "hook round trip", D5b: "double-fire",
   D6: "MCP", D7: "project and worktree", D8: "context.db", D9: "index", D10: "enforcement mode",
 });
 export const HOOK_FIXTURE_DIR = "fixtures"; // impl/00 §1 file tree: <bundle>/fixtures/hook-roundtrip.json (D-M5-arch-4)
@@ -446,7 +446,7 @@ export const LS_REMOTE_FIELD_SEP = "\t"; // git ls-remote line: "<sha>\t<ref>"
 export const GIT_SHA_HEX_LEN = 40; // a full commit sha
 export const DOCTOR_GIT_TIMEOUT_MS = 10000; // D1 git ls-remote; a timeout is "no network" (UNKNOWN)
 export const DOCTOR_PASS_DETAIL = "ok"; // detail of a PASS row with nothing more to say
-// doctor-config.ts: D3 host config, D4 v1 leftovers, D7 project (impl/07 §5).
+// doctor-config.ts: D3 host config, D4 old entries, D7 project (impl/07 §5).
 export const D3_PART_JOIN = ", ";
 export function D3_DETAIL(parts: readonly string[]): string { return `wrong: ${parts.join(D3_PART_JOIN)}`; }
 // doctor-config.ts D3 hook entries (DEVIATIONS D-M5-D2-1..3): where each agent's own hook entries live and their
@@ -573,25 +573,25 @@ export const PI_PACKAGE_SOURCE_KEY = "source"; // Pi packages[] entry: a string 
 export const V1_PATH_SEPS = Object.freeze(["/", "\\"] as const); // hooks/codex/ in a command, POSIX or Windows
 // V1Finding.reason texts, used verbatim in the D4 row and the upgrade change table (impl/07 §3 step 3).
 export const V1_REASON = Object.freeze({
-  hook: "v1 hook entry: command contains context-mode and a v1 script name or context-mode hook",
-  cacheHealHook: "v1 cache-heal SessionStart hook entry",
-  cacheHealFile: "v1 cache-heal script file",
-  statusLine: "v1 statusLine (context-mode statusline): report only, never removed",
-  mcpEntry: "v1 MCP entry mcpServers.context-mode",
-  codexHook: "v1 Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
-  codexToml: "v1 config.toml [mcp_servers.context-mode*] section",
-  hookFile: "v1 hook file context-mode.json (runs context-mode hook)",
-  vscodeMcp: "v1 MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
-  kiroHook: "v1 Kiro flat hook entry: command contains context-mode and a v1 script name or context-mode hook",
-  kiroAgentFile: "v1 Kiro agent file agents/*.json with name context-mode",
-  kiroSteering: "v1 Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
-  piNpm: "v1 Pi package npm:context-mode",
-  opencodePlugin: "v1 OpenCode plugin spec context-mode",
-  zcodeHook: "v1 ZCode hook entry: command contains context-mode hook",
-  dataDir: "v1 data dir <agent home>/context-mode/",
-  dataDirShared: "v1 data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
-  dataRoot: "v1 content under ~/.context-mode/",
-  tmpFile: "v1 temp file context-mode-* under the OS temp dir",
+  hook: "old context-mode hook entry: command contains context-mode and an old script name or context-mode hook",
+  cacheHealHook: "old context-mode cache-heal SessionStart hook entry",
+  cacheHealFile: "old context-mode cache-heal script file",
+  statusLine: "old context-mode statusLine (context-mode statusline): report only, never removed",
+  mcpEntry: "old context-mode MCP entry mcpServers.context-mode",
+  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
+  codexToml: "old context-mode config.toml [mcp_servers.context-mode*] section",
+  hookFile: "old context-mode hook file context-mode.json (runs context-mode hook)",
+  vscodeMcp: "old context-mode MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
+  kiroHook: "old Kiro hook entry: command contains context-mode and an old script name or context-mode hook",
+  kiroAgentFile: "old context-mode Kiro agent file agents/*.json with name context-mode",
+  kiroSteering: "old context-mode Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
+  piNpm: "old context-mode Pi package npm:context-mode",
+  opencodePlugin: "old context-mode OpenCode plugin spec context-mode",
+  zcodeHook: "old context-mode ZCode hook entry: command contains context-mode hook",
+  dataDir: "old context-mode data dir <agent home>/context-mode/",
+  dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
+  dataRoot: "old context-mode content under ~/.context-mode/",
+  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir",
 } as const);
 // ADR-0011 "reported with a fix, not removed" rows, Gemini data "only after a prompt" (a tool cannot prompt), and
 // tmp context-mode-* (a live v1 server may own them), and the Kiro steering doc (A37: manual review): report only
