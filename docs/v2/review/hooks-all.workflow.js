@@ -79,7 +79,12 @@ const liveTest = (a, tag) => agent(`${base('l-' + a + tag)}\n\nRole: live saving
 1. context-mode setup --yes --agents ${a}; context-mode doctor --agents ${a}. Record the hook registration as the host sees it (host list command or config file).
 2. In a temp project, make a 200 KB log file with one FATAL line holding a value. Run the host headless with its cheapest model (Claude: --model claude-sonnet-5-5 --effort low, --max-budget-usd 1; others: their cheapest model, one session): "Read logs/app.log with a shell cat and tell me the value on the FATAL line." Do it twice: once with context-mode removed (off arm), once installed.
 3. Evidence from the transcript/session log: bytes of the tool result the model saw in each arm; the hook fired (context-mode journal row for agent ${a} in the store); answer correct. Then run the ctx-stats skill/command the host way and check it answers.
-Pass = hookRegistered and hookFired and bytesV2 < bytesOff/2 and answerOk. If the host cannot run headless or has no login, pass=false and say exactly what is missing (do not count it as pass). Do not commit. Return agent, pass, hookRegistered, hookFired, bytesOff, bytesV2, answerOk, skillOk, evidence, problems.`,
+Pass = hookRegistered and hookFired and bytesV2 < bytesOff/2 and answerOk.
+NO LOGIN on this machine (owner 2026-10-25: verify with web search, a login here is not needed): do not stop. Instead prove it without a model session:
+(a) hookRegistered: after setup, the host's own CLI or config loader shows the hook (host list/inspect command, or the host's documented loader run on the temp HOME); quote the output.
+(b) hookFired: web-search the host's official hook docs (current version) and quote the exact input payload and output fields for the events we use (URL + version in evidence). Build that exact payload for a shell cat of the 200 KB log, pipe it into the installed hook command (the command string setup registered, run as the host would), and check the hook's output matches the documented output schema field by field and replaces/denies as the docs say.
+(c) bytesOff = 200 KB tool output, bytesV2 = bytes the host would pass to the model per the documented effect (replaced output, or deny message + the redirected ctx tool result run through the installed MCP server). answerOk = the FATAL value is in what the model would see.
+Then pass follows the same rule; write "doc-verified, no live session" plus every URL in evidence. skillOk = the rendered skill file is in the host's documented skill dir with the host's tool prefix. Do not commit. Return agent, pass, hookRegistered, hookFired, bytesOff, bytesV2, answerOk, skillOk, evidence, problems.`,
   { label: `l-${a}${tag}`, phase: tag ? 'Fix' : 'Live', schema: LIVE, ...SNM })
 
 phase('Live')
