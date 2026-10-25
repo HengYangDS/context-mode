@@ -37,10 +37,21 @@ Own temp space only: /private/tmp/cm-v2-cp-${id}; raw data under /private/tmp/cm
 Rules: no regex/truncation as a mechanism; never write instruction files; tests first (red commit before green); never weaken an assertion; never raise a budget; DEVIATIONS.md row per behaviour change; frozen evals e2e/live/compact-hard and bench/m2 never edited. No personal names, tenant ids or secrets.
 Definitions: a cache break at turn n (n>1) = cache_creation_input_tokens at turn n is larger than the new content since turn n-1 (tool results + prompt + hook text) by more than 1024 tokens, i.e. part of the old prefix was written again. Cache hit ratio = cache_read / (cache_read + cache_creation + input). Cross-session prefix read = cache_read on turn 1 of a second session started within 4 minutes in the same project.`
 
+// Transient API errors (SSL, 5xx) return null: retry the same task, it continues from what is pushed.
+async function retry(prompt, opts, n = 3) {
+  for (let i = 0; i < n; i++) {
+    const r = await agent(i ? prompt + "\n\nA previous attempt died on an API error. Fetch and continue from what is pushed." : prompt, i ? { ...opts, label: opts.label + "-retry" + i } : opts)
+    if (r) return r
+    log(`${opts.label}: no result, retry ${i + 1}`)
+  }
+  return null
+}
+
 const STATIC = `${base('static')}\n\nRole: static audit (no live runs).
 1. Server determinism: start the built MCP server (release-out) 5 times per --agent id (all 10) with different cwd, session env, clock (TZ, a faked Date via a preload is fine) and an empty vs filled store. Capture initialize result (instructions, capabilities), tools/list, prompts/list, resources/list. They must be byte-identical across starts for the same agent. Grep the server for notifications/tools/list_changed, prompts/list_changed, resources/list_changed and any dynamic text (dates, counts, paths, ids, stats) in descriptions or instructions.
 2. Hook output placement: for every event v2 emits output on (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, compact paths) and every host, classify where the text lands from the host docs (system prompt / prefix, appended to the current turn, replaces a tool result before the model sees it). Anything that edits or re-orders earlier content or varies the system prompt between turns is a break. SessionStart text that varies between sessions in the same project is a cross-session break unless it lands after the tool/system prefix.
 3. Add a test (red first if it fails): tests/v2/cache/prefix-determinism.test.mjs pins byte-identical initialize/tools/list across starts per agent and no list_changed emission; and a lint that tool descriptions and instructions contain no dynamic tokens. Wire it into gate.
+4. opencode and pi run v2 in-process and may put text into the system prompt they rebuild each turn. Find every string v2 adds there (plugin system/chat hooks, pi extension context) and prove it is byte-identical across turns and across sessions in the same project (no counts, times, ids, stats, last prompt). If anything varies, it is a break: list it.
 Return done, breaks (host, what, where file:line, evidence), numbers, commits, summary.`
 
 const MINE = `${base('mine')}\n\nRole: mine existing evidence, no new spend. Raw Claude Code stream-json transcripts with per-turn usage exist under /private/tmp/cm-v2-impl-private/compact-m2/** (m2 eval, compact-hard, r2-r4, du-*), and any bench/live raw dirs referenced in docs/benchmarks/** and docs/v2/spikes/**. Write bench/cache/mine.mjs (committed, pure parsing) that reads them and outputs per arm (off/direct vs v2) and per workload: turns, cache breaks (definition above), cache hit ratio per turn and per session, median and p90. Separate turns right after a /compact (the host resets the cache there; count them apart). Run it, write bench/cache/mined.json and a table. Return done, breaks (each v2-only break with transcript path + turn), numbers, commits, summary.`
@@ -55,11 +66,11 @@ const DOCS = `${base('docs')}\n\nRole: host docs (web search, primary sources, c
 
 phase('Measure')
 const found = (await parallel([
-  () => agent(STATIC, { label: 'cp-static', phase: 'Measure', schema: FIND, ...OPH }),
-  () => agent(MINE, { label: 'cp-mine', phase: 'Measure', schema: FIND, ...SNM }),
-  () => agent(LIVE_CC, { label: 'cp-live-cc', phase: 'Measure', schema: FIND, ...SNH }),
-  () => agent(LIVE_CX, { label: 'cp-live-codex', phase: 'Measure', schema: FIND, ...SNH }),
-  () => agent(DOCS, { label: 'cp-hosts', phase: 'Measure', schema: FIND, ...SNM }),
+  () => retry(STATIC, { label: 'cp-static', phase: 'Measure', schema: FIND, ...OPH }),
+  () => retry(MINE, { label: 'cp-mine', phase: 'Measure', schema: FIND, ...SNM }),
+  () => retry(LIVE_CC, { label: 'cp-live-cc', phase: 'Measure', schema: FIND, ...SNH }),
+  () => retry(LIVE_CX, { label: 'cp-live-codex', phase: 'Measure', schema: FIND, ...SNH }),
+  () => retry(DOCS, { label: 'cp-hosts', phase: 'Measure', schema: FIND, ...SNM }),
 ])).filter(Boolean)
 const breaks = found.flatMap((f) => f.breaks)
 log(`measure done: ${found.length}/5 agents, ${breaks.length} break(s) reported`)
@@ -67,14 +78,14 @@ log(`measure done: ${found.length}/5 agents, ${breaks.length} break(s) reported`
 phase('Fix')
 let fix = null, again = null
 if (breaks.length) {
-  fix = await agent(`${base('fix')}\n\nCache breaks found: ${JSON.stringify(breaks).slice(0, 10000)}. Measurement summaries: ${JSON.stringify(found.map((f) => ({ n: f.numbers, s: f.summary.slice(0, 600) }))).slice(0, 6000)}.
+  fix = await retry(`${base('fix')}\n\nCache breaks found: ${JSON.stringify(breaks).slice(0, 10000)}. Measurement summaries: ${JSON.stringify(found.map((f) => ({ n: f.numbers, s: f.summary.slice(0, 600) }))).slice(0, 6000)}.
 Fix each real break at the root, test-first (a red test that shows the break, then the fix): e.g. move any varying text out of instructions/tool descriptions, make tool order and text deterministic, never emit list_changed in a session, put per-session or per-turn context only where the host appends it after the prefix, never re-emit or edit earlier content. Keep saving and routing intact: run node --test tests/v2/, gate --all --quick, and GP-LIVE-ROUTING (sonnet) once. If a reported break is not real (host behaviour, or the off arm breaks the same way), say why with evidence and do not change code. Return done, commits, numbers, summary.`, { label: 'cp-fix', phase: 'Fix', schema: RESULT, ...OPH })
-  again = await agent(`${base('again')}\n\nRe-measure after the fix (${JSON.stringify(fix).slice(0, 1500)}): run e2e/live/cache/run.mjs (Claude Code, n=3 per arm, cap $6) and e2e/live/cache/codex.mjs (n=2) on the current v2-design head, plus tests/v2/cache. Same pass rule. Commit results JSON next to the first ones (suffix -after). Return done, breaks, numbers, commits, summary.`, { label: 'cp-again', phase: 'Fix', schema: FIND, ...SNH })
+  again = await retry(`${base('again')}\n\nRe-measure after the fix (${JSON.stringify(fix).slice(0, 1500)}): run e2e/live/cache/run.mjs (Claude Code, n=3 per arm, cap $6) and e2e/live/cache/codex.mjs (n=2) on the current v2-design head, plus tests/v2/cache. Same pass rule. Commit results JSON next to the first ones (suffix -after). Return done, breaks, numbers, commits, summary.`, { label: 'cp-again', phase: 'Fix', schema: FIND, ...SNH })
 }
 
 phase('Ship')
-const doc = await agent(`${base('doc')}\n\nWrite docs/v2/spikes/cache/RESULT.md: the question (does v2 break the prompt cache), the definitions, the static audit, mined numbers, live Claude Code and Codex A/B (every run, per-turn hit ratio, breaks, cross-session read), host table (cache-safe / break / unknown with sources), fixes and after numbers, open items. Plain short sentences, Gateway not involved. Add one ADR-0021 "Prompt-cache safety" with the rules the code now follows and the test that guards them. Update docs/v2/OPEN-ITEMS.md. Inputs: ${JSON.stringify({ found, fix, again }).slice(0, 14000)}. Commit, push. Return done, commits, numbers, summary.`, { label: 'cp-doc', phase: 'Ship', schema: RESULT, ...SNM })
-const rv = await agent(`${base('review')}\n\nRole: adversarial review of the cache proof. Claims: ${JSON.stringify(doc).slice(0, 2500)}. Fresh clone. Re-run bench/cache/mine.mjs and tests/v2/cache; recompute every number in docs/v2/spikes/cache/RESULT.md from the committed JSON; read 3 raw v2 transcripts and check the per-turn usage by hand; check the break definition is applied the same to both arms and that post-compact turns are separated. Fix wrong numbers in place; list real defects. Return pass, problems, summary.`, { label: 'cp-review', phase: 'Ship', schema: CHECK, ...OPH })
+const doc = await retry(`${base('doc')}\n\nWrite docs/v2/spikes/cache/RESULT.md: the question (does v2 break the prompt cache), the definitions, the static audit, mined numbers, live Claude Code and Codex A/B (every run, per-turn hit ratio, breaks, cross-session read), host table (cache-safe / break / unknown with sources), fixes and after numbers, open items. Plain short sentences, Gateway not involved. Add one ADR-0021 "Prompt-cache safety" with the rules the code now follows and the test that guards them. Update docs/v2/OPEN-ITEMS.md. Inputs: ${JSON.stringify({ found, fix, again }).slice(0, 14000)}. Commit, push. Return done, commits, numbers, summary.`, { label: 'cp-doc', phase: 'Ship', schema: RESULT, ...SNM })
+const rv = await retry(`${base('review')}\n\nRole: adversarial review of the cache proof. Claims: ${JSON.stringify(doc).slice(0, 2500)}. Fresh clone. Re-run bench/cache/mine.mjs and tests/v2/cache; recompute every number in docs/v2/spikes/cache/RESULT.md from the committed JSON; read 3 raw v2 transcripts and check the per-turn usage by hand; check the break definition is applied the same to both arms and that post-compact turns are separated. Fix wrong numbers in place; list real defects. Return pass, problems, summary.`, { label: 'cp-review', phase: 'Ship', schema: CHECK, ...OPH })
 const g = await agent(`${base('gate')}\n\nRole: gate on v2-design. Fresh clone, install, build, node scripts/gate.mjs --all twice, build/check-install-docs.mjs, build/check-secrets.mjs, node bench/fixtures/run.mjs --check. Do not fix. Return green, failing, summary.`,
   { label: 'cp-gate', phase: 'Ship', schema: GATE, ...HKM })
 if (g && !g.green) await agent(`${base('gatefix')}\n\nRole: fixer. Failing: ${JSON.stringify(g.failing)} — ${g.summary}. Fix at the root, gate --all once, commit, push. Return done, commits, numbers, summary.`, { label: 'cp-gatefix', phase: 'Ship', schema: RESULT, ...OPH })
