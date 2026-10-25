@@ -9,180 +9,60 @@
     {
       "arm": "off",
       "label": "off-1",
-      "threadId": "01a17403-9cc3-7470-8126-d4c20fb3f688",
+      "threadId": "01a17411-0a5f-7412-897e-cfb4cde42fa2",
       "setup": null,
       "requests": [
         {
-          "turnId": "01a17403-9d06-7723-b653-08dd68af2226",
+          "turnId": "01a17411-0a77-71d1-be1a-886f4d586831",
           "input": 14364,
-          "cached": 12160,
-          "output": 82
-        },
-        {
-          "turnId": "01a17403-9d06-7723-b653-08dd68af2226",
-          "input": 16136,
-          "cached": 14208,
-          "output": 17
-        },
-        {
-          "turnId": "01a17403-d5a7-76e2-8b59-9a03a54c7f32",
-          "input": 16179,
-          "cached": 16000,
-          "output": 63
-        },
-        {
-          "turnId": "01a17403-d5a7-76e2-8b59-9a03a54c7f32",
-          "input": 19547,
-          "cached": 16000,
-          "output": 44
-        },
-        {
-          "turnId": "01a17404-469e-7440-a004-9f5420b88583",
-          "input": 19620,
-          "cached": 19456,
-          "output": 70
-        },
-        {
-          "turnId": "01a17404-469e-7440-a004-9f5420b88583",
-          "input": 19751,
-          "cached": 19456,
-          "output": 33
-        },
-        {
-          "turnId": "01a17404-7768-7162-93cc-09cbfeb3c999",
-          "input": 19800,
-          "cached": 19584,
-          "output": 27
-        },
-        {
-          "turnId": "01a17404-c2cc-7773-a929-37d29e82c216",
-          "input": 19847,
-          "cached": 19712,
-          "output": 46
-        },
-        {
-          "turnId": "01a17404-c2cc-7773-a929-37d29e82c216",
-          "input": 19951,
-          "cached": 19712,
-          "output": 10
-        }
-      ],
-      "turns": [
-        {
-          "n": 1,
-          "usage": {
-            "input": 30500,
-            "cached": 26368,
-            "output": 99
-          },
-          "mcp": [],
-          "shell": 2
-        },
-        {
-          "n": 2,
-          "usage": {
-            "input": 66226,
-            "cached": 58368,
-            "output": 206
-          },
-          "mcp": [],
-          "shell": 1
-        },
-        {
-          "n": 3,
-          "usage": {
-            "input": 105597,
-            "cached": 97280,
-            "output": 309
-          },
-          "mcp": [],
-          "shell": 1
-        },
-        {
-          "n": 4,
-          "usage": {
-            "input": 125397,
-            "cached": 116864,
-            "output": 336
-          },
-          "mcp": [],
-          "shell": 0
-        },
-        {
-          "n": 5,
-          "usage": {
-            "input": 165195,
-            "cached": 156288,
-            "output": 392
-          },
-          "mcp": [],
-          "shell": 1
-        }
-      ],
-      "breaks": [],
-      "hitRatioSession": 0.9460819032053028,
-      "hitRatioTurns2to5": 0.9645495378447604,
-      "firstRequestInput": 14364,
-      "firstRequestCached": 12160,
-      "mcpCalls": []
-    },
-    {
-      "arm": "v2",
-      "label": "v2-1",
-      "threadId": "01a17405-1dc5-7282-a673-677048b681cb",
-      "setup": "AGENT         STATUS  DETAIL\ncodex         PASS    checked: parse, list, mcp, hook\n",
-      "requests": [
-        {
-          "turnId": "01a17405-1dd1-7722-bf40-e35bb7518089",
-          "input": 14372,
           "cached": 12160,
           "output": 87
         },
         {
-          "turnId": "01a17405-1dd1-7722-bf40-e35bb7518089",
-          "input": 14516,
+          "turnId": "01a17411-0a77-71d1-be1a-886f4d586831",
+          "input": 14508,
           "cached": 14336,
           "output": 12
         },
         {
-          "turnId": "01a17405-6d9b-78e1-b175-c08d7c8c5e41",
-          "input": 14554,
+          "turnId": "01a17411-5cd4-7e00-aa48-9ce294fe7b16",
+          "input": 14546,
           "cached": 14336,
           "output": 63
         },
         {
-          "turnId": "01a17405-6d9b-78e1-b175-c08d7c8c5e41",
-          "input": 17922,
+          "turnId": "01a17411-5cd4-7e00-aa48-9ce294fe7b16",
+          "input": 17917,
           "cached": 14464,
-          "output": 37
+          "output": 46
         },
         {
-          "turnId": "01a17405-bda8-78e0-a3b9-a75618c4ff4f",
-          "input": 17988,
+          "turnId": "01a17411-910c-7d02-809a-20b0ac4846f0",
+          "input": 17992,
           "cached": 17792,
-          "output": 70
+          "output": 69
         },
         {
-          "turnId": "01a17405-bda8-78e0-a3b9-a75618c4ff4f",
-          "input": 18118,
+          "turnId": "01a17411-910c-7d02-809a-20b0ac4846f0",
+          "input": 18120,
           "cached": 17920,
-          "output": 34
+          "output": 33
         },
         {
-          "turnId": "01a17405-e956-7410-9c7b-33311145f28a",
-          "input": 18168,
+          "turnId": "01a17411-c0b1-7b00-bfca-40a2ea74cbe9",
+          "input": 18169,
           "cached": 17920,
           "output": 23
         },
         {
-          "turnId": "01a17406-0837-71b0-913e-74892712558a",
-          "input": 18211,
-          "cached": 18048,
+          "turnId": "01a17411-e600-75a1-bd1b-cf843f5a5c48",
+          "input": 18212,
+          "cached": 12160,
           "output": 42
         },
         {
-          "turnId": "01a17406-0837-71b0-913e-74892712558a",
-          "input": 18310,
+          "turnId": "01a17411-e600-75a1-bd1b-cf843f5a5c48",
+          "input": 18311,
           "cached": 18048,
           "output": 10
         }
@@ -191,7 +71,7 @@
         {
           "n": 1,
           "usage": {
-            "input": 28888,
+            "input": 28872,
             "cached": 26496,
             "output": 99
           },
@@ -201,9 +81,9 @@
         {
           "n": 2,
           "usage": {
-            "input": 61364,
+            "input": 61335,
             "cached": 55296,
-            "output": 199
+            "output": 208
           },
           "mcp": [],
           "shell": 1
@@ -211,9 +91,9 @@
         {
           "n": 3,
           "usage": {
-            "input": 97470,
+            "input": 97447,
             "cached": 91008,
-            "output": 303
+            "output": 310
           },
           "mcp": [],
           "shell": 1
@@ -221,9 +101,9 @@
         {
           "n": 4,
           "usage": {
-            "input": 115638,
+            "input": 115616,
             "cached": 108928,
-            "output": 326
+            "output": 333
           },
           "mcp": [],
           "shell": 0
@@ -231,129 +111,9 @@
         {
           "n": 5,
           "usage": {
-            "input": 152159,
-            "cached": 145024,
-            "output": 378
-          },
-          "mcp": [],
-          "shell": 1
-        }
-      ],
-      "breaks": [],
-      "hitRatioSession": 0.9531082617525088,
-      "hitRatioTurns2to5": 0.9615237971623496,
-      "firstRequestInput": 14372,
-      "firstRequestCached": 12160,
-      "mcpCalls": []
-    },
-    {
-      "arm": "off",
-      "label": "off-2",
-      "threadId": "01a17406-6ffe-78c2-8319-6a9d4d7e843d",
-      "setup": null,
-      "requests": [
-        {
-          "turnId": "01a17406-7009-7810-a458-6ee93df1d117",
-          "input": 14364,
-          "cached": 12160,
-          "output": 82
-        },
-        {
-          "turnId": "01a17406-7009-7810-a458-6ee93df1d117",
-          "input": 16138,
-          "cached": 14208,
-          "output": 17
-        },
-        {
-          "turnId": "01a17406-dbc1-7da0-bebc-80c58ec53af7",
-          "input": 16181,
-          "cached": 16000,
-          "output": 63
-        },
-        {
-          "turnId": "01a17406-dbc1-7da0-bebc-80c58ec53af7",
-          "input": 19549,
-          "cached": 12160,
-          "output": 37
-        },
-        {
-          "turnId": "01a17407-2ba7-7f43-b059-c8815b310abc",
-          "input": 19615,
-          "cached": 19456,
-          "output": 70
-        },
-        {
-          "turnId": "01a17407-2ba7-7f43-b059-c8815b310abc",
-          "input": 19745,
-          "cached": 19456,
-          "output": 33
-        },
-        {
-          "turnId": "01a17407-83e1-7f53-afe1-6de4633b49a5",
-          "input": 19794,
-          "cached": 19584,
-          "output": 25
-        },
-        {
-          "turnId": "01a17407-cb28-7f32-a614-347f46fc9e24",
-          "input": 19839,
-          "cached": 19584,
-          "output": 42
-        },
-        {
-          "turnId": "01a17407-cb28-7f32-a614-347f46fc9e24",
-          "input": 19941,
-          "cached": 19712,
-          "output": 10
-        }
-      ],
-      "turns": [
-        {
-          "n": 1,
-          "usage": {
-            "input": 30502,
-            "cached": 26368,
-            "output": 99
-          },
-          "mcp": [],
-          "shell": 2
-        },
-        {
-          "n": 2,
-          "usage": {
-            "input": 66232,
-            "cached": 54528,
-            "output": 199
-          },
-          "mcp": [],
-          "shell": 1
-        },
-        {
-          "n": 3,
-          "usage": {
-            "input": 105592,
-            "cached": 93440,
-            "output": 302
-          },
-          "mcp": [],
-          "shell": 1
-        },
-        {
-          "n": 4,
-          "usage": {
-            "input": 125386,
-            "cached": 113024,
-            "output": 327
-          },
-          "mcp": [],
-          "shell": 0
-        },
-        {
-          "n": 5,
-          "usage": {
-            "input": 165166,
-            "cached": 152320,
-            "output": 379
+            "input": 152139,
+            "cached": 139136,
+            "output": 385
           },
           "mcp": [],
           "shell": 1
@@ -361,74 +121,223 @@
       ],
       "breaks": [
         {
-          "index": 3,
-          "turnId": "01a17406-dbc1-7da0-bebc-80c58ec53af7",
-          "rewritten": 4021
+          "index": 7,
+          "turnId": "01a17411-e600-75a1-bd1b-cf843f5a5c48",
+          "rewritten": 6009
         }
       ],
-      "hitRatioSession": 0.9222237022147415,
-      "hitRatioTurns2to5": 0.935305649616824,
+      "hitRatioSession": 0.9145321055087782,
+      "hitRatioTurns2to5": 0.913788767472235,
       "firstRequestInput": 14364,
       "firstRequestCached": 12160,
       "mcpCalls": []
     },
     {
       "arm": "v2",
-      "label": "v2-2",
-      "threadId": "01a17408-25f6-7390-b2e2-c9c5389ef5b2",
+      "label": "v2-1",
+      "threadId": "01a17412-1eb7-7051-afbb-9501c33a648f",
       "setup": "AGENT         STATUS  DETAIL\ncodex         PASS    checked: parse, list, mcp, hook\n",
       "requests": [
         {
-          "turnId": "01a17408-2600-7402-83ad-96fee49d6261",
+          "turnId": "01a17412-1ed9-7361-bce0-267c5e9c3282",
           "input": 14372,
           "cached": 12160,
-          "output": 87
+          "output": 93
         },
         {
-          "turnId": "01a17408-2600-7402-83ad-96fee49d6261",
-          "input": 14516,
+          "turnId": "01a17412-1ed9-7361-bce0-267c5e9c3282",
+          "input": 14490,
           "cached": 14336,
           "output": 12
         },
         {
-          "turnId": "01a17408-8883-7fc0-98a4-76bd85a3e421",
-          "input": 14554,
+          "turnId": "01a17412-81f6-7592-bb17-010e4362d23e",
+          "input": 14528,
           "cached": 14336,
-          "output": 63
+          "output": 65
         },
         {
-          "turnId": "01a17408-8883-7fc0-98a4-76bd85a3e421",
-          "input": 17922,
+          "turnId": "01a17412-81f6-7592-bb17-010e4362d23e",
+          "input": 17899,
           "cached": 14464,
-          "output": 37
+          "output": 44
         },
         {
-          "turnId": "01a17408-d3aa-7522-8080-630a5384a439",
-          "input": 17988,
+          "turnId": "01a17413-248c-7193-9b20-0c8da8afe948",
+          "input": 17979,
+          "cached": 12160,
+          "output": 59
+        },
+        {
+          "turnId": "01a17413-248c-7193-9b20-0c8da8afe948",
+          "input": 18696,
+          "cached": 17920,
+          "output": 45
+        },
+        {
+          "turnId": "01a17413-248c-7193-9b20-0c8da8afe948",
+          "input": 18793,
+          "cached": 18560,
+          "output": 28
+        },
+        {
+          "turnId": "01a17413-248c-7193-9b20-0c8da8afe948",
+          "input": 18875,
+          "cached": 18688,
+          "output": 38
+        },
+        {
+          "turnId": "01a17413-919d-7b42-9678-8bdb47dcbee7",
+          "input": 18929,
           "cached": 17792,
-          "output": 69
+          "output": 24
         },
         {
-          "turnId": "01a17408-d3aa-7522-8080-630a5384a439",
-          "input": 18117,
-          "cached": 17920,
-          "output": 34
-        },
-        {
-          "turnId": "01a17409-2212-7513-aa04-73050a1fe40f",
-          "input": 18167,
-          "cached": 17920,
-          "output": 26
-        },
-        {
-          "turnId": "01a17409-471b-7d61-a980-5a1833b4d66e",
-          "input": 18213,
-          "cached": 18048,
+          "turnId": "01a17413-b375-7151-b639-d04ae84f3d5f",
+          "input": 18973,
+          "cached": 18688,
           "output": 42
         },
         {
-          "turnId": "01a17409-471b-7d61-a980-5a1833b4d66e",
-          "input": 18312,
+          "turnId": "01a17413-b375-7151-b639-d04ae84f3d5f",
+          "input": 19072,
+          "cached": 18816,
+          "output": 10
+        }
+      ],
+      "turns": [
+        {
+          "n": 1,
+          "usage": {
+            "input": 28862,
+            "cached": 26496,
+            "output": 105
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 2,
+          "usage": {
+            "input": 61289,
+            "cached": 55296,
+            "output": 214
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 3,
+          "usage": {
+            "input": 135632,
+            "cached": 122624,
+            "output": 384
+          },
+          "mcp": [
+            "context-mode.ctx_index",
+            "context-mode.ctx_search"
+          ],
+          "shell": 0
+        },
+        {
+          "n": 4,
+          "usage": {
+            "input": 154561,
+            "cached": 140416,
+            "output": 408
+          },
+          "mcp": [],
+          "shell": 0
+        },
+        {
+          "n": 5,
+          "usage": {
+            "input": 192606,
+            "cached": 177920,
+            "output": 460
+          },
+          "mcp": [],
+          "shell": 1
+        }
+      ],
+      "breaks": [
+        {
+          "index": 4,
+          "turnId": "01a17413-248c-7193-9b20-0c8da8afe948",
+          "rewritten": 5739
+        },
+        {
+          "index": 8,
+          "turnId": "01a17413-919d-7b42-9678-8bdb47dcbee7",
+          "rewritten": 1083
+        }
+      ],
+      "hitRatioSession": 0.9237510773288475,
+      "hitRatioTurns2to5": 0.9247606019151847,
+      "firstRequestInput": 14372,
+      "firstRequestCached": 12160,
+      "mcpCalls": [
+        "context-mode.ctx_index",
+        "context-mode.ctx_search"
+      ]
+    },
+    {
+      "arm": "off",
+      "label": "off-2",
+      "threadId": "01a17413-f0c9-7b52-b558-11032ce97679",
+      "setup": null,
+      "requests": [
+        {
+          "turnId": "01a17413-f0d5-77e1-8079-3d02b678a7fd",
+          "input": 14364,
+          "cached": 12160,
+          "output": 87
+        },
+        {
+          "turnId": "01a17413-f0d5-77e1-8079-3d02b678a7fd",
+          "input": 14509,
+          "cached": 14208,
+          "output": 12
+        },
+        {
+          "turnId": "01a17414-2eab-7ef1-9a06-c3ff0734d922",
+          "input": 14547,
+          "cached": 14336,
+          "output": 62
+        },
+        {
+          "turnId": "01a17414-2eab-7ef1-9a06-c3ff0734d922",
+          "input": 17915,
+          "cached": 14336,
+          "output": 39
+        },
+        {
+          "turnId": "01a17414-6a83-7e81-ac5c-b5eda784838a",
+          "input": 17983,
+          "cached": 17792,
+          "output": 66
+        },
+        {
+          "turnId": "01a17414-6a83-7e81-ac5c-b5eda784838a",
+          "input": 18108,
+          "cached": 17792,
+          "output": 33
+        },
+        {
+          "turnId": "01a17414-9947-7ce1-90cc-d730965c6dd6",
+          "input": 18157,
+          "cached": 17920,
+          "output": 30
+        },
+        {
+          "turnId": "01a17414-dbb1-7693-957e-1bcac44efb18",
+          "input": 18207,
+          "cached": 17920,
+          "output": 42
+        },
+        {
+          "turnId": "01a17414-dbb1-7693-957e-1bcac44efb18",
+          "input": 18308,
           "cached": 18048,
           "output": 10
         }
@@ -437,8 +346,8 @@
         {
           "n": 1,
           "usage": {
-            "input": 28888,
-            "cached": 26496,
+            "input": 28873,
+            "cached": 26368,
             "output": 99
           },
           "mcp": [],
@@ -447,9 +356,9 @@
         {
           "n": 2,
           "usage": {
-            "input": 61364,
-            "cached": 55296,
-            "output": 199
+            "input": 61335,
+            "cached": 55040,
+            "output": 200
           },
           "mcp": [],
           "shell": 1
@@ -457,9 +366,9 @@
         {
           "n": 3,
           "usage": {
-            "input": 97469,
-            "cached": 91008,
-            "output": 302
+            "input": 97426,
+            "cached": 90624,
+            "output": 299
           },
           "mcp": [],
           "shell": 1
@@ -467,9 +376,9 @@
         {
           "n": 4,
           "usage": {
-            "input": 115636,
-            "cached": 108928,
-            "output": 328
+            "input": 115583,
+            "cached": 108544,
+            "output": 329
           },
           "mcp": [],
           "shell": 0
@@ -477,20 +386,164 @@
         {
           "n": 5,
           "usage": {
-            "input": 152161,
-            "cached": 145024,
-            "output": 380
+            "input": 152098,
+            "cached": 144512,
+            "output": 381
           },
           "mcp": [],
           "shell": 1
         }
       ],
       "breaks": [],
-      "hitRatioSession": 0.9530957341237242,
-      "hitRatioTurns2to5": 0.9615081972532509,
-      "firstRequestInput": 14372,
+      "hitRatioSession": 0.9501242619889808,
+      "hitRatioTurns2to5": 0.9587664840738487,
+      "firstRequestInput": 14364,
       "firstRequestCached": 12160,
       "mcpCalls": []
+    },
+    {
+      "arm": "v2",
+      "label": "v2-2",
+      "threadId": "01a17415-3210-76d0-b149-85af7893eceb",
+      "setup": "AGENT         STATUS  DETAIL\ncodex         PASS    checked: parse, list, mcp, hook\n",
+      "requests": [
+        {
+          "turnId": "01a17415-321d-7d91-b465-d0325f8bfc7b",
+          "input": 14372,
+          "cached": 12160,
+          "output": 71
+        },
+        {
+          "turnId": "01a17415-321d-7d91-b465-d0325f8bfc7b",
+          "input": 14499,
+          "cached": 14208,
+          "output": 78
+        },
+        {
+          "turnId": "01a17415-321d-7d91-b465-d0325f8bfc7b",
+          "input": 14635,
+          "cached": 14336,
+          "output": 12
+        },
+        {
+          "turnId": "01a17415-9fb4-7bc3-ae33-0758e73677ff",
+          "input": 14673,
+          "cached": 14464,
+          "output": 62
+        },
+        {
+          "turnId": "01a17415-9fb4-7bc3-ae33-0758e73677ff",
+          "input": 18042,
+          "cached": 14592,
+          "output": 37
+        },
+        {
+          "turnId": "01a17415-ccf6-7ec2-9ba1-d70135b4ba49",
+          "input": 18115,
+          "cached": 17920,
+          "output": 64
+        },
+        {
+          "turnId": "01a17415-ccf6-7ec2-9ba1-d70135b4ba49",
+          "input": 18837,
+          "cached": 18048,
+          "output": 45
+        },
+        {
+          "turnId": "01a17415-ccf6-7ec2-9ba1-d70135b4ba49",
+          "input": 18934,
+          "cached": 18688,
+          "output": 28
+        },
+        {
+          "turnId": "01a17415-ccf6-7ec2-9ba1-d70135b4ba49",
+          "input": 19016,
+          "cached": 18816,
+          "output": 68
+        },
+        {
+          "turnId": "01a17416-3a24-7060-b3d5-1a22c3807f80",
+          "input": 19100,
+          "cached": 18944,
+          "output": 27
+        },
+        {
+          "turnId": "01a17416-958a-7340-a522-2d62ff9502c5",
+          "input": 19147,
+          "cached": 18944,
+          "output": 42
+        },
+        {
+          "turnId": "01a17416-958a-7340-a522-2d62ff9502c5",
+          "input": 19246,
+          "cached": 19072,
+          "output": 10
+        }
+      ],
+      "turns": [
+        {
+          "n": 1,
+          "usage": {
+            "input": 43506,
+            "cached": 40704,
+            "output": 161
+          },
+          "mcp": [],
+          "shell": 2
+        },
+        {
+          "n": 2,
+          "usage": {
+            "input": 76221,
+            "cached": 69760,
+            "output": 260
+          },
+          "mcp": [],
+          "shell": 1
+        },
+        {
+          "n": 3,
+          "usage": {
+            "input": 151123,
+            "cached": 143232,
+            "output": 465
+          },
+          "mcp": [
+            "context-mode.ctx_index",
+            "context-mode.ctx_search"
+          ],
+          "shell": 0
+        },
+        {
+          "n": 4,
+          "usage": {
+            "input": 170223,
+            "cached": 162176,
+            "output": 492
+          },
+          "mcp": [],
+          "shell": 0
+        },
+        {
+          "n": 5,
+          "usage": {
+            "input": 208616,
+            "cached": 200192,
+            "output": 544
+          },
+          "mcp": [],
+          "shell": 1
+        }
+      ],
+      "breaks": [],
+      "hitRatioSession": 0.9596195881428078,
+      "hitRatioTurns2to5": 0.9659499727454425,
+      "firstRequestInput": 14372,
+      "firstRequestCached": 12160,
+      "mcpCalls": [
+        "context-mode.ctx_index",
+        "context-mode.ctx_search"
+      ]
     }
   ],
   "cross": [
@@ -501,13 +554,13 @@
       "fraction": 0.847859433830707,
       "gapMs": 0,
       "sessionA": {
-        "turnId": "01a17409-8e88-7410-8608-f3543c185bbc",
+        "turnId": "01a17416-df2b-77c1-8341-1fab6b179d68",
         "input": 14342,
         "cached": 12160,
         "output": 5
       },
       "sessionB": {
-        "turnId": "01a17409-aef6-7c42-8324-39da783ee3b9",
+        "turnId": "01a17417-2a79-78e0-a4ef-cb788ea0a9db",
         "input": 14342,
         "cached": 12160,
         "output": 5
@@ -520,13 +573,13 @@
       "fraction": 0.8473867595818816,
       "gapMs": 0,
       "sessionA": {
-        "turnId": "01a1740a-059e-7db1-bbf1-eb9c766a7441",
+        "turnId": "01a17417-8099-72c3-a502-2455a5a2dc97",
         "input": 14350,
         "cached": 12160,
         "output": 5
       },
       "sessionB": {
-        "turnId": "01a1740a-5943-7680-8b64-024ebcfc0bca",
+        "turnId": "01a17417-bb28-7232-ad21-d4af59da8556",
         "input": 14350,
         "cached": 12160,
         "output": 5
@@ -537,14 +590,14 @@
     "off": {
       "sessions": 2,
       "breaksPerSession": [
-        0,
-        1
+        1,
+        0
       ],
       "hitRatioTurns2to5": [
-        0.9645495378447604,
-        0.935305649616824
+        0.913788767472235,
+        0.9587664840738487
       ],
-      "hitRatioTurns2to5Median": 0.9499275937307923,
+      "hitRatioTurns2to5Median": 0.9362776257730419,
       "firstRequestInput": [
         14364,
         14364
@@ -557,26 +610,26 @@
     "v2": {
       "sessions": 2,
       "breaksPerSession": [
-        0,
+        2,
         0
       ],
       "hitRatioTurns2to5": [
-        0.9615237971623496,
-        0.9615081972532509
+        0.9247606019151847,
+        0.9659499727454425
       ],
-      "hitRatioTurns2to5Median": 0.9615159972078002,
+      "hitRatioTurns2to5Median": 0.9453552873303136,
       "firstRequestInput": [
         14372,
         14372
       ],
       "mcpCalls": [
-        0,
-        0
+        2,
+        2
       ]
     }
   },
   "pass": {
-    "breaks": true,
+    "breaks": false,
     "hitRatio": true,
     "crossSession": false
   }
