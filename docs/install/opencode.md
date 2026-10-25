@@ -39,7 +39,7 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
-- The context-mode hooks plugin is not part of setup: no OpenCode build loads the release `opencode/plugin.js` ("Plugin export is not a function"). Setup adds the MCP server only.
+- Setup adds the hooks plugin to the `plugin` list in `~/.config/opencode/opencode.json`. On its first start after that, OpenCode installs `@opencode-ai/plugin` into `~/.config/opencode` (about 76 s on OpenCode 1.19.4, needs the network). The first `context-mode setup --agents opencode` can fail with "opencode mcp list does not list context-mode" and roll back. Run the same command again; it passes.
 
 ## Report a problem
 
