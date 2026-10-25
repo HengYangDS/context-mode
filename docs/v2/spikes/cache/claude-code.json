@@ -7,7 +7,7 @@
   "capUsd": 10,
   "bundle": "release-out",
   "complete": true,
-  "costUsd": 3.3255,
+  "costUsd": 4.41,
   "arms": {
     "off": {
       "sessions": [
@@ -2246,70 +2246,78 @@
     "off": {
       "arm": "off",
       "tag": "compact",
-      "valid": false,
+      "valid": true,
       "analysis": {
-        "breaks": [
+        "breaks": [],
+        "postCompact": [
           {
-            "turn": 3,
+            "turn": 4,
             "call": 0,
-            "rewritten": 13236,
-            "prevPrompt": 17752,
-            "cacheRead": 4516,
-            "cacheCreation": 3963
+            "rewritten": 12174,
+            "prevPrompt": 17609,
+            "cacheRead": 5435,
+            "cacheCreation": 3023
           }
         ],
-        "postCompact": [],
         "perTurn": [
           {
             "turn": 0,
             "calls": 3,
             "input": 6,
-            "cacheRead": 20126,
-            "cacheCreation": 2074,
-            "hitRatio": 0.9063316220841214
+            "cacheRead": 20015,
+            "cacheCreation": 2000,
+            "hitRatio": 0.9089051360065392
           },
           {
             "turn": 1,
             "calls": 2,
             "input": 4,
-            "cacheRead": 16189,
-            "cacheCreation": 9354,
-            "hitRatio": 0.6336947586800799
+            "cacheRead": 16038,
+            "cacheCreation": 9325,
+            "hitRatio": 0.6322387353648441
           },
           {
             "turn": 2,
             "calls": 2,
             "input": 4,
-            "cacheRead": 34883,
-            "cacheCreation": 372,
-            "hitRatio": 0.9893360560424289
+            "cacheRead": 34667,
+            "cacheCreation": 332,
+            "hitRatio": 0.9904008227866183
           },
           {
             "turn": 3,
-            "calls": 2,
-            "input": 4,
-            "cacheRead": 12995,
-            "cacheCreation": 4152,
-            "hitRatio": 0.7576817678269488
+            "calls": 0,
+            "input": 0,
+            "cacheRead": 0,
+            "cacheCreation": 0,
+            "hitRatio": 0
           },
           {
             "turn": 4,
-            "calls": 1,
-            "input": 2,
-            "cacheRead": 8668,
-            "cacheCreation": 170,
-            "hitRatio": 0.9805429864253393
+            "calls": 2,
+            "input": 4,
+            "cacheRead": 13893,
+            "cacheCreation": 3215,
+            "hitRatio": 0.8118863955119214
           },
           {
             "turn": 5,
+            "calls": 1,
+            "input": 2,
+            "cacheRead": 8650,
+            "cacheCreation": 152,
+            "hitRatio": 0.9825079509313949
+          },
+          {
+            "turn": 6,
             "calls": 2,
             "input": 4,
-            "cacheRead": 17705,
+            "cacheRead": 17633,
             "cacheCreation": 253,
-            "hitRatio": 0.985692016479234
+            "hitRatio": 0.9856344326439351
           }
         ],
-        "firstPrefix": 6347
+        "firstPrefix": 6321
       },
       "turns": [
         {
@@ -2323,32 +2331,32 @@
           "hooks": [],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.013060599999999999,
-          "wallMs": 12879,
+          "costUsd": 0.0128535,
+          "wallMs": 8068,
           "calls": [
             {
               "input": 2,
               "cacheRead": 5950,
-              "cacheCreation": 395,
+              "cacheCreation": 369,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 6345,
-              "cacheCreation": 1486,
+              "cacheRead": 6319,
+              "cacheCreation": 1427,
               "output": 4,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 7831,
-              "cacheCreation": 193,
-              "output": 61,
+              "cacheRead": 7746,
+              "cacheCreation": 204,
+              "output": 58,
               "afterCompact": false
             }
           ],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         },
         {
           "label": "read",
@@ -2360,25 +2368,25 @@
           "hooks": [],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.0541835,
-          "wallMs": 7956,
+          "costUsd": 0.0534853,
+          "wallMs": 6159,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 8024,
-              "cacheCreation": 141,
+              "cacheRead": 7950,
+              "cacheCreation": 138,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 8165,
-              "cacheCreation": 9213,
-              "output": 49,
+              "cacheRead": 8088,
+              "cacheCreation": 9187,
+              "output": 39,
               "afterCompact": false
             }
           ],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         },
         {
           "label": "grep",
@@ -2390,25 +2398,25 @@
           "hooks": [],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.0625578,
-          "wallMs": 10334,
+          "costUsd": 0.061598,
+          "wallMs": 6820,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 17378,
-              "cacheCreation": 127,
+              "cacheRead": 17275,
+              "cacheCreation": 117,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 17505,
-              "cacheCreation": 245,
-              "output": 4,
+              "cacheRead": 17392,
+              "cacheCreation": 215,
+              "output": 6,
               "afterCompact": false
             }
           ],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         },
         {
           "label": "/compact",
@@ -2418,10 +2426,10 @@
           "hooks": [],
           "compacted": true,
           "isError": false,
-          "costUsd": 0.0900043,
-          "wallMs": 21330,
+          "costUsd": 0.0895602,
+          "wallMs": 16899,
           "calls": [],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         },
         {
           "label": "search",
@@ -2433,25 +2441,25 @@
           "hooks": [],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.1100198,
-          "wallMs": 7266,
+          "costUsd": 0.10573750000000001,
+          "wallMs": 4480,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 4516,
-              "cacheCreation": 3963,
+              "cacheRead": 5435,
+              "cacheCreation": 3023,
               "output": 8,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 8479,
-              "cacheCreation": 189,
-              "output": 108,
+              "cacheRead": 8458,
+              "cacheCreation": 192,
+              "output": 90,
               "afterCompact": false
             }
           ],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         },
         {
           "label": "plain",
@@ -2461,18 +2469,18 @@
           "hooks": [],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.1116006,
-          "wallMs": 4871,
+          "costUsd": 0.1072445,
+          "wallMs": 5203,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 8668,
-              "cacheCreation": 170,
+              "cacheRead": 8650,
+              "cacheCreation": 152,
               "output": 3,
               "afterCompact": false
             }
           ],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         },
         {
           "label": "small",
@@ -2484,25 +2492,25 @@
           "hooks": [],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.11526109999999999,
-          "wallMs": 9193,
+          "costUsd": 0.1108978,
+          "wallMs": 5002,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 8795,
+              "cacheRead": 8759,
               "cacheCreation": 115,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 8910,
+              "cacheRead": 8874,
               "cacheCreation": 138,
               "output": 11,
               "afterCompact": false
             }
           ],
-          "sessionId": "22fb9660-2ba5-4fa5-8cc0-74c99d9d5276"
+          "sessionId": "b0f1db55-c6f7-4030-b612-930b6b8db518"
         }
       ],
       "realTurns": 6
@@ -2510,76 +2518,83 @@
     "v2": {
       "arm": "v2",
       "tag": "compact",
-      "valid": false,
+      "valid": true,
       "analysis": {
-        "breaks": [
+        "breaks": [],
+        "postCompact": [
           {
-            "turn": 3,
+            "turn": 4,
             "call": 0,
-            "rewritten": 11359,
-            "prevPrompt": 19342,
+            "rewritten": 11180,
+            "prevPrompt": 19163,
             "cacheRead": 7983,
-            "cacheCreation": 3339
+            "cacheCreation": 3572
           }
         ],
-        "postCompact": [],
         "perTurn": [
           {
             "turn": 0,
-            "calls": 3,
-            "input": 6,
-            "cacheRead": 27062,
-            "cacheCreation": 1137,
-            "hitRatio": 0.9594752703421379
+            "calls": 2,
+            "input": 4,
+            "cacheRead": 17639,
+            "cacheCreation": 846,
+            "hitRatio": 0.9540267185894316
           },
           {
             "turn": 1,
             "calls": 2,
             "input": 4,
-            "cacheRead": 19402,
-            "cacheCreation": 9346,
-            "hitRatio": 0.6748052309404563
+            "cacheRead": 18980,
+            "cacheCreation": 9481,
+            "hitRatio": 0.6667837695415423
           },
           {
             "turn": 2,
             "calls": 2,
             "input": 4,
-            "cacheRead": 38080,
-            "cacheCreation": 359,
-            "hitRatio": 0.9905574486902687
+            "cacheRead": 37766,
+            "cacheCreation": 336,
+            "hitRatio": 0.9910775206004304
           },
           {
             "turn": 3,
-            "calls": 2,
-            "input": 4,
-            "cacheRead": 19305,
-            "cacheCreation": 4692,
-            "hitRatio": 0.8043414857714262
+            "calls": 0,
+            "input": 0,
+            "cacheRead": 0,
+            "cacheCreation": 0,
+            "hitRatio": 0
           },
           {
             "turn": 4,
-            "calls": 1,
-            "input": 2,
-            "cacheRead": 12675,
-            "cacheCreation": 714,
-            "hitRatio": 0.946531252333657
+            "calls": 2,
+            "input": 4,
+            "cacheRead": 19538,
+            "cacheCreation": 4828,
+            "hitRatio": 0.8017234304472712
           },
           {
             "turn": 5,
+            "calls": 1,
+            "input": 2,
+            "cacheRead": 12811,
+            "cacheCreation": 674,
+            "hitRatio": 0.9498776599688589
+          },
+          {
+            "turn": 6,
             "calls": 2,
             "input": 4,
-            "cacheRead": 26475,
-            "cacheCreation": 758,
-            "hitRatio": 0.9720233505892719
+            "cacheRead": 26687,
+            "cacheCreation": 713,
+            "hitRatio": 0.9738359363596555
           }
         ],
-        "firstPrefix": 9168
+        "firstPrefix": 9143
       },
       "turns": [
         {
           "label": "cat",
           "tools": [
-            "Bash",
             "Bash"
           ],
           "subagentCalls": 0,
@@ -2601,45 +2616,30 @@
             },
             {
               "event": "PostToolUse",
-              "bytes": 323
-            },
-            {
-              "event": "PreToolUse",
-              "bytes": 0
-            },
-            {
-              "event": "PostToolUse",
-              "bytes": 0
+              "bytes": 312
             }
           ],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.010346200000000002,
-          "wallMs": 8665,
+          "costUsd": 0.0077859,
+          "wallMs": 7521,
           "calls": [
             {
               "input": 2,
               "cacheRead": 8498,
-              "cacheCreation": 668,
+              "cacheCreation": 643,
               "output": 17,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 9166,
-              "cacheCreation": 232,
+              "cacheRead": 9141,
+              "cacheCreation": 203,
               "output": 8,
-              "afterCompact": false
-            },
-            {
-              "input": 2,
-              "cacheRead": 9398,
-              "cacheCreation": 237,
-              "output": 52,
               "afterCompact": false
             }
           ],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         },
         {
           "label": "read",
@@ -2665,30 +2665,30 @@
             },
             {
               "event": "PostToolUse",
-              "bytes": 334
+              "bytes": 307
             }
           ],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.0516684,
-          "wallMs": 14250,
+          "costUsd": 0.049335899999999995,
+          "wallMs": 4905,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 9635,
-              "cacheCreation": 132,
+              "cacheRead": 9344,
+              "cacheCreation": 292,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 9767,
-              "cacheCreation": 9214,
-              "output": 40,
+              "cacheRead": 9636,
+              "cacheCreation": 9189,
+              "output": 38,
               "afterCompact": false
             }
           ],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         },
         {
           "label": "grep",
@@ -2719,25 +2719,25 @@
           ],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.0603104,
-          "wallMs": 9760,
+          "costUsd": 0.057444499999999996,
+          "wallMs": 6574,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 18981,
-              "cacheCreation": 118,
+              "cacheRead": 18825,
+              "cacheCreation": 116,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 19099,
-              "cacheCreation": 241,
-              "output": 10,
+              "cacheRead": 18941,
+              "cacheCreation": 220,
+              "output": 8,
               "afterCompact": false
             }
           ],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         },
         {
           "label": "/compact",
@@ -2758,10 +2758,10 @@
           ],
           "compacted": true,
           "isError": false,
-          "costUsd": 0.08784829999999999,
-          "wallMs": 22084,
+          "costUsd": 0.08549209999999999,
+          "wallMs": 16470,
           "calls": [],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         },
         {
           "label": "search",
@@ -2779,7 +2779,7 @@
             },
             {
               "event": "UserPromptSubmit",
-              "bytes": 240
+              "bytes": 0
             },
             {
               "event": "PreToolUse",
@@ -2792,25 +2792,25 @@
           ],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.11160479999999999,
-          "wallMs": 16402,
+          "costUsd": 0.10961589999999999,
+          "wallMs": 8190,
           "calls": [
             {
               "input": 2,
               "cacheRead": 7983,
-              "cacheCreation": 3339,
-              "output": 40,
+              "cacheCreation": 3572,
+              "output": 42,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 11322,
-              "cacheCreation": 1353,
-              "output": 233,
+              "cacheRead": 11555,
+              "cacheCreation": 1256,
+              "output": 213,
               "afterCompact": false
             }
           ],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         },
         {
           "label": "plain",
@@ -2831,18 +2831,18 @@
           ],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.11576229999999998,
-          "wallMs": 6555,
+          "costUsd": 0.11362699999999999,
+          "wallMs": 3193,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 12675,
-              "cacheCreation": 714,
+              "cacheRead": 12811,
+              "cacheCreation": 674,
               "output": 3,
               "afterCompact": false
             }
           ],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         },
         {
           "label": "small",
@@ -2873,25 +2873,25 @@
           ],
           "compacted": false,
           "isError": false,
-          "costUsd": 0.12231979999999998,
-          "wallMs": 5495,
+          "costUsd": 0.11977569999999998,
+          "wallMs": 5194,
           "calls": [
             {
               "input": 2,
-              "cacheRead": 12927,
-              "cacheCreation": 621,
+              "cacheRead": 13043,
+              "cacheCreation": 601,
               "output": 16,
               "afterCompact": false
             },
             {
               "input": 2,
-              "cacheRead": 13548,
-              "cacheCreation": 137,
+              "cacheRead": 13644,
+              "cacheCreation": 112,
               "output": 11,
               "afterCompact": false
             }
           ],
-          "sessionId": "ba3035ee-3e11-45f5-936e-904eab2419ed"
+          "sessionId": "9d2bb1d7-a57d-4896-bfcb-a80544f4b8b0"
         }
       ],
       "realTurns": 6
