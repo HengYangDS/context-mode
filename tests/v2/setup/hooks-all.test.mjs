@@ -130,3 +130,53 @@ test("ADR-0020: --print lists the hook step and the skill step for every agent",
     if (getAdapter(row.id).skillChannel.kind === "home-dir") assert.ok(kinds.includes("skill"), row.id + " skill step");
   }
 });
+
+// ADR-0020 step 4: doctor runs three hook checks (registered, runs, seen) and one skill check per agent.
+test("ADR-0020: doctor names hook-registered, hook-runs, hook-seen and skills; seen is a WARN before the first event", async (t) => {
+  const s = sandbox(t);
+  const { runDoctor } = await import("../../../src/setup/index.ts");
+  const agents = ["codex", "kiro", "opencode"];
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents, runId: "r1" });
+  assert.equal(res.exitCode, 0, JSON.stringify(res.agents.map((a) => [a.id, a.status, a.reason])));
+  const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents });
+  assert.equal(d.exitCode, 0, JSON.stringify(d.agents.map((a) => [a.id, a.status, a.reason])));
+  for (const a of d.agents) {
+    const by = Object.fromEntries(a.checks.map((c) => [c.name, c]));
+    for (const n of ["hook-registered", "hook-runs", "hook-seen", "skills"]) assert.ok(by[n], a.id + " " + n);
+    assert.equal(by["hook-registered"].ok, true, a.id);
+    assert.equal(by["hook-runs"].ok, true, a.id);
+    assert.equal(by.skills.ok, true, a.id);
+    assert.equal(by["hook-seen"].warn, true, a.id + " seen is WARN");
+    assert.match(by["hook-seen"].detail, /not seen yet, run one tool call/);
+  }
+});
+
+test("ADR-0020: doctor hook-seen passes once the journal holds a row from that agent", async (t) => {
+  const s = sandbox(t);
+  const { runDoctor } = await import("../../../src/setup/index.ts");
+  await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"], runId: "r1" });
+  const { DatabaseSync } = await import("node:sqlite");
+  const { DDL } = await import("../../../src/core/store/schema.ts");
+  const dir = path.join(s.home, ".context-mode", "projects", "abc");
+  mkdirSync(dir, { recursive: true });
+  const db = new DatabaseSync(path.join(dir, "context.db"));
+  db.exec(DDL);
+  db.prepare("INSERT INTO events(session_id, worktree, agent, kind, turn, created_at, accessed_at) VALUES ('s','/w','codex','cmd',1,1,1)").run();
+  db.close();
+  const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["codex"] });
+  const seen = d.agents[0].checks.find((c) => c.name === "hook-seen");
+  assert.equal(seen.ok, true);
+  assert.notEqual(seen.warn, true);
+});
+
+test("ADR-0020: doctor fails hook-registered when the hook file lost the entry, and skills when a skill has the wrong prefix", async (t) => {
+  const s = sandbox(t);
+  const { runDoctor } = await import("../../../src/setup/index.ts");
+  await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["kiro"], runId: "r1" });
+  writeFileSync(path.join(s.home, ".kiro", "hooks", "context-mode.json"), JSON.stringify({ version: "v1", hooks: [] }));
+  const skill = path.join(s.home, ".kiro", "skills", "ctx-stats", "SKILL.md");
+  writeFileSync(skill, readFileSync(skill, "utf8").split("mcp_context-mode_ctx_stats").join("ctx_stats"));
+  const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["kiro"] });
+  assert.equal(d.exitCode, 1);
+  assert.equal(d.agents[0].status, "FAIL");
+});
