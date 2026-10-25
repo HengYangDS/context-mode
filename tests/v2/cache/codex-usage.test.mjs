@@ -22,7 +22,7 @@ test("parseExecJson: thread id, one usage row per turn.completed, agent text kep
 });
 
 test("parseExecJson: a line that is not JSON is an error, not skipped", () => {
-  assert.throws(() => parseExecJson("not json\n"), /not JSON/);
+  assert.throws(() => parseExecJson("not json\n"), (e) => e.message.includes("not JSON"));
 });
 
 test("hitRatio: cached / input for one usage row; 0 when input is 0", () => {
