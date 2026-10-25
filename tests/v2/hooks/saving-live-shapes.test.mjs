@@ -7,12 +7,13 @@
 // dist/core/extensions/types.d.ts (tool_call / tool_result, toolName "bash" / "read").
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { handleHook } from "../../../src/core/hooks/dispatch.ts";
 import { decode as copilotDecode } from "../../../src/adapters/copilot-cli.ts";
+import { READ_DENY_MESSAGE } from "../../../src/core/policy/read-deny.ts";
 
 function bigLog() {
   const lines = [];
@@ -41,7 +42,8 @@ test("qwen PreToolUse run_shell_command `cat <large file>` is denied with the ct
   assert.equal(out.exitCode, 0);
   const j = JSON.parse(out.stdout);
   assert.equal(j.hookSpecificOutput.permissionDecision, "deny");
-  assert.ok(j.hookSpecificOutput.permissionDecisionReason.includes("mcp__context-mode__ctx_execute"));
+  const abs = path.join(repo, "logs", "app.log");
+  assert.equal(j.hookSpecificOutput.permissionDecisionReason, READ_DENY_MESSAGE(abs, statSync(abs).size));
 });
 
 test("copilot-cli preToolUse with the host's lowercase `bash` tool reaches the shell rules", async (t) => {
