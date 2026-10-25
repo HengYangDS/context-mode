@@ -10,7 +10,7 @@
 //        [--root <scratch>] [--raw <dir>] [--out <json>] [--parts main,cross,compact] [--arms off,v2]
 import { execFileSync, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { readFileSync, chmodSync, closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { runGroup } from "../lib/proc-group.mjs";
@@ -27,6 +27,7 @@ const ARMS = arg("--arms", "off,v2").split(",");
 const PARTS = arg("--parts", "main,cross,compact").split(",");
 const SCRATCH = path.resolve(arg("--root", path.join(os.tmpdir(), "cm-v2-cp-cc")));
 const RAW = arg("--raw", "") === "" ? null : path.resolve(arg("--raw", ""));
+const BASE = arg("--base", "") === "" ? null : path.resolve(arg("--base", ""));
 const OUT = path.resolve(arg("--out", path.join(SCRATCH, `cache-claude-code-${Date.now()}.json`)));
 const TURN_TIMEOUT_MS = 420000;
 
@@ -118,7 +119,7 @@ async function oneTurn(bin, sb, arm, sid, first, text, label) {
 
 const brief = (t) => ({ label: t.label, tools: t.tools, subagentCalls: t.subagentCalls, mcp: t.mcp, hooks: t.hooks, compacted: t.compacted, isError: t.isError, costUsd: t.costUsd, wallMs: t.wallMs,
   calls: t.calls.map(({ input, cacheRead, cacheCreation, output, afterCompact }) => ({ input, cacheRead, cacheCreation, output, afterCompact })), sessionId: t.sessionId });
-const valid = (arm, turns) => turns.every((t) => !t.isError && t.calls.length > 0) && (arm !== "v2" || turns[0].mcp.some((m) => m.includes("context-mode") && m.endsWith(":connected")));
+const valid = (arm, turns) => turns.every((t) => !t.isError && (t.calls.length > 0 || t.label === "/compact")) && (arm !== "v2" || turns[0].mcp.some((m) => m.includes("context-mode") && m.endsWith(":connected")));
 
 async function runSession(bin, arm, labels, tag) {
   const sb = sandbox(`${arm}-${tag}`);
@@ -133,7 +134,7 @@ async function runSession(bin, arm, labels, tag) {
     }
   } finally { rmSync(sb.dir, { recursive: true, force: true }); }
   const real = turns.filter((t) => t.label !== "/compact");
-  return { arm, tag, valid: valid(arm, turns), analysis: analyzeSession(turns.filter((t) => t.calls.length > 0)), turns: turns.map(brief), realTurns: real.length };
+  return { arm, tag, valid: valid(arm, turns), analysis: analyzeSession(turns), turns: turns.map(brief), realTurns: real.length };
 }
 
 async function runCross(bin, arm, tag) {
@@ -158,13 +159,14 @@ function main() {
   if (cred.value === "") fail("no login credential in the Keychain (ADR-0012: login only, no API key)");
   mkdirSync(SCRATCH, { recursive: true });
   const version = String(execFileSync(bin, ["--version"], { encoding: "utf8" })).trim();
-  const doc = { id: "cache-claude-code", claudeVersion: version, model: MODEL, effort: EFFORT, n: N, capUsd: CAP, bundle: path.basename(BUNDLE), complete: false, costUsd: 0, arms: {}, compact: {}, error: null };
+  const doc = BASE ? JSON.parse(readFileSync(BASE, "utf8")) : { id: "cache-claude-code", claudeVersion: version, model: MODEL, effort: EFFORT, n: N, capUsd: CAP, bundle: path.basename(BUNDLE), complete: false, costUsd: 0, arms: {}, compact: {}, error: null };
+  if (BASE) { doc.complete = false; doc.error = null; doc.capUsd = CAP; spent = Number(doc.costUsd ?? 0); }
   const save = () => { doc.costUsd = Number(spent.toFixed(4)); mkdirSync(path.dirname(OUT), { recursive: true }); writeFileSync(OUT, JSON.stringify(doc, null, 2)); };
   return (async () => {
     try {
-      for (const arm of ARMS) doc.arms[arm] = { sessions: [], crossRuns: [] };
+      for (const arm of ARMS) doc.arms[arm] ??= { sessions: [], crossRuns: [] };
       if (PARTS.includes("main")) for (let i = 0; i < N; i++) for (const arm of ARMS) { doc.arms[arm].sessions.push(await runSession(bin, arm, MAIN_TURNS, `main${i}`)); save(); }
-      if (PARTS.includes("cross")) for (let i = 0; i < N; i++) for (const arm of ARMS) { doc.arms[arm].crossRuns.push(await runCross(bin, arm, `cross${i}`)); save(); }
+      if (PARTS.includes("cross")) for (let i = 0; i < N; i++) for (const arm of ARMS) { doc.arms[arm].crossRuns.push(await runCross(bin, arm, `cross${doc.arms[arm].crossRuns.length}`)); save(); }
       if (PARTS.includes("compact")) for (const arm of ARMS) { doc.compact[arm] = await runSession(bin, arm, COMPACT_TURNS, "compact"); save(); }
       doc.complete = true;
     } catch (e) { doc.error = String(e.message ?? e); }
