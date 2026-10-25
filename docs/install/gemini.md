@@ -4,7 +4,7 @@ Run the two commands on the [install page](./README.md). This page lists what `c
 
 ## Install
 
-What setup does for Gemini CLI: Runs `gemini extensions link <package folder> --consent`. The extension ships the MCP server (`gemini-extension.json`) and the hooks (`hooks/hooks.json`). Setup uses `link`, not `install`, because `install <folder>` waits on a trust prompt and hangs (D-INST-1). It checks the result with `gemini extensions list`, which prints to stderr in 0.65.0 (D-INST-2). It drops v1 hook commands from `~/.gemini/settings.json`.
+What setup does for Gemini CLI: Runs `gemini extensions link <package folder> --consent`. The extension ships the MCP server (`gemini-extension.json`) and the hooks (`hooks/hooks.json`). Setup uses `link`, not `install`, because `install <folder>` waits on a trust prompt and hangs (D-INST-1). It checks the result with `gemini extensions list`, which prints to stderr in 0.65.0 (D-INST-2). It drops old context-mode hook commands from `~/.gemini/settings.json`.
 
 It writes `~/.gemini/extensions/context-mode/` (link), `extension-enablement.json`. Hooks: shipped by the extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
@@ -39,13 +39,6 @@ Or run `context-mode upgrade --agents gemini`. After the owner moves the `latest
 - `hooks/hooks.json` has no SessionStart (D-FU-GCH-1). The resume hint comes on the first BeforeAgent of a session (D-FU-GCH-2).
 - No live, logged-in Gemini session loaded the hooks in any run.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Gemini CLI it drops the v1 hook commands (`context-mode hook ...`) from the host settings file, because the plugin or extension ships its own hooks. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Rollback to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Gemini CLI as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 

@@ -37,13 +37,6 @@ Or run `context-mode upgrade --agents kiro`. After the owner moves the `latest` 
 - Setup writes no hook file. The hook file `~/.kiro/hooks/context-mode.json` is not part of the setup run.
 - Kiro has no npm package, so no run showed Kiro load the server or fire a hook.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Kiro it writes a new v2 entry. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Rollback to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Kiro as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 

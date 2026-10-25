@@ -11,9 +11,12 @@
 // A fenced `npm i -g context-mode` without a version tag fails (@next = v2 preview, @1 = v1): latest is v1 until the owner moves it (ADR-0019 D2). The default run also checks README.md.
 // Any fenced line with "change this", "your path" or "edit this" fails: the reader must not edit a block.
 // D-INST-4 (npm route): a fenced `context-mode setup|doctor|upgrade` line may use only flags that command has (checkLines);
-// checkPages: README.md names Node 24.15.0, the two-command install and the uninstall command; each agent page names `context-mode setup` and has a "## Upgrade from v1" heading.
+// checkPages: README.md names Node 24.15.0, the two-command install and the uninstall command; each agent page names `context-mode setup` (no upgrade section: D-V1OUT-1).
+// D-V1OUT-1 (owner 2026-10-25): the word "v1" must not appear in README.md, CONTRIBUTING.md, docs/*.md, docs/install/**, skills/**,
+// src/prompt/** or .github/ISSUE_TEMPLATE/** (checkNoV1, v1FreeFiles). docs/benchmarks/** and docs/v2/** are exempt. CLI help and output
+// are checked by tests/v2/repo/install-docs-v1out.test.mjs, which runs the CLI.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -44,7 +47,6 @@ export function checkPages(pages) {
       if (!text.includes("context-mode setup --remove && npm rm -g context-mode")) bad.push("README.md needs the uninstall command");
     } else {
       if (!text.includes("context-mode setup")) bad.push(`${name} needs context-mode setup`);
-      if (!text.split("\n").includes("## Upgrade from v1")) bad.push(`${name} needs a ## Upgrade from v1 heading`);
     }
   }
   return bad;
@@ -94,6 +96,30 @@ export function checkLines(name, text) {
   return bad;
 }
 
+const V1_WORD = /\bv1\b/i;
+/** Lines of `text` that hold the word v1 (any case; v10, ev1 and @1 do not match). */
+export function checkNoV1(name, text) {
+  return text.split("\n").flatMap((line, i) => (V1_WORD.test(line) ? [`${name}:${i + 1} the word v1 is not allowed in user-facing files: ${line.trim().slice(0, 100)}`] : []));
+}
+
+function walk(dir, exts, out = []) {
+  if (!existsSync(dir)) return out;
+  for (const e of readdirSync(dir).sort()) {
+    const f = path.join(dir, e);
+    if (statSync(f).isDirectory()) walk(f, exts, out);
+    else if (exts.some((x) => f.endsWith(x))) out.push(f);
+  }
+  return out;
+}
+
+/** Files that must not name v1. */
+export function v1FreeFiles(repo) {
+  const top = ["README.md", "CONTRIBUTING.md"].map((f) => path.join(repo, f)).filter(existsSync);
+  const docs = readdirSync(path.join(repo, "docs")).filter((f) => f.endsWith(".md")).sort().map((f) => path.join(repo, "docs", f));
+  return [...top, ...docs, ...walk(path.join(repo, "docs", "install"), [".md"]), ...walk(path.join(repo, "skills"), [".md"]),
+    ...walk(path.join(repo, "src", "prompt"), [".md"]), ...walk(path.join(repo, ".github", "ISSUE_TEMPLATE"), [".yml", ".yaml", ".md"])];
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const files = readdirSync(DIR).filter((f) => f.endsWith(".md")).sort();
   const bad = files.flatMap((f) => checkLines(f, readFileSync(path.join(DIR, f), "utf8")));
@@ -101,6 +127,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const readme = path.join(DIR, "..", "..", "README.md");
     bad.push(...checkLines("README.md", readFileSync(readme, "utf8")));
     files.push("README.md");
+    const repo = path.join(DIR, "..", "..");
+    bad.push(...v1FreeFiles(repo).flatMap((f) => checkNoV1(path.relative(repo, f), readFileSync(f, "utf8"))));
   }
   for (const b of bad) console.log("  " + b);
   console.log(`${bad.length ? "FAIL" : "PASS"} install-docs ${files.length} files`);

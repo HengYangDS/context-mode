@@ -38,13 +38,6 @@ Or run `context-mode upgrade --agents vscode`. After the owner moves the `latest
 - VS Code itself was not run, so no run showed that VS Code reads `.vscode/mcp.json` under the home folder.
 - The shipped `hooks/vscode.json` is a template: the writer fills the path; do not copy hooks/vscode.json by hand.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For VS Code (Copilot) it writes a new v2 entry. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Rollback to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for VS Code (Copilot) as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 

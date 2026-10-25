@@ -27,7 +27,7 @@ parser recurses into those forms instead.
 denied. The deny message always states the real byte count and offers three ways to get the data: a ranged
 Read, `ctx_execute` with `file`, or `grep`/`tail`. No part of the file is ever truncated and returned.
 
-**Why:** v1 tried a hint-then-allow path (hints are now removed, DECISIONS-r10); the model often ignored the hint and the full file still landed in
+**Why:** A hint-then-allow path was tried and removed (DECISIONS-r10); the model often ignored the hint and the full file still landed in
 context. A deny with no path around it is the only rule that holds every time.
 
 **Source:** `docs/v2/adr/0008-enforcement-rewrite-and-cap.md`; `docs/v2/impl/00-architecture.md` §3.2.
@@ -47,7 +47,7 @@ the session's journal (tool errors, prompts, edits, index writes) and greedily p
 rows until a byte budget is used up. No row's text is ever cut; a row that cannot fit whole becomes a pointer
 instead.
 
-**Why:** v1 cut text at fixed character counts (80, 400, 150) and used a clock-stamped header, so output was
+**Why:** Cutting text at fixed character counts (80, 400, 150) with a clock-stamped header makes output
 never stable and never reproducible. A deterministic score-then-select pass over the journal, with no LLM
 call and no regex, fixes both.
 
@@ -181,7 +181,7 @@ process has not exited. On Windows it runs `taskkill /F /T /PID` instead, since 
 groups.
 
 **Why:** A child process (for example a test runner) can itself spawn children. Killing only the top PID
-leaves those running. v1 proved this mechanism works; v2 keeps it rather than moving to a Windows Job Object,
+leaves those running. This mechanism is proven, so it stays rather than moving to a Windows Job Object,
 pending a live check.
 
 **Source:** `docs/v2/impl/03-sandbox.md` lines 155-171, 221-225, 295 (A6); PRD §9; TECH-SPEC GP4.
@@ -196,14 +196,12 @@ Not yet run at this commit — see `DEVIATIONS.md`.
 
 ## Context-saving numbers (whole system)
 
-The old v1 savings numbers (from the removed `BENCHMARK.md`) are gone: no file in this repo measures them now.
-
 | Metric | Value | Source, date, agent |
 |---|---|---|
 | Live proof, bytes the model saw (4 sizes x git/non-git x 2 = 16 runs) | full 8,893 / 19,998 / 28,003 / 60,090 bytes; model saw 152 / 187 / 182 / 190 chars; correct 16/16 | `docs/v2/benchmarks.md` "Replace live proof (final)", `980272a5`, 2026-10-21, Claude Code 2.1.303, claude-sonnet-5-5 low |
-| Final A/B, large tasks, median tool_result bytes | off 4,694.5; v1 2,436.5; v2 734.5 | `bench/live/results/ab-final2.json`, `docs/v2/benchmarks.md`, 2026-10-21 |
-| Final A/B, large tasks (36 sessions), median session tokens | off 55,897; v1 65,599; v2 60,390 (v2 -19.6 % vs off, -2.7 % vs v1); 12/12 pass per arm | same |
-| Final A/B, small tasks (45 sessions), median session tokens | off 36,184; v1 42,493; v2 38,210 (v2 -5.7 % vs off, +10.2 % vs v1); 15/15 pass per arm; fixed plugin cost about 2,000 tokens (v2), 6,300 (v1) | same |
+| Final A/B, large tasks, median tool_result bytes | off 4,694.5; with the plugin 734.5 | `bench/live/results/ab-final2.json`, `docs/v2/benchmarks.md`, 2026-10-21 |
+| Final A/B, large tasks (36 sessions), median session tokens | off 55,897; with the plugin 60,390; 12/12 pass per arm | same |
+| Final A/B, small tasks (45 sessions), median session tokens | off 36,184; with the plugin 38,210; 15/15 pass per arm; fixed plugin cost about 2,000 tokens | same |
 | Saving score, median of 3 runs | M1 94.21, M2 87.23, `guardsOk` false (gate guard) | `bench/saving-score.mjs`, `980272a5`, 2026-10-21 |
 | Offline replay, corpus byte saving (23175 tool calls, 820 sessions; old policy with hints) | 1.1%; -1.5% with the re-run bound | `docs/v2/benchmarks.md`, 2026-10-19, Claude Code transcripts mostly 2.1.149 to 2.1.283 |
 | Offline replay, Read byte saving (28 denies of large unranged reads) | 21.2%; 10.4% with the re-run bound | same |

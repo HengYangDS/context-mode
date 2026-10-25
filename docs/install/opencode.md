@@ -37,13 +37,6 @@ Or run `context-mode upgrade --agents opencode`. After the owner moves the `late
 
 - The context-mode hooks plugin is not part of setup: no OpenCode build loads the release `opencode/plugin.js` ("Plugin export is not a function"). Setup adds the MCP server only.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For OpenCode it writes a new v2 entry. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Rollback to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for OpenCode as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 

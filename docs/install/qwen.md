@@ -4,7 +4,7 @@ Run the two commands on the [install page](./README.md). This page lists what `c
 
 ## Install
 
-What setup does for Qwen Code: Runs `qwen extensions link <package folder>` and answers its risk prompt with `y` on stdin, because Qwen has no consent flag. The extension ships the MCP server and four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse). Setup drops v1 hook commands from `~/.qwen/settings.json`.
+What setup does for Qwen Code: Runs `qwen extensions link <package folder>` and answers its risk prompt with `y` on stdin, because Qwen has no consent flag. The extension ships the MCP server and four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse). Setup drops old context-mode hook commands from `~/.qwen/settings.json`.
 
 It writes `~/.qwen/extensions/context-mode/` (link), `extension-store/state.json`. Hooks: shipped by the extension. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
@@ -38,13 +38,6 @@ Or run `context-mode upgrade --agents qwen`. After the owner moves the `latest` 
 - `qwen extensions update context-mode` updates a git-route install. A linked install updates when you run `npm i -g context-mode@next` again.
 - No logged-in Qwen session ran `/ctx-doctor`, `/hooks` or the other three hooks.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Qwen Code it drops the v1 hook commands (`context-mode hook ...`) from the host settings file, because the plugin or extension ships its own hooks. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Roll back to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Qwen Code as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 

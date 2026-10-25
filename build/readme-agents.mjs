@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// build/readme-agents.mjs — D-README-1: renders the two README agent tables (install, upgrade) from the adapter
+// build/readme-agents.mjs — D-README-1: renders the README agent table (install) from the adapter
 // table (src/adapters/table.ts) and the setup registry (src/setup/registry.ts).
 // Agent name = the "# Install context-mode v2 on <name>" heading of docs/install/<id>.md.
 // Support "full" = setup installs the agent's own package through the agent CLI (installMode marketplace,
@@ -16,7 +16,7 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const README = path.join(REPO_ROOT, "README.md");
 const TITLE_PREFIX = "# Install context-mode v2 on ";
 const PACKAGE_MODES = new Set(["marketplace", "extension", "in-process"]);
-const SECTIONS = { install: { heading: "## Install", anchor: "install" }, upgrade: { heading: "## Upgrade from v1", anchor: "upgrade-from-v1" } };
+const SECTIONS = { install: { heading: "## Install", anchor: "install" } };
 
 export const MARKERS = Object.freeze(Object.fromEntries(Object.keys(SECTIONS).map((k) => [k, Object.freeze([
   `<!-- agents:${k}:start (node build/readme-agents.mjs --write) -->`,
@@ -105,6 +105,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.log(next === text ? "readme-agents: README.md already up to date" : "readme-agents: README.md updated");
   } else {
     const t = renderAgentTables();
-    console.log(`${t.install}\n\n${t.upgrade}`);
+    console.log(t.install);
   }
 }

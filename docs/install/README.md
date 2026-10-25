@@ -14,7 +14,7 @@ Two commands install context-mode v2 for every agent on your machine. Setup find
 npm i -g context-mode@next && context-mode setup
 ```
 
-`@next` is the v2 preview. After the owner moves the `latest` tag, you run `npm i -g context-mode && context-mode setup` without `@next`. Until then a plain `npm i -g context-mode` still installs v1.
+`@next` is the v2 preview. After the owner moves the `latest` tag, you run `npm i -g context-mode && context-mode setup` without `@next`. Until then a plain `npm i -g context-mode` does not install this version.
 
 Restart your agent after setup. Then run `/ctx-doctor` in the agent, or `context-mode doctor` in a shell.
 
@@ -23,7 +23,7 @@ Restart your agent after setup. Then run `/ctx-doctor` in the agent, or `context
 1. Finds each agent: its command on `PATH` or its config folder.
 2. Shows the plan: for each agent, the exact command it will run or the exact file change.
 3. Asks once, then applies. `--yes` skips the question.
-4. Checks each agent: the config entry, v1 leftovers, an MCP handshake, one hook call.
+4. Checks each agent: the config entry, old context-mode entries, an MCP handshake, one hook call.
 5. Rolls back any agent that fails, and prints a `gh issue create` command with a report file.
 
 Setup backs up every file it touches under `~/.context-mode/backups`. It writes only the files in the plan. It never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
@@ -64,15 +64,6 @@ Each page lists what setup does for that agent, the manual fallback, known limit
 
 The git `release` branch stays for two routes: the Claude Code marketplace (ADR-0011 step b) and the Gemini and Qwen git-route extension install. Setup does not need it. See [ADR-0019](../v2/adr/0019-interactive-setup-and-npm-channel.md).
 
-## Upgrade from v1
-
-Run the same two commands. Setup lists the v1 entries it finds, then:
-
-- Claude Code, Gemini, Qwen: drops v1 hook commands (`context-mode hook ...`) from the host settings file. The plugin or extension ships its own hooks, and a v1 copy would run twice.
-- Codex, Copilot CLI: rewrites a v1 hook command to the absolute v2 form, if the hook file exists.
-- Other agents: writes a new v2 entry.
-
-Do not run `npm uninstall -g context-mode` before setup. v1 hooks call the global `context-mode` command, and the v2 package uses the same name, so `npm i -g context-mode@next` replaces the v1 package under the same name.  For the feature changes and the rollback table, see [Upgrading from v1](../../README.md#upgrading-from-v1).
 
 ## Uninstall
 

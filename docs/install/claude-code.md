@@ -4,7 +4,7 @@ Run the two commands on the [install page](./README.md). This page lists what `c
 
 ## Install
 
-What setup does for Claude Code: Runs `claude plugin marketplace add` on the installed package folder, then `claude plugin install context-mode@context-mode`. The package carries `.claude-plugin/marketplace.json` and `plugin.json`, and the plugin ships the MCP server and the hooks. Setup also drops v1 hook commands from `~/.claude/settings.json`.
+What setup does for Claude Code: Runs `claude plugin marketplace add` on the installed package folder, then `claude plugin install context-mode@context-mode`. The package carries `.claude-plugin/marketplace.json` and `plugin.json`, and the plugin ships the MCP server and the hooks. Setup also drops old context-mode hook commands from `~/.claude/settings.json`.
 
 It writes `~/.claude/settings.json` (`extraKnownMarketplaces`, `enabledPlugins`) and `~/.claude.json`. Hooks: shipped by the plugin. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
@@ -38,13 +38,6 @@ Or run `context-mode upgrade --agents claude-code`. After the owner moves the `l
 - The git route (`claude plugin marketplace add mksglu/context-mode`) works after the owner-only ADR-0011 step b (`marketplace.json` source -> github ref `release` on `main`). Setup does not use it; it adds the package folder from npm.
 - No live, logged-in Claude Code session fired the hooks in any run.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Claude Code it drops the v1 hook commands (`context-mode hook ...`) from the host settings file, because the plugin or extension ships its own hooks. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Rollback to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Claude Code as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 

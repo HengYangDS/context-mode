@@ -70,9 +70,9 @@ test("install-docs: a fenced context-mode command with an unknown flag fails", (
 
 test("install-docs: page rules for the install page and the agent pages", () => {
   const good = "Node 24.15.0\n```sh\nnpm i -g context-mode@next && context-mode setup\ncontext-mode setup --remove && npm rm -g context-mode\n```\n";
-  assert.deepEqual(checkPages({ "README.md": good, "codex.md": "run context-mode setup\n## Upgrade from v1\n" }), []);
+  assert.deepEqual(checkPages({ "README.md": good, "codex.md": "run context-mode setup\n" }), []);
   const out = checkPages({ "README.md": "nothing", "codex.md": "## Install\n" }).join("\n");
-  for (const s of ["README.md needs Node 24.15.0", "README.md needs the two-command install", "README.md needs the uninstall command", "codex.md needs context-mode setup", "codex.md needs a ## Upgrade from v1 heading"]) assert.ok(out.includes(s), s + "\n" + out);
+  for (const s of ["README.md needs Node 24.15.0", "README.md needs the two-command install", "README.md needs the uninstall command", "codex.md needs context-mode setup"]) assert.ok(out.includes(s), s + "\n" + out);
 });
 
 test("install-docs: the real pages pass the page rules", () => {

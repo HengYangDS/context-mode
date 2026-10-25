@@ -38,7 +38,7 @@ test("readme-agents: a hand edit or a missing block fails the check", () => {
   const edited = README.replace("| Codex | MCP only |", "| Codex | full |");
   assert.notEqual(edited, README, "fixture edit did not apply");
   assert.ok(checkAgentTables(edited).some((p) => p.includes("install")), checkAgentTables(edited).join("\n"));
-  const missing = README.split(MARKERS.upgrade[0]).join("");
-  assert.ok(checkAgentTables(missing).some((p) => p.includes("upgrade")), checkAgentTables(missing).join("\n"));
-  assert.ok(tables.install.includes("(docs/install/codex.md#install)") && tables.upgrade.includes("(docs/install/codex.md#upgrade-from-v1)"));
+  const missing = README.split(MARKERS.install[0]).join("");
+  assert.ok(checkAgentTables(missing).some((p) => p.includes("install")), checkAgentTables(missing).join("\n"));
+  assert.ok(tables.install.includes("(docs/install/codex.md#install)") && !("upgrade" in tables));
 });

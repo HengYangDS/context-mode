@@ -4,7 +4,7 @@ Run the two commands on the [install page](./README.md). This page lists what `c
 
 ## Install
 
-What setup does for Codex: Writes a `[mcp_servers.context-mode]` table to `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) with the absolute `node` and `server.mjs` paths. It rewrites v1 hook commands in `~/.codex/hooks.json` to the absolute v2 form, but only if they exist.
+What setup does for Codex: Writes a `[mcp_servers.context-mode]` table to `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) with the absolute `node` and `server.mjs` paths. It rewrites old context-mode hook commands in `~/.codex/hooks.json` to the absolute v2 form, but only if they exist.
 
 It writes `~/.codex/config.toml`. Hooks: not written on a fresh HOME. A failed step is rolled back byte for byte; setup never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
@@ -39,13 +39,6 @@ Or run `context-mode upgrade --agents codex`. After the owner moves the `latest`
 - A Codex plugin install does not work yet: there is no `.agents/plugins/marketplace.json`.
 - The shipped `hooks/codex.json` is a template: the writer fills the path; do not copy hooks/codex.json by hand.
 
-## Upgrade from v1
-
-Run the same two commands as a new install. Setup finds v1 entries first (`context-mode doctor` lists them). For Codex it rewrites a v1 hook command (`context-mode hook ...`) to the absolute v2 form when the hook file exists. Setup backs up every file it touches under `~/.context-mode/backups`. See the [upgrade steps](./README.md#upgrade-from-v1).
-
-## Rollback to v1
-
-Run `context-mode setup --remove`, then install v1 with `npm install -g context-mode@1`. Then add the v1 entry for Codex as the [Rollback table](../../README.md#upgrading-from-v1) says.
 
 ## Uninstall
 
