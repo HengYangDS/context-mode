@@ -11,16 +11,16 @@ export const AGENT_IDS: readonly AgentId[] = ADAPTERS.map((a) => a.id);
 export interface Flags {
   help: boolean; json: boolean; yes: boolean; noInput: boolean; dryRun: boolean; debug: boolean;
   quiet: boolean; verbose: boolean; noColor: boolean; list: boolean; remove: boolean; repair: boolean;
-  agents?: AgentId[]; tag: string;
+  agents?: AgentId[]; tag: string; print?: AgentId;
 }
 
 const COMMON = ["--help", "-h", "--json", "--yes", "-y", "--no-input", "--debug", "--quiet", "-q", "--verbose", "--no-color", "--agents"];
 const FLAGS: Readonly<Record<Command, readonly string[]>> = {
-  setup: [...COMMON, "--dry-run", "--list", "--remove", "--repair"],
+  setup: [...COMMON, "--dry-run", "--list", "--remove", "--repair", "--print"],
   doctor: COMMON,
   upgrade: [...COMMON, "--dry-run", "--tag"],
 };
-const VALUE_FLAGS = new Set(["--agents", "--tag"]);
+const VALUE_FLAGS = new Set(["--agents", "--tag", "--print"]);
 const TAG_RE = /^[a-z0-9][a-z0-9.+-]*$/i; // npm dist-tag or semver; never reaches a shell unquoted
 
 export class UsageError extends Error {}
@@ -82,6 +82,10 @@ export function parseFlags(cmd: Command, argv: readonly string[]): Flags {
         if (!TAG_RE.test(value!)) throw new UsageError(`--tag "${value}" is not an npm dist-tag or version.`);
         f.tag = value!;
         break;
+      case "--print":
+        if (!(AGENT_IDS as readonly string[]).includes(value!)) throw new UsageError(`unknown agent "${value}".${suggest(value!, AGENT_IDS)} Run context-mode setup --list.`);
+        f.print = value as AgentId;
+        break;
       case "--agents": {
         const ids = value!.split(",").map((s) => s.trim()).filter(Boolean);
         for (const id of ids) {
@@ -93,6 +97,10 @@ export function parseFlags(cmd: Command, argv: readonly string[]): Flags {
     }
   }
   if (f.list && f.remove) throw new UsageError("--list and --remove cannot be used together.");
+  if (f.print) {
+    const mixed = ([["--remove", f.remove], ["--list", f.list], ["--dry-run", f.dryRun], ["--repair", f.repair], ["--agents", !!f.agents]] as const).find(([, on]) => on);
+    if (mixed) throw new UsageError(`--print cannot be used with ${mixed[0]}.`);
+  }
   return f;
 }
 
@@ -146,12 +154,14 @@ Options:
   --dry-run          Show the plan; change nothing
   --remove           Undo every setup run: put each touched file back
   --repair           Apply again and verify (upgrade runs this)
+  --print <id>       Print the manual step for one agent, paths filled in; change nothing
 ${COMMON_HELP}
 ${EXIT_CODES}
 Examples:
   context-mode setup
   context-mode setup --yes --agents codex,claude-code
   context-mode setup --dry-run --json
+  context-mode setup --print codex
 `,
   doctor: `Usage: context-mode doctor [options]
 

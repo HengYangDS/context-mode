@@ -10,7 +10,7 @@ import path from "node:path";
 import * as clack from "@clack/prompts";
 import { ADAPTERS } from "../adapters/table.ts";
 import type { AgentId } from "../core/contracts/agents.ts";
-import { buildRegistry, detectAgents, runDoctor, runRemove, runSetup, STATE_DIR } from "../setup/index.ts";
+import { buildRegistry, detectAgents, printPlan, printText, runDoctor, runRemove, runSetup, STATE_DIR } from "../setup/index.ts";
 import type { AgentResult, SetupContext, SetupResult } from "../setup/index.ts";
 import { HELP, parseFlags, UsageError, type Command, type Flags } from "./args.ts";
 
@@ -254,8 +254,18 @@ async function remove(ui: Ui): Promise<number> {
   return r.exitCode;
 }
 
+/** setup --print <id>: the manual step from the same registry row setup applies; writes nothing. */
+function printManual(ui: Ui, id: AgentId): number {
+  const row = buildRegistry(ui.ctx).find((r) => r.id === id)!;
+  const p = printPlan(row);
+  if (ui.f.json) out(JSON.stringify({ command: "setup", print: p }));
+  else out(printText(p));
+  return EXIT_OK;
+}
+
 async function setup(ui: Ui): Promise<number> {
   const { f } = ui;
+  if (f.print) return printManual(ui, f.print);
   if (f.list) return list(ui);
   if (f.remove) return remove(ui);
   if (f.dryRun) {
@@ -370,7 +380,7 @@ export async function runCommand(cmd: Command, args: readonly string[], env: Cli
   if (f.help) { out(HELP[cmd].trimEnd()); return EXIT_OK; }
   const ctx: SetupContext = { home: process.env.HOME || os.homedir(), pkgDir: env.pkgDir, env: process.env };
   const tty = !!process.stdin.isTTY && !!process.stdout.isTTY;
-  const interactive = tty && !f.yes && !f.noInput && !f.json && !f.list;
+  const interactive = tty && !f.yes && !f.noInput && !f.json && !f.list && !f.print;
   // A pty may report 0 columns; clack would then wrap every character onto its own line. Fall back to 80.
   if (interactive && !process.stdout.columns) Object.defineProperty(process.stdout, "columns", { value: 80, configurable: true });
   const ui: Ui = { f, ctx, env, clack: interactive ? clack : undefined };

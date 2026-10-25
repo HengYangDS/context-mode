@@ -6,7 +6,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -396,7 +396,8 @@ test("[M7] cli/pty-ctrl-c: Ctrl-C mid-apply exits 130 and leaves files byte-iden
 /** Absolute paths in --print output become <NODE>, <PKG>, <HOME> so one golden fits every machine. */
 function normPaths(text, s) {
   let t = text;
-  for (const [p, tag] of [[s.pkg, "<PKG>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
+  // The CLI finds its package dir through realpath (macOS: /var -> /private/var), so map that form first.
+  for (const [p, tag] of [[realpathSync(s.pkg), "<PKG>"], [s.pkg, "<PKG>"], [realpathSync(s.home), "<HOME>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
     t = t.replaceAll(JSON.stringify(p).slice(1, -1), tag).replaceAll(p, tag);
   }
   return t;
