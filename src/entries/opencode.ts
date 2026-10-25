@@ -140,3 +140,19 @@ export async function setup(app: OpenCodeApp) {
     },
   };
 }
+
+/** ADR-0020, D-HA-6: the OpenCode 1.19.4 loader takes `export default { id, server }`; `server(input)` returns the
+ *  hook object, and plugin tools ride in its `tool` map with `args` as a record of zod fields (the object shape). */
+export async function server(input: { directory?: string }, _options?: unknown) {
+  const tool: Record<string, OpenCodeToolDef & { args: unknown }> = {};
+  const hooks = await setup({
+    directory: input.directory,
+    tool(name, def) {
+      const shape = (def.args as { shape?: unknown }).shape;
+      tool[name] = { ...def, args: shape ?? {} };
+    },
+  });
+  return { ...hooks, tool };
+}
+
+export default { id: PLUGIN_ID, server };
