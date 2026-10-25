@@ -44,8 +44,8 @@ export interface SkillFile { name: string; src: string; file: string; }
 export type SkillInstall = { kind: "dir"; dir: string; files: SkillFile[]; prefix: string } | { kind: "package"; via: string };
 
 export const COMMAND_SKILLS: readonly string[] = Object.freeze(["ctx-doctor", "ctx-stats", "ctx-upgrade"]);
-const SKILLS_DIR = "skills";
-const SKILL_FILE = "SKILL.md";
+export const SKILLS_DIR = "skills";
+export const SKILL_FILE = "SKILL.md";
 const OPENCODE_PLUGIN = ["opencode", "plugin.js"];
 
 /** The skill text with every ctx tool name given the agent's tool name prefix (plain split/join, no regex). */
@@ -69,6 +69,8 @@ export interface CheckRow {
   hookFiles: HookFile[];
   hookInstall: HookInstall;
   skillInstall: SkillInstall;
+  /** ADR-0020 hook-runs: the hook bundle for this agent, also for in-process agents (doctor sample event). */
+  hookRunCommand: string[];
   allowedWrites: string[];
   goldenPayload: Record<string, unknown>;
 }
@@ -185,7 +187,7 @@ export function buildRegistry(ctx: SetupContext): CheckRow[] {
     ];
     const out: CheckRow = {
       id, installMode: row.installMode, serverCommand: serverCmd(ctx, id), config, cli: cliFor(ctx, id),
-      listCommand: LIST[id], hookFiles, hookInstall, skillInstall,
+      listCommand: LIST[id], hookFiles, hookInstall, skillInstall, hookRunCommand: hookCommand,
       allowedWrites: [...new Set(writes.map((f) => path.resolve(f)))],
       goldenPayload: golden(row, ctx.home),
     };

@@ -5,12 +5,12 @@ import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { AGENT_HOME_DIR, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, DB_FILE_NAME, PROJECTS_DIR_NAME, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
-import { BACKUP_DIR, LOCK_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString, renderSkill } from "./registry.ts";
+import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILLS_DIR, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
@@ -30,7 +30,7 @@ const V1_HOOK_MARK = "context-mode hook";
 
 export type AgentStatus = "PASS" | "FAIL" | "SKIPPED";
 export interface Change { file?: string; path?: string; before?: unknown; after?: unknown; command?: string[]; }
-export interface Check { name: string; ok: boolean; detail?: string; overheadP95Ms?: number; wallP95Ms?: number; bareP95Ms?: number; }
+export interface Check { name: string; ok: boolean; warn?: boolean; detail?: string; overheadP95Ms?: number; wallP95Ms?: number; bareP95Ms?: number; }
 export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
 }
@@ -311,12 +311,70 @@ function parseCheck(row: CheckRow): Check {
   } catch (e) { return { name: "parse", ok: false, detail: (e as Error).message }; }
 }
 
-async function verifyRow(row: CheckRow, env: SetupContext["env"]): Promise<Check[]> {
+/** ADR-0020 hook-registered: the host channel holds our entry. A file or plugin-list channel is planned again (no
+ *  edit left means the entry is there); a package channel is registered when the host list command shows it. */
+function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Check | undefined): Check {
+  const h = row.hookInstall;
+  if (h.kind === "package") {
+    const l = row.listCommand;
+    if (!l) return { name: "hook-registered", ok: false, detail: `no list command for ${row.id}` };
+    if (!list) return { name: "hook-registered", ok: false, detail: `${l.bin} is not on PATH, so the hooks cannot be checked` };
+    return { name: "hook-registered", ok: list.ok, detail: list.ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode (hooks ship in ${h.via})` };
+  }
+  const edits: FileEdit[] = [];
+  try { planHookInstall(row, edits); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
+  return { name: "hook-registered", ok: edits.length === 0, detail: edits.length ? `${h.file} lacks the context-mode hook entry` : undefined };
+}
+
+/** ADR-0020 hook-runs: one sample event through the hook bundle for this agent (in-process agents too). */
+function hookRunsCheck(row: CheckRow, env: SetupContext["env"]): Check {
+  const cmd = row.hookRunCommand;
+  const r = spawnSync(cmd[0], cmd.slice(1), { env, input: JSON.stringify(row.goldenPayload), encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
+  if (r.status !== 0) return { name: "hook-runs", ok: false, detail: `hook exited ${r.status}: ${`${r.stderr}`.trim()}` };
+  const out = `${r.stdout}`.trim();
+  if (out) { let j: unknown; try { j = JSON.parse(out); } catch { /* below */ } if (!isObj(j)) return { name: "hook-runs", ok: false, detail: "hook answer is not a JSON object" }; }
+  return { name: "hook-runs", ok: true };
+}
+
+const SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
+export const NOT_SEEN_LINE = "not seen yet, run one tool call";
+/** ADR-0020 hook-seen: a journal row from this agent exists in any project db. None yet is a WARN, not a FAIL. */
+function hookSeenCheck(row: CheckRow, home: string): Check {
+  const base = path.join(home, STATE_DIR, PROJECTS_DIR_NAME);
+  const dirs = existsSync(base) ? readdirSync(base) : [];
+  let sqlite: typeof import("node:sqlite") | undefined;
+  try { sqlite = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite"); } catch { sqlite = undefined; }
+  for (const d of dirs) {
+    const file = path.join(base, d, DB_FILE_NAME);
+    if (!sqlite || !existsSync(file)) continue;
+    let db: import("node:sqlite").DatabaseSync | undefined;
+    try {
+      db = new sqlite.DatabaseSync(file, { readOnly: true });
+      if (db.prepare(SEEN_SQL).get(row.id)) return { name: "hook-seen", ok: true };
+    } catch { /* a busy or old db does not count as seen */ } finally { db?.close(); }
+  }
+  return { name: "hook-seen", ok: true, warn: true, detail: NOT_SEEN_LINE };
+}
+
+/** ADR-0020 skills: every skill file is present with this agent's tool name prefix (package: shipped skills/). */
+function skillsCheck(row: CheckRow, pkgDir: string): Check {
+  const s = row.skillInstall;
+  if (s.kind === "package") {
+    const miss = COMMAND_SKILLS.map((n) => path.join(pkgDir, SKILLS_DIR, n, SKILL_FILE)).filter((f) => !existsSync(f));
+    return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : undefined };
+  }
+  const bad = s.files.filter((f) => readOr(f.file) !== (existsSync(f.src) ? renderSkill(readFileSync(f.src, "utf8"), s.prefix) : undefined));
+  return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f) => f.file).join(", ")} missing or without the ${s.prefix || "plain"} tool prefix` : undefined };
+}
+
+async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
+  const env = ctx.env;
   const checks: Check[] = [parseCheck(row)];
   const l = listCheck(row, env);
   if (l) checks.push(l);
   checks.push(await mcpCheck(row.serverCommand, env));
   if (row.hookCommand) checks.push(hookCheck(row, env));
+  checks.push(hookRegisteredCheck(row, env, l), hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
   return checks;
 }
 
@@ -445,7 +503,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
     }
     if (plan.cli.length) for (const args of row.cli!.remove) run.record({ agent: row.id, undo: { bin: row.cli!.bin, args } });
-    res.checks = await verifyRow(row, ctx.env);
+    res.checks = await verifyRow(row, ctx);
     const bad = res.checks.filter((c) => !c.ok);
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
   } catch (e) {
@@ -478,7 +536,7 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
       if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
       else if (res.changes.length) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
       else {
-        res.checks = await verifyRow(row, ctx.env);
+        res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
         if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); }
       }
