@@ -10,7 +10,7 @@ import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
-import { BACKUP_DIR, LOCK_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString } from "./registry.ts";
+import { BACKUP_DIR, LOCK_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
@@ -141,6 +141,66 @@ function planHookFile(row: CheckRow, hf: HookFile): FileEdit | undefined {
   return changes.length ? { file: hf.file, before, after: JSON.stringify(doc, null, 2) + "\n", changes } : undefined;
 }
 
+// ADR-0020 merge: objects merge key by key; in an array, an own item (it holds the hook command or plugin entry)
+// that differs from the wanted one is replaced, user items stay; scalars take the wanted value.
+const holds = (v: unknown, mark: string): boolean => JSON.stringify(v).includes(JSON.stringify(mark).slice(1, -1));
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+function mergeOwn(cur: unknown, want: unknown, mark: string): unknown {
+  if (isObj(want)) {
+    const base: Json = isObj(cur) ? { ...cur } : {};
+    for (const [k, v] of Object.entries(want)) base[k] = mergeOwn(base[k], v, mark);
+    return base;
+  }
+  if (Array.isArray(want)) {
+    const base = Array.isArray(cur) ? cur.filter((x) => !holds(x, mark) || want.some((w) => same(w, x))) : [];
+    for (const w of want) if (!base.some((x) => same(x, w))) base.push(w);
+    return base;
+  }
+  return want;
+}
+
+/** One edit of `file` (a JSON host file), chained on any earlier edit of the same file in this plan. */
+function planJsonKeys(row: CheckRow, edits: FileEdit[], file: string, want: (doc: Json) => [readonly string[], unknown][]): void {
+  const prior = edits.find((e) => e.file === file);
+  const text = prior ? prior.after : readOr(file);
+  let doc: unknown = {};
+  if (text !== undefined && text.trim() !== "") { try { doc = JSON.parse(text); } catch { throw new Error(parseFail(row, file)); } }
+  if (!isObj(doc)) throw new Error(parseFail(row, file));
+  let res;
+  try { res = editHostConfigText(row.id, file, text ?? "", "json", want(doc)); }
+  catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, file)); throw e; }
+  if (!res.edits.length) return;
+  const changes = res.edits.map((e) => ({ file, ...e }));
+  if (prior) { prior.after = res.text; prior.changes.push(...changes); }
+  else edits.push({ file, before: text, after: res.text, changes });
+}
+
+/** ADR-0020 hook channel: write or merge the host hook file, or add the in-process plugin list entry. */
+function planHookInstall(row: CheckRow, edits: FileEdit[]): void {
+  const h = row.hookInstall;
+  if (h.kind === "file") {
+    planJsonKeys(row, edits, h.file, (doc) => Object.keys(h.shape).map((k) => [[k], mergeOwn(doc[k], h.shape[k], h.command)]));
+  } else if (h.kind === "plugin-list") {
+    planJsonKeys(row, edits, h.file, (doc) => {
+      const cur = doc[h.key[0]];
+      const list = Array.isArray(cur) ? cur : [];
+      return [[h.key, list.includes(h.entry) ? list : [...list, h.entry]]];
+    });
+  }
+}
+
+/** ADR-0020 skill channel: <dir>/<name>/SKILL.md rendered with the agent's tool name prefix. */
+function planSkills(row: CheckRow, edits: FileEdit[]): void {
+  const s = row.skillInstall;
+  if (s.kind !== "dir") return;
+  for (const f of s.files) {
+    if (!existsSync(f.src)) throw new Error(`preflight: ${f.src} is missing`);
+    const after = renderSkill(readFileSync(f.src, "utf8"), s.prefix);
+    const before = readOr(f.file);
+    if (before !== after) edits.push({ file: f.file, before, after, changes: [{ file: f.file, path: f.name, before: before === undefined ? null : "old", after: "SKILL.md" }] });
+  }
+}
+
 function planRow(row: CheckRow, listed: boolean): Plan {
   const edits: FileEdit[] = [];
   if (row.config) {
@@ -152,6 +212,8 @@ function planRow(row: CheckRow, listed: boolean): Plan {
     if (res.edits.length) edits.push({ file: c.file, before, after: res.text, changes: res.edits.map((e) => ({ file: c.file, ...e })) });
   }
   for (const hf of row.hookFiles) { const e = planHookFile(row, hf); if (e) edits.push(e); }
+  planHookInstall(row, edits);
+  planSkills(row, edits);
   const cli = row.config || !row.cli || listed ? [] : row.cli.install;
   return { edits, cli };
 }
