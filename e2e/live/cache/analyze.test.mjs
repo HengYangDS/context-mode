@@ -78,3 +78,11 @@ test("crossSession: second session turn-1 read as a share of the first session t
   assert.equal(r.bRead, 14400);
   assert.equal(Number(r.share.toFixed(4)), 0.8999);
 });
+
+test("parseTurn lists the tool names the model called, in order, and the mcp server states of init", () => {
+  const init = JSON.stringify({ type: "system", subtype: "init", session_id: "s1", mcp_servers: [{ name: "context-mode", status: "connected" }] });
+  const tu = (id, name) => JSON.stringify({ type: "assistant", session_id: "s1", message: { id, content: [{ type: "tool_use", id: "t" + id, name, input: {} }], usage: { input_tokens: 1, cache_read_input_tokens: 1, cache_creation_input_tokens: 1, output_tokens: 1 } } });
+  const t = parseTurn(stream(init, tu("m1", "Bash"), tu("m2", "Read"), result()));
+  assert.deepEqual(t.tools, ["Bash", "Read"]);
+  assert.deepEqual(t.mcp, ["context-mode:connected"]);
+});
