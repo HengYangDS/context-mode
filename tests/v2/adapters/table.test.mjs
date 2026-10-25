@@ -37,7 +37,7 @@ const CLAUDE_NATIVE = { shell: ["Bash"], read: ["Read"], grep: ["Grep"], webfetc
 const NATIVE = {
   "claude-code": CLAUDE_NATIVE,
   codex: { shell: ["Bash"], edit: ["apply_patch"] },
-  gemini: { shell: [] },
+  gemini: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, // gemini-cli 0.65.0 *_TOOL_NAME
   qwen: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
   "copilot-cli": { shell: [] },
   vscode: { shell: [] },

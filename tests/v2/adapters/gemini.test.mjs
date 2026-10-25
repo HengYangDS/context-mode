@@ -43,9 +43,9 @@ test("decode BeforeAgent reads prompt", () => {
   assert.deepEqual(decode(FX.BeforeAgent), { event: "UserPromptSubmit", ...head, prompt: "run the tests" });
 });
 
-test("decode BeforeTool native tool keeps its name; no subagent field on Gemini", () => {
+test("decode BeforeTool maps the native shell tool to Bash; no subagent field on Gemini (D-HA-GEMINI-NAMES-1)", () => {
   const ev = decode({ ...FX.BeforeTool, agent_id: "x", agent_type: "y" });
-  assert.deepEqual(ev, { event: "PreToolUse", ...head, tool: { name: "run_shell_command", canonicalName: "run_shell_command", input: { command: "cat big.log" } } });
+  assert.deepEqual(ev, { event: "PreToolUse", ...head, tool: { name: "run_shell_command", canonicalName: "Bash", input: { command: "cat big.log" } } });
   assert.equal("agentId" in ev, false);
   assert.equal("agentType" in ev, false);
 });
@@ -141,4 +141,11 @@ test("encode replace is a no-op (no replace field on Gemini)", () => {
 
 test("GP3 synthetic round trip: every payload decodes and encodes allow to the native empty shape", () => {
   for (const p of Object.values(FX)) assert.deepEqual(encode(decode(p), { kind: "allow" }), { stdout: "", exitCode: 0 });
+});
+
+// gemini-cli 0.65.0 bundle: SHELL_TOOL_NAME run_shell_command, READ_FILE_TOOL_NAME read_file, GREP_TOOL_NAME
+// grep_search, WEB_FETCH_TOOL_NAME web_fetch (D-HA-GEMINI-NAMES-1).
+test("decode maps Gemini native tool ids to canonical names", () => {
+  const want = { run_shell_command: "Bash", read_file: "Read", grep_search: "Grep", web_fetch: "WebFetch", list_directory: "list_directory" };
+  for (const [name, canonical] of Object.entries(want)) assert.equal(decode({ ...FX.BeforeTool, tool_name: name }).tool.canonicalName, canonical, name);
 });

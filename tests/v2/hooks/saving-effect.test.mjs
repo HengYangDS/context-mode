@@ -43,3 +43,18 @@ for (const id of Object.keys(SAVING)) {
     assert.ok(out.stdout.includes("ctx_execute"), id + " the host sees the redirect");
   });
 }
+
+// D-HA-GEMINI-NAMES-1: a real Gemini BeforeTool payload (native run_shell_command) reaches the shell rules and is denied
+// with the redirect, so the large output never enters the model.
+test("ADR-0020: gemini BeforeTool run_shell_command with a large-output call is denied with the redirect", async (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), "cm-saving-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const row = getAdapter("gemini");
+  const ev = row.decode({ session_id: "s1", transcript_path: "/tmp/t.json", cwd: dir, hook_event_name: "BeforeTool",
+    timestamp: "2026-10-25T00:00:00.000Z", tool_name: "run_shell_command", tool_input: { command: CURL } });
+  const d = decide(ev, row, []);
+  assert.equal(d.kind, "deny");
+  const out = row.encode(ev, d);
+  assert.equal(JSON.parse(out.stdout).decision, "deny");
+  assert.ok(out.stdout.includes(row.toolNamePrefix + "ctx_execute"));
+});
