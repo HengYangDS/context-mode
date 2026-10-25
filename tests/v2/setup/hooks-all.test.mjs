@@ -42,9 +42,13 @@ function sandbox(t) {
   const root = mkdtempSync(path.join(tmpdir(), "cm-hooks-all-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const home = path.join(root, "home");
+  const bin = path.join(root, "bin");
   mkdirSync(home, { recursive: true });
+  mkdirSync(bin, { recursive: true });
+  // copilot-cli adds its MCP server through its own CLI; a stub that already lists context-mode stands in for it.
+  writeFileSync(path.join(bin, "copilot"), "#!/bin/sh\necho context-mode\n", { mode: 0o755 });
   return { root, home, pkgDir: pkg(root),
-    env: { PATH: ["/usr/bin", "/bin"].join(path.delimiter), HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
+    env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
 }
 
 const hookCmd = (pkgDir, id) => `"${NODE}" "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;
