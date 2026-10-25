@@ -17,4 +17,39 @@ and keep the rest. These paths are for this machine.)
   }
 }
 
+Hooks: put this in <HOME>/.config/opencode/opencode.json (keep your own entries):
+
+{
+  "plugin": [
+    "<PKG>/opencode/plugin.js"
+  ]
+}
+
+Skill: put this in <HOME>/.config/opencode/skills/ctx-doctor/SKILL.md:
+
+---
+name: ctx-doctor
+description: Check that context-mode is installed and working, as a table.
+disable-model-invocation: true
+---
+Call the ctx_doctor tool and show its table to the user unchanged. If a row failed, list the fixes it names, in order.
+
+Skill: put this in <HOME>/.config/opencode/skills/ctx-stats/SKILL.md:
+
+---
+name: ctx-stats
+description: Show how much context context-mode saved, as a table.
+disable-model-invocation: true
+---
+Call the ctx_stats tool and show its table to the user unchanged. Add one sentence under the table that names the largest saving.
+
+Skill: put this in <HOME>/.config/opencode/skills/ctx-upgrade/SKILL.md:
+
+---
+name: ctx-upgrade
+description: Update context-mode to the latest release.
+disable-model-invocation: true
+---
+Call the ctx_upgrade tool and show its table to the user. Then call ctx_doctor and show its table. If a restart is needed, say so in one sentence.
+
 Then restart the agent and check it: context-mode doctor --agents opencode
