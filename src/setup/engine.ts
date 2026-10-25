@@ -1,6 +1,7 @@
 // src/setup/engine.ts
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
+import { codexTrustEntries } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -175,11 +176,30 @@ function planJsonKeys(row: CheckRow, edits: FileEdit[], file: string, want: (doc
   else edits.push({ file, before: text, after: res.text, changes });
 }
 
+/** D-HA-CODEX-TRUST-1: one [hooks.state."<key>"] table per own handler in the planned hooks.json, chained on any
+ *  earlier edit of config.toml in this plan (the MCP server entry). */
+function planCodexTrust(row: CheckRow, edits: FileEdit[], hooksFile: string, file: string, command: string): void {
+  const hooksText = edits.find((e) => e.file === hooksFile)?.after ?? readOr(hooksFile);
+  if (hooksText === undefined) return;
+  const want = codexTrustEntries(hooksFile, JSON.parse(hooksText), command);
+  if (!want.length) return;
+  const prior = edits.find((e) => e.file === file);
+  const text = prior ? prior.after : readOr(file);
+  let res;
+  try { res = editHostConfigText(row.id, file, text ?? "", "toml", want); }
+  catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, file)); throw e; }
+  if (!res.edits.length) return;
+  const changes = res.edits.map((e) => ({ file, ...e }));
+  if (prior) { prior.after = res.text; prior.changes.push(...changes); }
+  else edits.push({ file, before: text, after: res.text, changes });
+}
+
 /** ADR-0020 hook channel: write or merge the host hook file, or add the in-process plugin list entry. */
 function planHookInstall(row: CheckRow, edits: FileEdit[]): void {
   const h = row.hookInstall;
   if (h.kind === "file") {
     planJsonKeys(row, edits, h.file, (doc) => Object.keys(h.shape).map((k) => [[k], mergeOwn(doc[k], h.shape[k], h.command)]));
+    if (h.trust) planCodexTrust(row, edits, h.file, h.trust, h.command);
   } else if (h.kind === "plugin-list") {
     planJsonKeys(row, edits, h.file, (doc) => {
       const cur = doc[h.key[0]];
@@ -323,7 +343,9 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   }
   const edits: FileEdit[] = [];
   try { planHookInstall(row, edits); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
-  return { name: "hook-registered", ok: edits.length === 0, detail: edits.length ? `${h.file} lacks the context-mode hook entry` : undefined };
+  if (!edits.length) return { name: "hook-registered", ok: true };
+  if (h.trust && edits.every((e) => e.file === h.trust)) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${h.trust}; re-run setup` };
+  return { name: "hook-registered", ok: false, detail: `${h.file} lacks the context-mode hook entry` };
 }
 
 /** ADR-0020 hook-runs: one sample event through the hook bundle for this agent (in-process agents too). */
