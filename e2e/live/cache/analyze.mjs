@@ -17,17 +17,20 @@ export const promptTokens = (u) => u.input + u.cacheRead + u.cacheCreation;
 export function parseTurn(text) {
   const byId = new Map();
   const subIds = new Set();
-  const hooks = [];
+  const hooks = [], tools = [];
+  let mcp = [];
   let sessionId = null, costUsd = 0, isError = false, resultText = "", compacted = false, pending = false;
   for (const line of text.split("\n")) {
     if (line.trim() === "") continue;
     const e = JSON.parse(line);
     if (e.session_id !== undefined) sessionId = e.session_id;
+    if (e.type === "system" && e.subtype === "init") mcp = (e.mcp_servers ?? []).map((m) => `${m.name}:${m.status}`);
     if (e.type === "system" && e.subtype === "compact_boundary") { compacted = true; pending = true; }
     else if (e.type === "system" && e.subtype === "hook_response") hooks.push({ event: String(e.hook_event ?? e.hook_name ?? ""), bytes: Buffer.byteLength(String(e.stdout ?? e.output ?? "")) });
     else if (e.type === "assistant") {
       const m = e.message ?? {};
       if (e.parent_tool_use_id) { subIds.add(m.id); continue; }
+      for (const c of m.content ?? []) if (c.type === "tool_use") tools.push(c.name);
       const u = m.usage ?? {};
       const row = { id: m.id, input: u.input_tokens ?? 0, cacheRead: u.cache_read_input_tokens ?? 0, cacheCreation: u.cache_creation_input_tokens ?? 0, output: u.output_tokens ?? 0, afterCompact: false };
       const old = byId.get(m.id);
@@ -39,7 +42,7 @@ export function parseTurn(text) {
       resultText = String(e.result ?? "");
     }
   }
-  return { calls: [...byId.values()], subagentCalls: subIds.size, sessionId, costUsd, isError, resultText, compacted, hooks };
+  return { calls: [...byId.values()], subagentCalls: subIds.size, sessionId, costUsd, isError, resultText, compacted, hooks, tools, mcp };
 }
 
 const ratio = (read, creation, input) => { const d = read + creation + input; return d === 0 ? 0 : read / d; };
