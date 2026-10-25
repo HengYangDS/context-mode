@@ -42,7 +42,8 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   },
   {
     id: "gemini", installMode: "extension", projectSource: "spawn-cwd", toolNamePrefix: gemini.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    // D-HA-GEMINI-NAMES-1: gemini-cli 0.65.0 *_TOOL_NAME constants.
+    nativeTools: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, execReadOnlyHint: false,
     // D-FU-GCH-1: no SessionStart. Claude Code also loads hooks/hooks.json (Gemini's file) and would run a SessionStart
     // entry through /bin/sh, which fails on ${extensionPath}. Gemini's SessionStart only sent the resume hint (compact never
     // arrives there), and GP6 forbids that hint on BeforeAgent, so Gemini goes without it.

@@ -34,9 +34,18 @@ function own(p: Record<string, unknown>, key: string): unknown {
 
 // Own tool -> bare ctx_* name; another MCP server's tool -> "mcp:<server>:<tool>" read from the payload's
 // mcp_context {server_name, tool_name}, never split out of the sanitized name (DEVIATIONS D-M3-A1-2);
-// native names unchanged (impl/01 §2).
+// the four native ids in NATIVE_TO_CANONICAL map to canonical names; other native names unchanged (impl/01 §2).
+// gemini-cli 0.65.0 SHELL/READ_FILE/GREP/WEB_FETCH_TOOL_NAME -> canonical name (D-HA-GEMINI-NAMES-1).
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = {
+  run_shell_command: "Bash",
+  read_file: "Read",
+  grep_search: "Grep",
+  web_fetch: "WebFetch",
+};
+
 function canonicalName(name: string, mcp: unknown): string {
   if (name.startsWith(TOOL_NAME_PREFIX)) return name.slice(TOOL_NAME_PREFIX.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
   if (typeof mcp !== "object" || mcp === null) return name;
   const m = mcp as Record<string, unknown>;
   const server = own(m, "server_name");
