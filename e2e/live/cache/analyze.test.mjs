@@ -86,3 +86,31 @@ test("parseTurn lists the tool names the model called, in order, and the mcp ser
   assert.deepEqual(t.tools, ["Bash", "Read"]);
   assert.deepEqual(t.mcp, ["context-mode:connected"]);
 });
+
+// ---- verdict: the owner pass rule over two arms ----
+import { verdict } from "./analyze.mjs";
+const sess = (turnsRatios, breaks = 0) => ({ breaks: Array.from({ length: breaks }, () => ({})), perTurn: turnsRatios.map((r, i) => ({ turn: i, input: 0, cacheRead: Math.round(r * 1000), cacheCreation: 1000 - Math.round(r * 1000), hitRatio: r })), firstPrefix: 1000 });
+const arm = (ratios, breaks, shares) => ({ sessions: [sess(ratios, breaks), sess(ratios, breaks)], cross: shares.map((s) => ({ share: s })) });
+
+test("verdict: pass when v2 has no more breaks, ratio within 2 points on turns 2-6, cross share >= 0.9", () => {
+  const v = verdict(arm([0, 0.9, 0.9, 0.9, 0.9, 0.9], 1, [0.95]), arm([0, 0.89, 0.9, 0.9, 0.9, 0.9], 1, [0.93, 0.91]));
+  assert.equal(v.pass, true);
+});
+
+test("verdict: more v2 breaks fail", () => {
+  const v = verdict(arm([0, 0.9, 0.9, 0.9, 0.9, 0.9], 0, [1]), arm([0, 0.9, 0.9, 0.9, 0.9, 0.9], 1, [1]));
+  assert.equal(v.breaksOk, false);
+  assert.equal(v.pass, false);
+});
+
+test("verdict: a pooled hit ratio more than 2 points under off fails", () => {
+  const v = verdict(arm([0, 0.9, 0.9, 0.9, 0.9, 0.9], 0, [1]), arm([0, 0.87, 0.87, 0.87, 0.87, 0.87], 0, [1]));
+  assert.equal(v.hitOk, false);
+});
+
+test("verdict: the worst cross-session share under 0.9 fails; turn 1 is not in the hit ratio", () => {
+  const v = verdict(arm([0, 0.9, 0.9, 0.9, 0.9, 0.9], 0, [1]), arm([0.5, 0.9, 0.9, 0.9, 0.9, 0.9], 0, [0.95, 0.89]));
+  assert.equal(v.hitOk, true);
+  assert.equal(v.crossOk, false);
+  assert.equal(v.pass, false);
+});
