@@ -70,3 +70,14 @@ test("crossSessionRead: second session's first-request cached over first session
   assert.equal(r.prefixA, 14000);
   assert.ok(Math.abs(r.fraction - 13952 / 14000) < 1e-12);
 });
+
+import { promptsFor } from "../../../e2e/live/cache/codex.mjs";
+
+test("promptsFor: 5 turns per arm; only the v2 arm names the ctx tools, off arm never does", () => {
+  const off = promptsFor("off"), v2 = promptsFor("v2");
+  assert.equal(off.length, 5);
+  assert.equal(v2.length, 5);
+  assert.ok(!off.some((p) => p.includes("ctx_")));
+  assert.ok(v2[2].includes("ctx_index") && v2[2].includes("ctx_search"));
+  assert.deepEqual(off.filter((_, i) => i !== 2), v2.filter((_, i) => i !== 2));
+});
