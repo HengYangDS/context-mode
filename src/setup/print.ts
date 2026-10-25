@@ -1,14 +1,17 @@
 // src/setup/print.ts: `context-mode setup --print <id>`, the manual step for one agent with absolute paths filled
 // in (owner 2026-10-25: users never type paths, JSON or scripts). Built from the same registry row setup applies,
 // so the printed step and the applied step cannot drift. Writes nothing.
+import { readFileSync } from "node:fs";
+
 import { editHostConfigText } from "../core/ops/host-config.ts";
+import { renderSkill } from "./registry.ts";
 import type { CheckRow } from "./registry.ts";
 
 export type PrintStep =
   | { kind: "config"; file: string; format: string; key: readonly string[]; block: string }
   | { kind: "run"; argv: string[]; input?: string }
   | { kind: "hook"; file: string; block: string }   // ADR-0020: the hook channel file (merge, keep user entries)
-  | { kind: "skill"; dir: string; names: string[] }; // ADR-0020: <dir>/<name>/SKILL.md from the package skills/
+  | { kind: "skill"; file: string; block: string }; // ADR-0020: one <dir>/<name>/SKILL.md, rendered for this agent
 export interface PrintPlan { agent: string; steps: PrintStep[]; verify: string; }
 
 /** One shell word: left bare when safe, else single-quoted (POSIX shells; PowerShell reads '...' the same). */
@@ -29,7 +32,9 @@ export function printPlan(row: CheckRow): PrintPlan {
   if (h.kind === "file") steps.push({ kind: "hook", file: h.file, block: JSON.stringify(h.shape, null, 2) + "\n" });
   else if (h.kind === "plugin-list") steps.push({ kind: "hook", file: h.file, block: JSON.stringify({ [h.key[0]]: [h.entry] }, null, 2) + "\n" });
   const sk = row.skillInstall;
-  if (sk.kind === "dir") steps.push({ kind: "skill", dir: sk.dir, names: sk.files.map((f) => f.name) });
+  if (sk.kind === "dir") {
+    for (const f of sk.files) steps.push({ kind: "skill", file: f.file, block: renderSkill(readFileSync(f.src, "utf8"), sk.prefix) });
+  }
   return { agent: row.id, steps, verify: `context-mode doctor --agents ${row.id}` };
 }
 
@@ -37,7 +42,7 @@ function extraText(p: PrintPlan): string {
   let out = "";
   for (const s of p.steps) {
     if (s.kind === "hook") out += `\nHooks: put this in ${s.file} (keep your own entries):\n\n${s.block}`;
-    if (s.kind === "skill") out += `\nSkills: copy ${s.names.join(", ")} from the package skills/ dir into ${s.dir}\n`;
+    if (s.kind === "skill") out += `\nSkill: put this in ${s.file}:\n\n${s.block}`;
   }
   return out;
 }

@@ -442,6 +442,16 @@ for (const a of ADAPTERS) {
         assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
         mkdirSync(path.dirname(step.file), { recursive: true });
         writeFileSync(step.file, step.block);
+      } else if (step.kind === "hook") {
+        // ADR-0020: the hook block goes next to the user's keys (zcode and opencode share the config file).
+        assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
+        mkdirSync(path.dirname(step.file), { recursive: true });
+        const cur = existsSync(step.file) ? JSON.parse(readFileSync(step.file, "utf8")) : {};
+        writeFileSync(step.file, JSON.stringify({ ...cur, ...JSON.parse(step.block) }, null, 2) + "\n");
+      } else if (step.kind === "skill") {
+        assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
+        mkdirSync(path.dirname(step.file), { recursive: true });
+        writeFileSync(step.file, step.block);
       } else {
         assert.equal(step.kind, "run");
         fakeAgentBin(s, step.argv[0]);
