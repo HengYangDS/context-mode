@@ -68,6 +68,19 @@ Each page gives one command, what setup changes, how to check it, how to remove 
 The git `release` branch stays for two routes: the Claude Code marketplace (ADR-0011 step b) and the Gemini and Qwen git-route extension install. Setup does not need it. See [ADR-0019](../v2/adr/0019-interactive-setup-and-npm-channel.md).
 
 
+## From source
+
+Use this to test a build from a clone. The repo root is the dev package: it has no `bin`, so `npm i -g .` gives no `context-mode` command. The user package is the release tree.
+
+```sh
+npm install --no-package-lock
+node build/build.mjs --out release-out
+npm i -g ./release-out
+context-mode --version
+```
+
+Then run `context-mode setup` as above. `context-mode --version` must print a version. If it does not, see [Troubleshooting](#troubleshooting).
+
 ## Uninstall
 
 ```sh
@@ -78,6 +91,8 @@ npm rm -g context-mode
 `setup --remove` puts each touched file back. It reports what it restored.
 
 ## Troubleshooting
+
+`context-mode: command not found` after `npm i -g`: npm put the command in a folder that is not on your `PATH`. Run `npm prefix -g`. Add its `bin` folder (`Scripts` on Windows) to `PATH`, open a new shell, and run `context-mode --version`. If the install was from a clone, you must install `./release-out`, not the repo root (see [From source](#from-source)).
 
 Run `context-mode doctor`. It checks each agent and changes nothing. On a TTY, a failed agent gets one question: fix now.
 
