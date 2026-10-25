@@ -30,12 +30,14 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     id: "claude-code", installMode: "marketplace", projectSource: "env:CLAUDE_PROJECT_DIR", toolNamePrefix: claudeCode.TOOL_NAME_PREFIX,
     nativeTools: CLAUDE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
     decode: claudeCode.decode, encode: claudeCode.encode,
   },
   {
     id: "codex", installMode: "config-mcp", projectSource: "arg:--agent+cwd", toolNamePrefix: codex.TOOL_NAME_PREFIX,
     nativeTools: { shell: ["Bash"], edit: ["apply_patch"] }, execReadOnlyHint: true, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".codex/hooks.json" }, skillChannel: { kind: "home-dir", path: ".codex/skills" }, // ADR-0020
     decode: codex.decode, encode: codex.encode,
   },
   {
@@ -46,6 +48,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     // arrives there), and GP6 forbids that hint on BeforeAgent, so Gemini goes without it.
     eventMap: { UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/hooks.json" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
     decode: gemini.decode, encode: gemini.encode,
   },
   {
@@ -53,6 +56,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, execReadOnlyHint: false,
     eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/qwen.json" }, skillChannel: { kind: "home-dir", path: ".qwen/skills" }, // ADR-0020
     decode: qwen.decode, encode: qwen.encode,
   },
   {
@@ -60,6 +64,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: [] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode.json" }, skillChannel: { kind: "home-dir", path: ".copilot/skills" }, // ADR-0020
     decode: copilotCli.decode, encode: copilotCli.encode,
   },
   {
@@ -67,6 +72,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
     nativeTools: { shell: [] }, execReadOnlyHint: false, eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode-vscode.json" }, skillChannel: { kind: "home-dir", path: ".copilot/skills" }, // ADR-0020
     decode: vscode.decode, encode: vscode.encode,
   },
   {
@@ -74,6 +80,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: [] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "hint-only",
+    hookChannel: { kind: "home-file", path: ".kiro/hooks/context-mode.json" }, skillChannel: { kind: "home-dir", path: ".kiro/skills" }, // ADR-0020
     decode: kiro.decode, encode: kiro.encode,
   },
   {
@@ -81,6 +88,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     id: "zcode", installMode: "hooks+mcp", projectSource: "spawn-cwd", toolNamePrefix: zcode.TOOL_NAME_PREFIX,
     nativeTools: CLAUDE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".zcode/cli/config.json" }, skillChannel: { kind: "home-dir", path: ".zcode/skills" }, // ADR-0020
     decode: zcode.decode, encode: zcode.encode,
   },
   {
@@ -88,6 +96,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: [] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "pi/index.js" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
     decode: pi.decode, encode: pi.encode, checkPermission: pi.checkPermission,
   },
   {
@@ -96,6 +105,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     // Usage: step-finish cost row (DEVIATIONS D-M5-arch-2).
     eventMap: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     compactDelivery: "opencode-cache", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "opencode/plugin.js" }, skillChannel: { kind: "home-dir", path: ".config/opencode/skills" }, // ADR-0020
     decode: opencode.decode, encode: opencode.encode, toCanonicalTool: opencode.toCanonicalTool,
   },
 ] satisfies Row[]);
