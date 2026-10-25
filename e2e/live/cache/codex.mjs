@@ -76,13 +76,18 @@ export function crossSessionRead(reqsA, reqsB) {
 
 // ---- runner ----
 
-const PROMPTS = [
-  "Run `cat big.log` in the shell and tell me how many lines contain the word ERROR.",
-  "Read lines 1 to 300 of module.js and tell me the name of the longest function.",
-  "Search the project for the string handleRetry (use any search tool you have) and list which files contain it.",
-  "In one sentence, what is a prompt cache?",
-  "Run `echo hello` in the shell and show me the output.",
-];
+const SEARCH_OFF = "Search the project for the string handleRetry (use any search tool you have) and list which files contain it.";
+const SEARCH_V2 = "Call the tool ctx_index on the file module.js, then call the tool ctx_search with the query handleRetry, and list which functions it finds.";
+/** Same 5-turn mix per arm. Only turn 3 differs: the v2 arm is told to use the ctx tools so they are exercised. */
+export function promptsFor(arm) {
+  return [
+    "Run `cat big.log` in the shell and tell me how many lines contain the word ERROR.",
+    "Read lines 1 to 300 of module.js and tell me the name of the longest function.",
+    arm === "v2" ? SEARCH_V2 : SEARCH_OFF,
+    "In one sentence, what is a prompt cache?",
+    "Run `echo hello` in the shell and show me the output.",
+  ];
+}
 const CROSS_PROMPT = "Reply with the word ok.";
 
 function writeFixtures(dir) {
@@ -150,12 +155,14 @@ async function runSession({ root, rawRoot, arm, label, authSrc, releaseOut, home
   let setup = null;
   if (arm === "v2" && !existsSync(join(h.codexHome, "config.toml"))) setup = await setupV2(env, releaseOut);
   let threadId = null; const turns = [], calls = [];
-  for (let t = 0; t < PROMPTS.length; t++) {
-    const r = await codexTurn(env, proj, threadId, PROMPTS[t], rawDir, `turn${t + 1}`);
+  const prompts = promptsFor(arm);
+  for (let t = 0; t < prompts.length; t++) {
+    const r = await codexTurn(env, proj, threadId, prompts[t], rawDir, `turn${t + 1}`);
     threadId = threadId ?? r.threadId;
     turns.push({ n: t + 1, usage: r.turns[0]?.usage ?? null, mcp: mcpCalls(r.items), shell: r.items.filter((i) => i.type === "command_execution").length });
     calls.push(...mcpCalls(r.items));
   }
+  if (arm === "v2" && calls.length === 0) throw new Error(`v2 arm ${label}: no ctx tool call happened; the run does not exercise v2`);
   const rollout = findRollout(h.codexHome, threadId);
   copyFileSync(rollout, join(rawDir, "rollout.jsonl"));
   const reqs = requestsFromRollout(readFileSync(rollout, "utf8"));
