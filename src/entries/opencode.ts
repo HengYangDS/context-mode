@@ -155,4 +155,5 @@ export async function server(input: { directory?: string }, _options?: unknown) 
   return { ...hooks, tool };
 }
 
-export default { id: PLUGIN_ID, server };
+// The 1.19.4 loader reads only id, server and tui on the default export; setup stays for the M5 plugin API tests.
+export default { id: PLUGIN_ID, server, setup };
