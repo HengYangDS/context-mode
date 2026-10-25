@@ -15,6 +15,11 @@
 // D-V1OUT-1 (owner 2026-10-25): the word "v1" must not appear in README.md, CONTRIBUTING.md, docs/*.md, docs/install/**, skills/**,
 // src/prompt/**, e2e/golden/cli/** (CLI help goldens) or .github/ISSUE_TEMPLATE/** (checkNoV1, v1FreeFiles). docs/benchmarks/** and docs/v2/** are exempt. CLI help and output
 // are checked by tests/v2/repo/install-docs-v1out.test.mjs, which runs the CLI.
+// Simple rules (owner 2026-10-25: users never type paths, JSON or scripts), checkSimpleLines over docFiles: a fenced line
+// must not hold `node -e`, `npm root -g`, `$(...)` or a path under a home dir (~/, $HOME, %USERPROFILE%, $env:USERPROFILE,
+// {env:HOME}, /Users/, /home/, C:\Users); a line in a shell or unlabelled fence is at most 100 chars. checkSimplePages: a
+// README names `npm i -g context-mode@next` and `context-mode setup` as two fenced lines; an agent page <id>.md names
+// `context-mode setup --agents <id>` (or the two lines), `context-mode setup --print <id>` and `context-mode setup --remove --agents <id>`.
 // Usage: node build/check-install-docs.mjs [dir]   (default: docs/install). Prints "PASS|FAIL install-docs <n> files"; exit 1 on FAIL.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -35,7 +40,7 @@ const PS_LANG = /^(powershell|pwsh|ps1)$/i;
 const EDIT_HINT = /change this|edit this|your (own )?path|replace (this|with your)/i;
 
 const CLI_FLAGS = new Set(["--list", "--dry-run", "--remove", "--repair", "--agents", "--yes", "-y", "--no-input", "--json", "-q", "--quiet",
-  "--verbose", "--debug", "--no-color", "-h", "--help", "--tag"]); // setup, doctor and upgrade --help
+  "--verbose", "--debug", "--no-color", "-h", "--help", "--tag", "--print"]); // setup, doctor and upgrade --help
 const CLI_CMD = /(?:^|[&|;]\s*|^\s*)context-mode\s+(setup|doctor|upgrade)\b([^&|;\n]*)/g;
 
 export function checkPages(pages) {
@@ -43,8 +48,8 @@ export function checkPages(pages) {
   for (const [name, text] of Object.entries(pages)) {
     if (name === "README.md") {
       if (!text.includes("24.15.0")) bad.push("README.md needs Node 24.15.0");
-      if (!text.includes("npm i -g context-mode@next && context-mode setup")) bad.push("README.md needs the two-command install");
-      if (!text.includes("context-mode setup --remove && npm rm -g context-mode")) bad.push("README.md needs the uninstall command");
+      if (!text.includes("npm i -g context-mode@next && context-mode setup") && !hasTwoLines(text)) bad.push("README.md needs the two-command install");
+      if (!text.includes("context-mode setup --remove && npm rm -g context-mode") && !/^context-mode setup --remove\n(?:[^\n]*\n)*?npm rm -g context-mode$/m.test(fencedLines(text).join("\n"))) bad.push("README.md needs the uninstall command");
     } else {
       if (!text.includes("context-mode setup")) bad.push(`${name} needs context-mode setup`);
     }
@@ -96,6 +101,57 @@ export function checkLines(name, text) {
   return bad;
 }
 
+/** Every line inside a fence, with its 1-based line number and the fence language. */
+function fenced(text) {
+  const out = [];
+  let fence = null;
+  let lang = "";
+  text.split("\n").forEach((line, i) => {
+    const m = /^\s*(`{3,})\s*([\w+-]*)/.exec(line);
+    if (m) {
+      if (fence === null) { fence = m[1]; lang = m[2]; } else if (line.trim().startsWith(fence)) { fence = null; lang = ""; }
+      return;
+    }
+    if (fence !== null) out.push({ line, n: i + 1, lang });
+  });
+  return out;
+}
+const fencedLines = (text) => fenced(text).map((l) => l.line.trim());
+const hasTwoLines = (text) => { const l = fencedLines(text); return l.includes("npm i -g context-mode@next") && l.includes("context-mode setup"); };
+
+const HOME_PATH = /(^|[^\w])~[\/\\]|\$HOME\b|\$\{HOME\}|%USERPROFILE%|\$env:USERPROFILE|\{env:(HOME|USERPROFILE)\}|\/Users\/|\/home\/|[A-Z]:\\+Users\\/i;
+const SHELL_OR_PLAIN = /^(|sh|bash|zsh|shell|console|powershell|pwsh|ps1|cmd|bat)$/i;
+export const MAX_COMMAND_CHARS = 100;
+
+/** Simple rules for one doc: no script, no npm root -g, no $(...), no home path in a fence; shell lines <= 100 chars. */
+export function checkSimpleLines(name, text) {
+  const bad = [];
+  for (const { line, n, lang } of fenced(text)) {
+    const at = `${name}:${n}`;
+    const t = line.trim().slice(0, 100);
+    if (/\bnode\s+-e\b/.test(line)) bad.push(`${at} node -e script: ${t}`);
+    if (/\bnpm\s+root\s+-g\b/.test(line)) bad.push(`${at} npm root -g: ${t}`);
+    if (/\$\(/.test(line)) bad.push(`${at} $(...) substitution: ${t}`);
+    if (HOME_PATH.test(line)) bad.push(`${at} home path (setup or setup --print fills paths): ${t}`);
+    if (SHELL_OR_PLAIN.test(lang) && line.length > MAX_COMMAND_CHARS) bad.push(`${at} line over ${MAX_COMMAND_CHARS} chars (${line.length}): ${t}`);
+  }
+  return bad;
+}
+
+/** Page rules: a README has the two-command path; <id>.md has setup --agents <id>, setup --print <id>, setup --remove --agents <id>. */
+export function checkSimplePages(pages) {
+  const bad = [];
+  for (const [name, text] of Object.entries(pages)) {
+    const base = path.basename(name);
+    if (base === "README.md") { if (!hasTwoLines(text)) bad.push(`${name} needs the two-command path (npm i -g context-mode@next, then context-mode setup)`); continue; }
+    const id = base.replace(/\.md$/, "");
+    if (!hasTwoLines(text) && !fencedLines(text).includes(`context-mode setup --agents ${id}`)) bad.push(`${name} needs the two-command path or context-mode setup --agents ${id}`);
+    if (!text.includes(`context-mode setup --print ${id}`)) bad.push(`${name} needs context-mode setup --print ${id}`);
+    if (!text.includes(`context-mode setup --remove --agents ${id}`)) bad.push(`${name} needs context-mode setup --remove --agents ${id}`);
+  }
+  return bad;
+}
+
 const V1_WORD = /\bv1\b/i;
 /** Lines of `text` that hold the word v1 (any case; v10, ev1 and @1 do not match). */
 export function checkNoV1(name, text) {
@@ -110,6 +166,13 @@ function walk(dir, exts, out = []) {
     else if (exts.some((x) => f.endsWith(x))) out.push(f);
   }
   return out;
+}
+
+/** Docs a user may copy an install command from: README, CONTRIBUTING, docs/*.md, docs/install/**, skills/**. */
+export function docFiles(repo) {
+  const top = ["README.md", "CONTRIBUTING.md"].map((f) => path.join(repo, f)).filter(existsSync);
+  const docs = readdirSync(path.join(repo, "docs")).filter((f) => f.endsWith(".md")).sort().map((f) => path.join(repo, "docs", f));
+  return [...top, ...docs, ...walk(path.join(repo, "docs", "install"), [".md"]), ...walk(path.join(repo, "skills"), [".md"])];
 }
 
 /** Files that must not name v1. */
@@ -129,6 +192,10 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     files.push("README.md");
     const repo = path.join(DIR, "..", "..");
     bad.push(...v1FreeFiles(repo).flatMap((f) => checkNoV1(path.relative(repo, f), readFileSync(f, "utf8"))));
+    bad.push(...docFiles(repo).flatMap((f) => checkSimpleLines(path.relative(repo, f), readFileSync(f, "utf8"))));
+    const pages = Object.fromEntries(readdirSync(DIR).filter((f) => f.endsWith(".md")).map((f) => [f, readFileSync(path.join(DIR, f), "utf8")]));
+    pages["../../README.md"] = readFileSync(readme, "utf8"); // root README: same two-command rule
+    bad.push(...checkSimplePages(pages));
   }
   for (const b of bad) console.log("  " + b);
   console.log(`${bad.length ? "FAIL" : "PASS"} install-docs ${files.length} files`);

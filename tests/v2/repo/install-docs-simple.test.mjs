@@ -39,7 +39,9 @@ test("install-docs-simple: the simple forms pass", () => {
 
 test("install-docs-simple: every page has the two-command path or setup --agents", () => {
   const two = "```sh\nnpm i -g context-mode@next\ncontext-mode setup\n```\n";
-  assert.deepEqual(checkSimplePages({ "README.md": two, "codex.md": "```sh\ncontext-mode setup --agents codex\n```\n" }), []);
+  // A full agent page (the next test covers --print and --remove); this test is about the install command only.
+  const full = "```sh\ncontext-mode setup --agents codex\n```\ncontext-mode setup --print codex\ncontext-mode setup --remove --agents codex\n";
+  assert.deepEqual(checkSimplePages({ "README.md": two, "codex.md": full }), []);
   const out = checkSimplePages({ "README.md": "```sh\nnpm i -g context-mode@next\n```\n", "codex.md": "run context-mode setup\n" }).join("\n");
   assert.ok(out.includes("README.md needs the two-command path"), out);
   assert.ok(out.includes("codex.md needs the two-command path or context-mode setup --agents"), out);
