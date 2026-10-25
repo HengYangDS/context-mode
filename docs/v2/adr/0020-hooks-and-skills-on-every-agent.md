@@ -55,6 +55,12 @@ Skills are rendered from the single source `skills/` with the agent's own tool n
 
 - A live logged-in run per agent that shows a hook fire. Until then doctor's "seen" check is WARN on a fresh HOME.
 - Skill dirs for qwen, copilot-cli, vscode, kiro and zcode are from host docs and bundles; a live run must list the skill.
+- gemini skills ship in the linked extension dir as is, so they name the bare `ctx_stats`, not the host name
+  `mcp_context-mode_ctx_stats`. A live gemini session must show which name the model gets before the extension
+  skills are rendered per agent (no gemini login on the test machine, 2026-10-26).
+- codex and gemini fire proofs (D-HA-CODEX-TRUST-1, D-HA-GEMINI-REPLACE-1) come from `hooks/list` and docs-shaped
+  payloads piped into the hook, not from a model turn. Headless path to run: `codex exec --json` with a temp
+  CODEX_HOME, and `gemini -p` with a temp HOME, once a login is copied into the temp HOME.
 
 ## Consequences
 
