@@ -401,6 +401,9 @@ function normPaths(text, s) {
   for (const [p, tag] of [[realpathSync(s.pkg), "<PKG>"], [s.pkg, "<PKG>"], [realpathSync(s.home), "<HOME>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
     t = t.replaceAll(JSON.stringify(p).slice(1, -1), tag).replaceAll(p, tag);
   }
+  // D-HA-CODEX-TRUST-1: a codex trust hash covers the hook command, which holds this sandbox's paths; the golden
+  // holds the tag, and cli/print-apply proves the printed hash makes doctor PASS.
+  t = t.replace(/trusted_hash = "sha256:[0-9a-f]{64}"/g, 'trusted_hash = "sha256:<HASH>"');
   if (process.platform === "win32") {
     // The goldens hold the POSIX form. On Windows the same step has `\` (`\\` inside TOML/JSON strings) after a
     // tag, and shellWord single-quotes a word with a backslash. Map both back; the product output is right as is.
