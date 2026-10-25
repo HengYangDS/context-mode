@@ -318,6 +318,7 @@ Usage: context-mode doctor [options]
 | 19 | `--help` starts in under 100 ms | PASS (median) | 30 runs: median 69 ms, min 49 ms, p95 187 ms. Bare `node -e 0` on the same host: median 46 ms, p95 90 ms. The CLI adds about 23 ms. The p95 is host noise; a loaded host can exceed 100 ms |
 | 20 | No network call at start | PASS | `src/entries/cli.ts` reads `package.json` only before routing |
 | 21 | Writes only allowlisted paths and `~/.context-mode/` | PASS | file list after `setup --yes --agents codex`: `.codex/config.toml` and `.context-mode/{backups,reports}` |
+| 22 | Manual step without typing paths (`setup --print <agent>`) | PASS | golden per agent in `tests/v2/cli/cli.test.mjs`; writes nothing (HOME snapshot equal); `--json` machine form |
 
 Result: 20 of 21 rules pass.
 
