@@ -400,6 +400,12 @@ function normPaths(text, s) {
   for (const [p, tag] of [[realpathSync(s.pkg), "<PKG>"], [s.pkg, "<PKG>"], [realpathSync(s.home), "<HOME>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
     t = t.replaceAll(JSON.stringify(p).slice(1, -1), tag).replaceAll(p, tag);
   }
+  if (process.platform === "win32") {
+    // The goldens hold the POSIX form. On Windows the same step has `\` (`\\` inside TOML/JSON strings) after a
+    // tag, and shellWord single-quotes a word with a backslash. Map both back; the product output is right as is.
+    t = t.replace(/(<(?:PKG|NODE|HOME)>)((?:\\{1,2}[^\s"'\\]+)+)/g, (_m, tag, rest) => tag + rest.replace(/\\{1,2}/g, "/"));
+    t = t.replace(/'(<(?:PKG|NODE|HOME)>[^'\s]*)'/g, "$1");
+  }
   return t;
 }
 
