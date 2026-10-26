@@ -68,7 +68,9 @@ function sandbox(t) {
   mkdirSync(home, { recursive: true });
   mkdirSync(bin, { recursive: true });
   const pkg = makePkg(path.join(root, "pkg"));
-  const env = { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, NO_COLOR: "1", LOG: path.join(root, "calls.log") };
+  // D-HL-GATE-1: timing is not under test in the cli tests (the D3 gate has its own tests and e2e check): same CI-only
+  // knob as the engine, hooks-all and zcode-shape sandboxes, so a loaded host does not flip a PASS row.
+  const env = { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, NO_COLOR: "1", LOG: path.join(root, "calls.log"), CM_HOOK_OVERHEAD_BUDGET_MS: "60000" };
   return { root, home, bin, pkg, env };
 }
 
