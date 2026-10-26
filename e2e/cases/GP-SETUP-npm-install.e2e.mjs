@@ -79,7 +79,11 @@ test("[M6] GP-SETUP/npm-pack-install-setup-twice-remove: the packed npm bin sets
   const fakeState = path.join(tmp, "fakestate");
   const outDir = path.join(tmp, "out");
   const packDir = path.join(tmp, "pack");
-  for (const d of [home, prefix, fakeBin, fakeState, packDir]) mkdirSync(d, { recursive: true });
+  // D-HF-CLAUDE-SHIM-1: setup runs only the real Claude Code (a native binary or a file of the
+  // @anthropic-ai/claude-code package), so the claude fake lives in that package's dir, which is on PATH.
+  const claudePkg = path.join(tmp, "fakepkg", "node_modules", "@anthropic-ai", "claude-code");
+  for (const d of [home, prefix, fakeBin, fakeState, packDir, claudePkg]) mkdirSync(d, { recursive: true });
+  writeFileSync(path.join(claudePkg, "package.json"), JSON.stringify({ name: "@anthropic-ai/claude-code", version: "2.0.0" }));
 
   // ---- build + pack ----
   execFileSync(process.execPath, [path.join(REPO_ROOT, "build", "build.mjs"), "--out", outDir, "--version", VERSION], { cwd: REPO_ROOT, stdio: "pipe" });
@@ -90,7 +94,7 @@ test("[M6] GP-SETUP/npm-pack-install-setup-twice-remove: the packed npm bin sets
     ...process.env, HOME: home, USERPROFILE: home, FAKE_STATE: fakeState,
     npm_config_cache: path.join(tmp, "npm-cache"), npm_config_userconfig: path.join(tmp, "npmrc"),
     npm_config_update_notifier: "false", npm_config_audit: "false", npm_config_fund: "false",
-    [pathKey]: [fakeBin, binDir, process.env[pathKey] ?? ""].join(path.delimiter),
+    [pathKey]: [fakeBin, claudePkg, binDir, process.env[pathKey] ?? ""].join(path.delimiter),
   };
   delete env.CLAUDE_PROJECT_DIR;
   // D3 timing is gated once, by e2e/checks/setup-hook-overhead.mjs (DEVIATIONS D-CI-PERF-1). This functional case
@@ -125,7 +129,7 @@ test("[M6] GP-SETUP/npm-pack-install-setup-twice-remove: the packed npm bin sets
   // ---- fake agent CLIs ----
   writeFileSync(path.join(tmp, "fake-cli.mjs"), FAKE_CLI);
   for (const { id, bin } of CLI_AGENTS) {
-    const shim = path.join(fakeBin, WIN ? `${bin}.cmd` : bin);
+    const shim = path.join(id === "claude-code" ? claudePkg : fakeBin, WIN ? `${bin}.cmd` : bin);
     if (WIN) writeFileSync(shim, `@"${process.execPath}" "${path.join(tmp, "fake-cli.mjs")}" ${bin === "copilot" ? "copilot" : id} %*\r\n`);
     else { writeFileSync(shim, `#!/bin/sh\nexec "${process.execPath}" "${path.join(tmp, "fake-cli.mjs")}" ${bin === "copilot" ? "copilot" : id} "$@"\n`); chmodSync(shim, 0o755); }
   }
