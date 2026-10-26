@@ -147,3 +147,24 @@ test("encode replace on postToolUse is modifiedResult; on any other event a no-o
 });
 
 test("GP3 copilot-cli MCP-firing sub-case", { skip: "SKIPPED until S-NAMES closes (impl/10 §6, TECH-SPEC §3.8)" }, () => {});
+
+// Copilot CLI hooks reference (docs.github.com/en/copilot/reference/hooks-configuration): the camelCase
+// payload carries no hookEventName. Each event has its own key set; toolArgs is a JSON string (D-HQ-COPILOT-EVENT-1).
+test("decode the documented camelCase payloads that carry no hookEventName", () => {
+  const base = { sessionId: "cp-9", timestamp: 1704614600000, cwd: "/tmp/proj" };
+  const start = decode({ ...base, source: "new", initialPrompt: "hi" });
+  assert.equal(start.event, "SessionStart");
+  assert.equal(start.source, "startup");
+  const prompt = decode({ ...base, prompt: "run tests" });
+  assert.equal(prompt.event, "UserPromptSubmit");
+  assert.equal(prompt.prompt, "run tests");
+  const pre = decode({ ...base, toolName: "bash", toolArgs: "{\"command\":\"cat big.log\"}" });
+  assert.equal(pre.event, "PreToolUse");
+  assert.deepEqual(pre.tool, { name: "bash", canonicalName: "Bash", input: { command: "cat big.log" } });
+  const post = decode({ ...base, toolName: "bash", toolArgs: "{\"command\":\"cat big.log\"}",
+    toolResult: { resultType: "success", textResultForLlm: "out" } });
+  assert.equal(post.event, "PostToolUse");
+  assert.deepEqual(post.result, { isError: false, bytes: 3, text: "out" });
+  assert.equal(post.sessionId, "cp-9");
+  assert.equal(post.cwd, "/tmp/proj");
+});

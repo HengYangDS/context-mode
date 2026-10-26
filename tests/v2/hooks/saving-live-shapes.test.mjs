@@ -118,3 +118,16 @@ test("pi tool_result of a large bash output is replaced (content and details)", 
   assert.ok(Buffer.byteLength(text) < Buffer.byteLength(big) / 2, "replaced text is under half the raw output");
   assert.ok(text.includes("ctx_search("));
 });
+
+// D-HQ-COPILOT-EVENT-1: the documented copilot-cli payload has no hookEventName; the hook must still save.
+test("copilot-cli documented postToolUse payload (no hookEventName) is replaced through modifiedResult", async (t) => {
+  const { repo, big, env } = sandbox(t);
+  const out = await handleHook("copilot-cli", { sessionId: "c1", timestamp: 1, cwd: repo,
+    toolName: "bash", toolArgs: JSON.stringify({ command: "cat logs/app.log" }),
+    toolResult: { resultType: "success", textResultForLlm: big } }, env);
+  assert.equal(out.exitCode, 0);
+  const j = JSON.parse(out.stdout);
+  assert.equal(j.modifiedResult.resultType, "success");
+  assert.ok(Buffer.byteLength(j.modifiedResult.textResultForLlm) < Buffer.byteLength(big) / 2, "replaced text is under half the raw output");
+  assert.ok(j.modifiedResult.textResultForLlm.includes("ctx_search("), "the replace names ctx_search for the rest");
+});
