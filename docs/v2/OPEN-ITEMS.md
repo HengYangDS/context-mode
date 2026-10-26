@@ -85,7 +85,7 @@ Result: `docs/v2/spikes/hooks-all/RESULT.md`. Rules: ADR-0020. Merged into v2-de
 | H3 | pi: hook never resolved a project (live 200,067 -> 200,067) | fixed in code (D-HA-PI-PROJECT-1, D-HA-PI-NAMES-1) | Live re-run |
 | H4 | copilot-cli: `bash` unmapped, no replace | fixed in code (D-HA-COPILOT-NAMES-1, D-HA-COPILOT-REPLACE-1) | Live run |
 | H5 | Doctor `hook-runs`/`hook-seen` passed on pi while the hook could not resolve a project | closed | D-HF-DOCTOR-RUNS-1: `hook-runs` sends a large shell read per host and FAILs unless the saving effect comes back with the project resolved |
-| H6 | opencode saving not recorded in `ctx_stats` (0 B; no execute rows in the journal) | open | Journal the execute.before deny |
+| H6 | opencode saving not recorded in `ctx_stats` (0 B; no execute rows in the journal) | closed | D-HF-INPROC-JOURNAL-1 (in-process ctx_* calls write the server row), D-HF-OPENCODE-SHELL-1 (bash is routed) |
 | H7 | No run used a logged-in model session; kiro not run | open | Live session per host when a login exists |
 | H8 | claude-code setup fails when a shim is first on PATH | open | Setup must find the real host CLI |
 
