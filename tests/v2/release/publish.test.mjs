@@ -221,3 +221,103 @@ test("[M6] publish/promote-tagged-ok: a staged commit that contains the tagged r
   assert.equal(r.status, 0, r.stderr);
   assert.equal(git(bare, "rev-parse", "release^"), tagged);
 });
+
+// Release-next (D-RN-TAG-1): release.yml started by a pushed v2.* tag. The tag already sits on the source
+// commit on the remote; stage and promote reuse it: no second tag, no tag push, no refusal.
+const posixGh = { skip: process.platform === "win32" ? "stub gh is a sh script" : false };
+
+function pushTag(work, remote, name, ref = "HEAD") {
+  git(work, "tag", "-a", name, "-m", name, ref);
+  git(work, "push", "-q", remote, `refs/tags/${name}`);
+  return git(work, "rev-parse", `refs/tags/${name}^{commit}`);
+}
+
+test("[RN] publish/stage-reuse-tag: a pushed tag on the source commit is reused, not created again", (t) => {
+  const { bare, work } = fixture(t);
+  const src = pushTag(work, bare, "v2.0.0-next.1");
+  const tagObject = remoteRef(bare, "refs/tags/v2.0.0-next.1");
+  artifact(work, "next build");
+  const r = publish(work, "--stage", "--version", "2.0.0-next.1", "--source-commit", src, "--remote", bare);
+  assert.equal(r.status, 0, r.stderr);
+  assert.ok(r.stdout.includes("tag v2.0.0-next.1 already on"), r.stdout);
+  assert.equal(remoteRef(bare, "refs/tags/v2.0.0-next.1"), tagObject, "remote tag untouched");
+  assert.equal(git(work, "rev-parse", "refs/tags/v2.0.0-next.1^{commit}"), src, "local tag not moved to the staged commit");
+  assert.ok(git(work, "log", "-1", "--format=%B", "release-staging").includes(`Source-Commit: ${src}`));
+});
+
+test("[RN] publish/stage-reuse-tag-mismatch: a pushed tag on another commit than --source-commit -> refuse", (t) => {
+  const { bare, work } = fixture(t);
+  const src = pushTag(work, bare, "v2.0.0-next.1");
+  artifact(work, "next build");
+  const r = publish(work, "--stage", "--version", "2.0.0-next.1", "--source-commit", SRC, "--remote", bare);
+  assert.equal(r.status, 1);
+  assert.equal(r.stderr, `release failed: tag v2.0.0-next.1 on ${bare} points at ${src}, not source commit ${SRC}\n`);
+  assert.equal(remoteRef(bare, "refs/heads/release-staging"), "", "nothing staged");
+});
+
+test("[RN] publish/promote-reuse-tag: release moves to the staged commit; the pushed tag is not pushed again", (t) => {
+  const { root, bare, work } = fixture(t);
+  const src = pushTag(work, bare, "v2.0.0-next.1");
+  const tagObject = remoteRef(bare, "refs/tags/v2.0.0-next.1");
+  artifact(work, "next build");
+  assert.equal(publish(work, "--stage", "--version", "2.0.0-next.1", "--source-commit", src, "--remote", bare).status, 0);
+  const staged = remoteRef(bare, "refs/heads/release-staging");
+  const fresh = path.join(root, "fresh");
+  git(root, "clone", "-q", bare, fresh);
+  const r = publish(fresh, "--promote", "--version", "2.0.0-next.1", "--remote", bare);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(remoteRef(bare, "refs/heads/release"), staged);
+  assert.equal(remoteRef(bare, "refs/tags/v2.0.0-next.1"), tagObject, "remote tag untouched");
+  assert.equal(remoteRef(bare, "refs/tags/v2.0.0-next.1^{commit}"), src);
+});
+
+test("[RN] publish/promote-reuse-tag-mismatch: a pushed tag that is not the staged Source-Commit -> refuse, release untouched", (t) => {
+  const { bare, work } = fixture(t);
+  const main = git(work, "rev-parse", "HEAD");
+  artifact(work, "build");
+  assert.equal(publish(work, "--stage", "--version", "2.0.0-next.1", "--source-commit", SRC, "--remote", bare).status, 0);
+  const staged = remoteRef(bare, "refs/heads/release-staging");
+  git(work, "tag", "-d", "v2.0.0-next.1");
+  git(work, "tag", "-a", "v2.0.0-next.1", "-m", "x", main);
+  git(work, "push", "-q", bare, "refs/tags/v2.0.0-next.1");
+  const r = publish(work, "--promote", "--version", "2.0.0-next.1", "--remote", bare);
+  assert.equal(r.status, 1);
+  assert.equal(r.stderr, `release failed: tag v2.0.0-next.1 on ${bare} points at ${main}, not Source-Commit ${SRC} of release-staging ${staged}\n`);
+  assert.equal(remoteRef(bare, "refs/heads/release"), "");
+});
+
+test("[RN] publish/version-prerelease: --version takes x.y.z-<prerelease>; bad prerelease parts fail", (t) => {
+  const { work } = fixture(t);
+  for (const bad of ["2.0.0-", "2.0.0-next..1", "2.0.0-next.01", "2.0.0+b", "v2.0.0-next.1"]) {
+    const r = publish(work, "--stage", "--version", bad, "--source-commit", SRC);
+    assert.equal(r.status, 1, bad);
+    assert.equal(r.stderr, "release failed: --version <x.y.z> is required\n", bad);
+  }
+});
+
+// Stub gh: logs its argv to <bin>/argv.
+function stubGh(t) {
+  const bin = mkdtempSync(path.join(tmpdir(), "cm-v2-gh-"));
+  t.after(() => rmSync(bin, { recursive: true, force: true }));
+  writeFileSync(path.join(bin, "gh"), `#!/bin/sh\necho "$@" > "${bin}/argv"\n`, { mode: 0o755 });
+  return bin;
+}
+
+test("[RN] publish/gh-prerelease: a version with a '-' part is a prerelease and never Latest; x.y.z is unchanged", posixGh, (t) => {
+  for (const [version, pre] of [["2.0.0-next.1", true], ["2.0.0", false]]) {
+    const { bare, work } = fixture(t);
+    const src = pre ? pushTag(work, bare, `v${version}`) : SRC;
+    artifact(work, "b");
+    assert.equal(publish(work, "--stage", "--version", version, "--source-commit", src).status, 0);
+    const bin = stubGh(t);
+    const env = { ...ENV, PATH: `${bin}${path.delimiter}${process.env.PATH}` };
+    const r = spawnSync(process.execPath, [SCRIPT, "--promote", "--version", version, "--notes", "n"], { cwd: work, encoding: "utf8", env });
+    assert.equal(r.status, 0, r.stderr);
+    const argv = readFileSync(path.join(bin, "argv"), "utf8").trim().split(" ");
+    assert.deepEqual(argv.slice(0, 4), ["release", "create", `v${version}`, "--verify-tag"], version);
+    assert.equal(argv.includes("--prerelease"), pre, version);
+    assert.equal(argv.includes("--latest=false"), pre, version);
+    assert.ok(!argv.includes("--latest") && !argv.includes("--latest=true"), version);
+    assert.equal(remoteRef(bare, `refs/tags/v${version}^{commit}`), pre ? src : remoteRef(bare, "refs/heads/release"), version);
+  }
+});
