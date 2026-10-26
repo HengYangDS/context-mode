@@ -31,6 +31,8 @@ import {
 } from "../src/core/contracts/constants.ts";
 import { OUT_FILES, assertOutPackageJson, generateManifests } from "./manifests.ts";
 import { writeHashes } from "./hash.mjs";
+import { getAdapter } from "../src/adapters/table.ts";
+import { renderSkill } from "../src/setup/registry.ts";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEFAULT_OUT = "release-out";
@@ -213,15 +215,20 @@ function copyFixture(outDir) {
 }
 
 // §2.2 step 6: verbatim copy of skills/<name>/SKILL.md for the 3 command skills (impl/13 §5).
+// D-HQ-SKILLS-1: gemini loads <extension>/skills and pi loads package.json pi.skills as they are, so each host
+// gets its own copy, rendered from the one skills/ source with that host's real tool names (split/join).
+const SKILL_HOSTS = Object.freeze(["gemini", "pi"]);
+
 function copySkills(outDir) {
-  for (const name of COMMAND_SKILLS) {
-    const rel = path.join(SKILLS_DIR, name, SKILL_FILE);
-    const dest = path.join(outDir, rel);
-    mkdirSync(path.dirname(dest), { recursive: true });
-    try {
-      copyFileSync(path.join(REPO_ROOT, rel), dest);
-    } catch {
-      throw new BuildError(`missing ${rel}`);
+  for (const id of SKILL_HOSTS) {
+    const row = getAdapter(id);
+    for (const name of COMMAND_SKILLS) {
+      const rel = path.join(SKILLS_DIR, name, SKILL_FILE);
+      const src = path.join(REPO_ROOT, rel);
+      if (!existsSync(src)) throw new BuildError(`missing ${rel}`);
+      const dest = path.join(outDir, row.skillChannel.path, name, SKILL_FILE);
+      mkdirSync(path.dirname(dest), { recursive: true });
+      writeFileSync(dest, renderSkill(readFileSync(src, "utf8"), row.toolNamePrefix));
     }
   }
 }

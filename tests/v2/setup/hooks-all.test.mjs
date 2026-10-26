@@ -35,6 +35,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0" }));
   generateManifests(dir);
   for (const s of SKILLS) cpSync(path.join(REPO, "skills", s), path.join(dir, "skills", s), { recursive: true });
+  for (const s of SKILLS) cpSync(path.join(REPO, "skills", s), path.join(dir, "pi", "skills", s), { recursive: true }); // D-HQ-SKILLS-1: pi prefix is ""
   return dir;
 }
 

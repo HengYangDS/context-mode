@@ -42,6 +42,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0" }));
   generateManifests(pkgDir);
   for (const k of ["ctx-doctor", "ctx-stats", "ctx-upgrade"]) cpSync(path.join(REPO, "skills", k), path.join(pkgDir, "skills", k), { recursive: true });
+  for (const k of ["ctx-doctor", "ctx-stats", "ctx-upgrade"]) cpSync(path.join(REPO, "skills", k), path.join(pkgDir, "pi", "skills", k), { recursive: true }); // D-HQ-SKILLS-1
   return { home, pkgDir, env: { PATH: "/usr/bin:/bin", HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
 }
 

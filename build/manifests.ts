@@ -156,7 +156,7 @@ function manifestFor(row: AdapterRow, version: string): [string, JsonObject] | n
 // private: an npm or Pi install of the tree runs nothing.
 const OUT_PACKAGE_JSON = "package.json";
 const PI_EXTENSION = "./pi/index.js";
-const PI_SKILLS = "./skills";
+const PI_SKILLS = "./pi/skills"; // D-HQ-SKILLS-1: pi's own rendered copy
 const CLI_BUNDLE = "cli.mjs";
 const NODE_ENGINE = ">=24.15.0"; // D1
 

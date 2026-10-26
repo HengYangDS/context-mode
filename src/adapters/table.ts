@@ -97,7 +97,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: ["bash"], read: ["read"] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
-    hookChannel: { kind: "in-process", path: "pi/index.js" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
+    hookChannel: { kind: "in-process", path: "pi/index.js" }, skillChannel: { kind: "package", path: "pi/skills" }, // ADR-0020
     decode: pi.decode, encode: pi.encode, checkPermission: pi.checkPermission,
   },
   {

@@ -34,6 +34,7 @@ rl.on("line", (l) => {
   writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0" }));
   // ADR-0020: the release package ships skills/; setup renders them into the host skill dir.
   cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(dir, "skills"), { recursive: true });
+  cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(dir, "pi", "skills"), { recursive: true }); // D-HQ-SKILLS-1: pi prefix is ""
   return dir;
 }
 

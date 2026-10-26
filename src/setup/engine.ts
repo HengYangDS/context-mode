@@ -12,7 +12,7 @@ import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
-import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILLS_DIR, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
+import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 import { SAMPLE_FILE, hookSample, sampleText, sampleVerdict } from "./hook-sample.ts";
 
@@ -446,7 +446,7 @@ function hookSeenCheck(row: CheckRow, home: string): Check {
 function skillsCheck(row: CheckRow, pkgDir: string): Check {
   const s = row.skillInstall;
   if (s.kind === "package") {
-    const miss = COMMAND_SKILLS.map((n) => path.join(pkgDir, SKILLS_DIR, n, SKILL_FILE)).filter((f) => !existsSync(f));
+    const miss = COMMAND_SKILLS.map((n) => path.join(pkgDir, s.via, n, SKILL_FILE)).filter((f) => !existsSync(f));
     return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : undefined };
   }
   const bad = s.files.filter((f) => readOr(f.file) !== (existsSync(f.src) ? renderSkill(readFileSync(f.src, "utf8"), s.prefix) : undefined));
