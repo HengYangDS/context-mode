@@ -75,12 +75,21 @@ test("[M6] build/version-invalid: --version that is not x.y.z fails with one bui
   }
 });
 
-test("[M6] build/command-skills: the 3 command skills are copied verbatim, no other skill ships", (t) => {
+// Skills fix: gemini loads <extension>/skills and pi loads package.json pi.skills unrendered, so the build writes
+// each host's copy from the one skills/ source with that host's real tool names (split/join, D-HQ-SKILLS-1).
+test("[M6] build/command-skills: gemini skills/ and pi pi/skills are the 3 skills rendered with the host tool names", async (t) => {
+  const { renderSkill } = await import("../../../src/setup/registry.ts");
+  const { getAdapter } = await import("../../../src/adapters/table.ts");
   const { out, status, stderr } = build(t);
   assert.equal(status, 0, stderr);
-  assert.deepEqual(readdirSync(path.join(out, "skills")).sort(), [...SKILLS].sort());
-  for (const s of SKILLS) {
-    assert.deepEqual(readFileSync(path.join(out, "skills", s, "SKILL.md")), readFileSync(path.join(REPO, "skills", s, "SKILL.md")), s);
+  for (const [id, dir, stats] of [["gemini", "skills", "mcp_context-mode_ctx_stats"], ["pi", "pi/skills", "ctx_stats"]]) {
+    assert.equal(getAdapter(id).skillChannel.path, dir, id + " skill channel is the build dir");
+    assert.deepEqual(readdirSync(path.join(out, dir)).sort(), [...SKILLS].sort(), dir);
+    for (const s of SKILLS) {
+      const src = readFileSync(path.join(REPO, "skills", s, "SKILL.md"), "utf8");
+      assert.equal(readFileSync(path.join(out, dir, s, "SKILL.md"), "utf8"), renderSkill(src, getAdapter(id).toolNamePrefix), dir + " " + s);
+    }
+    assert.ok(readFileSync(path.join(out, dir, "ctx-stats", "SKILL.md"), "utf8").includes("Call the " + stats + " tool"), id + " names " + stats);
   }
 });
 

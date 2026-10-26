@@ -35,7 +35,7 @@ test("[M7] build/npm-d1-shape: release-out/package.json is the D1 package (bin c
     engines: { node: ">=24.15.0" },
     files: top,
     name: "context-mode",
-    pi: { extensions: ["./pi/index.js"], skills: ["./skills"] },
+    pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
     type: "module",
     version: "2.0.0",
   });

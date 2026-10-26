@@ -206,7 +206,7 @@ test("package.json is the D1 npm shape: name, version, bin, type, engines, files
     engines: { node: ">=24.15.0" },
     files: D1_FILES,
     name: "context-mode",
-    pi: { extensions: ["./pi/index.js"], skills: ["./skills"] },
+    pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
     type: "module",
     version: "2.0.0",
   });
@@ -216,7 +216,7 @@ test("package.json is the D1 npm shape: name, version, bin, type, engines, files
 test("assertOutPackageJson throws on dependencies, scripts, private or any other key", () => {
   const ok = {
     name: "context-mode", version: "2.0.0", type: "module", bin: { "context-mode": "cli.mjs" }, engines: { node: ">=24.15.0" },
-    files: D1_FILES, pi: { extensions: ["./pi/index.js"], skills: ["./skills"] },
+    files: D1_FILES, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"] },
   };
   assert.doesNotThrow(() => assertOutPackageJson(ok));
   assert.throws(() => assertOutPackageJson({ ...ok, dependencies: { "better-sqlite3": "1.0.0" } }), /dependencies/);
@@ -227,7 +227,7 @@ test("assertOutPackageJson throws on dependencies, scripts, private or any other
   assert.throws(() => assertOutPackageJson({ ...ok, bin: { "context-mode": "./cli.mjs" } }), /bin/);
   assert.throws(() => assertOutPackageJson({ ...ok, engines: { node: ">=22.5.0" } }), /engines/);
   assert.throws(() => assertOutPackageJson({ ...ok, files: D1_FILES.slice(1) }), /files/);
-  assert.throws(() => assertOutPackageJson({ ...ok, pi: { extensions: ["./pi/index.js"], skills: ["./skills"], prompts: [] } }), /pi/);
+  assert.throws(() => assertOutPackageJson({ ...ok, pi: { extensions: ["./pi/index.js"], skills: ["./pi/skills"], prompts: [] } }), /pi/);
   for (const key of ["pi", "bin", "engines", "files"]) {
     const { [key]: _drop, ...missing } = ok;
     assert.throws(() => assertOutPackageJson(missing), new RegExp(key));

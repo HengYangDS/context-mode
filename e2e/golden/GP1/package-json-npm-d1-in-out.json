@@ -39,7 +39,7 @@
         "./pi/index.js"
       ],
       "skills": [
-        "./skills"
+        "./pi/skills"
       ]
     },
     "type": "module"

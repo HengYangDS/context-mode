@@ -218,7 +218,7 @@ const SKILL_CHANNEL = {
   vscode: { kind: "home-dir", path: ".copilot/skills" },
   kiro: { kind: "home-dir", path: ".kiro/skills" },
   zcode: { kind: "home-dir", path: ".zcode/skills" },
-  pi: { kind: "package", path: "skills" },
+  pi: { kind: "package", path: "pi/skills" },
   opencode: { kind: "home-dir", path: ".config/opencode/skills" },
 };
 
