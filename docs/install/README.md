@@ -55,20 +55,39 @@ Each page gives one command, what setup changes, how to check it, how to remove 
 | Agent | Page | What setup runs | Checked in a clean HOME |
 |---|---|---|---|
 | Claude Code | [claude-code.md](./claude-code.md) | `claude plugin marketplace add` + `plugin install` | yes, 2.1.309 |
-| Codex | [codex.md](./codex.md) | writes `~/.codex/config.toml` (no hooks on a fresh HOME) | yes, 0.164.0 |
-| Copilot CLI | [copilot-cli.md](./copilot-cli.md) | `copilot mcp add` | yes, 1.0.103 |
+| Codex | [codex.md](./codex.md) | writes `~/.codex/config.toml`, `~/.codex/hooks.json`, skills | yes, 0.164.0 |
+| Copilot CLI | [copilot-cli.md](./copilot-cli.md) | `copilot mcp add`, writes hooks and skills | yes, 1.0.103 |
 | Gemini CLI | [gemini.md](./gemini.md) | `gemini extensions link --consent` | yes, 0.65.0 |
-| Kiro | [kiro.md](./kiro.md) | writes `~/.kiro/settings/mcp.json` | config only: Kiro not installed |
-| OpenCode | [opencode.md](./opencode.md) | writes `opencode.json` (no hooks) | yes, 1.19.4 |
+| Kiro | [kiro.md](./kiro.md) | writes `~/.kiro/settings/mcp.json`, hooks and skills | config only: Kiro not installed |
+| OpenCode | [opencode.md](./opencode.md) | writes `opencode.json` (MCP and plugin), skills | yes, 1.19.4 |
 | Pi | [pi.md](./pi.md) | `pi install <package folder>` | yes, 1.4.0 |
 | Qwen Code | [qwen.md](./qwen.md) | `qwen extensions link` | yes, 0.26.0 |
-| VS Code (Copilot) | [vscode.md](./vscode.md) | writes `~/.vscode/mcp.json` | config only: VS Code not run |
-| ZCode | [zcode.md](./zcode.md) | writes `~/.zcode/cli/config.json` (no hooks) | config only: ZCode not installed |
+| VS Code (Copilot) | [vscode.md](./vscode.md) | writes `~/.vscode/mcp.json`, hooks and skills | config only: VS Code not run |
+| ZCode | [zcode.md](./zcode.md) | writes `~/.zcode/cli/config.json` (MCP and hooks), skills | config only: ZCode not installed |
 
 "Checked in a clean HOME" means the command ran on macOS with a temporary HOME against the npm-packed build, the agent CLI was installed in a temporary prefix, and setup, a second setup, doctor and remove all passed. It does not mean a logged-in agent session fired the hooks: no run did that. No page is checked on Windows.
 
 The git `release` branch stays for two routes: the Claude Code marketplace (ADR-0011 step b) and the Gemini and Qwen git-route extension install. Setup does not need it. See [ADR-0019](../v2/adr/0019-interactive-setup-and-npm-channel.md).
 
+
+## Hooks, skills and saving
+
+Every agent gets hooks and the skills `/ctx-doctor`, `/ctx-stats`, `/ctx-upgrade` ([ADR-0020](../v2/adr/0020-hooks-and-skills-on-every-agent.md)). Each agent has one hook channel and one saving effect. R = the call runs, then a large result is replaced. D = a large call is denied and the reason names `ctx_execute`.
+
+"Live saving" is the bytes of one large tool result that reach the model: without context-mode -> with v2. No run used a logged-in model session: each run piped the host's documented payload into the installed hook or plugin. Full runs: [hooks-all RESULT](../v2/spikes/hooks-all/RESULT.md).
+
+| Agent | Hook channel | Skills | Effect | Live saving (bytes off -> v2) | Date | Host version |
+|---|---|---|---|---|---|---|
+| Claude Code | plugin `hooks/claude-code.json` | plugin `skills/` | R | pass: 200,079 -> 319 | 2026-10-26 | not recorded |
+| Codex | `~/.codex/hooks.json` + trust tables in `config.toml` | `~/.codex/skills` | D | pass: 200,090 -> 427 | 2026-10-26 | not recorded |
+| Gemini CLI | extension `hooks/hooks.json` | extension `skills/` | R | pass: 250,930 -> 208 | 2026-10-26 | not recorded |
+| Qwen Code | extension `hooks/qwen.json` | `~/.qwen/skills` | D | pass: 200,120 -> 286 | 2026-10-26 | 0.26.1 |
+| Copilot CLI | `~/.copilot/hooks/context-mode.json` | `~/.copilot/skills` | R | not run after the fix (D-HA-COPILOT-REPLACE-1) | - | 1.0.103 (probe) |
+| VS Code (Copilot) | `~/.copilot/hooks/context-mode-vscode.json` | `~/.copilot/skills` | D | fail: 200,049 -> 404, hook gets no `--workspace-folder` | 2026-10-26 | not run |
+| Kiro | `~/.kiro/hooks/context-mode.json` | `~/.kiro/skills` | D | not run | - | not installed |
+| ZCode | `~/.zcode/cli/config.json` `hooks` | `~/.zcode/skills` | D | fail: 200,067 -> 447, hook shape and MCP key | 2026-10-26 | not installed |
+| Pi | in process `pi/index.js` | package `skills/` | R | fail: 200,067 -> 200,067; fixed after the run (D-HA-PI-PROJECT-1), re-run open | 2026-10-26 | 1.4.0 |
+| OpenCode | in process `opencode/plugin.js` | `~/.config/opencode/skills` | D | pass: 200,072 -> 264, stats not recorded | 2026-10-26 | not installed |
 
 ## From source
 
