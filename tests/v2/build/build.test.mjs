@@ -108,3 +108,17 @@ test("[M6] build/hashes-last: SHA256SUMS lists every other file in the tree with
     assert.equal(l.slice(0, 66), hex + "  ", l);
   }
 });
+
+// Release-next (D-RN-TAG-1): a pushed tag v2.0.0-next.1 builds version 2.0.0-next.1; bad prerelease parts fail.
+test("[RN] build/version-prerelease: --version x.y.z-next.N lands in every manifest and package.json", (t) => {
+  const rel = build(t, ["--version", "2.0.0-next.1"]);
+  assert.equal(rel.status, 0, rel.stderr);
+  for (const m of [...MANIFESTS, "package.json"]) {
+    assert.equal(JSON.parse(readFileSync(path.join(rel.out, m), "utf8")).version, "2.0.0-next.1", m);
+  }
+  for (const bad of ["2.0.0-", "2.0.0-next..1", "2.0.0-next.01", "2.0.0+b"]) {
+    const r = build(t, ["--version", bad]);
+    assert.notEqual(r.status, 0, bad);
+    assert.ok(r.stderr.includes(`--version ${bad} is not an x.y.z release version`), r.stderr);
+  }
+});

@@ -58,3 +58,24 @@ test("check-npm-tarball: fails when a file differs from SHA256SUMS", (t) => {
   assert.equal(r.status, 1, r.stdout);
   assert.match(r.stdout + r.stderr, /server\.mjs/);
 });
+
+// Release-next (D-RN-TAG-1): a pushed v2.* tag is the version. The plan step passes the tag name to
+// plan.mjs through env (never ${{ }} in run text); a branch run keeps plan.mjs's own version.
+test("[RN] release.yml: plan step passes --tag \"$REF_NAME\" on a tag push, plain plan.mjs otherwise", () => {
+  const plan = yml.slice(yml.indexOf("\n  plan:"), yml.indexOf("\n  build:"));
+  const step = plan.slice(plan.indexOf("- id: plan"));
+  for (const s of ["REF_TYPE: ${{ github.ref_type }}", "REF_NAME: ${{ github.ref_name }}", 'if [ "$REF_TYPE" = "tag" ]; then',
+    'node scripts/release/plan.mjs --tag "$REF_NAME" >> "$GITHUB_OUTPUT"', 'node scripts/release/plan.mjs >> "$GITHUB_OUTPUT"']) {
+    assert.ok(step.includes(s), s);
+  }
+  const runText = step.slice(step.indexOf("run:"));
+  assert.ok(!runText.includes("${{"), "no ${{ }} in the plan run text");
+});
+
+test("[RN] release.yml: publish-npm stays --tag next and never names latest", () => {
+  const npmLines = job.split("\n").filter((l) => l.includes("npm publish"));
+  assert.deepEqual(npmLines.map((l) => l.trim()), ["run: npm publish --provenance --access public --tag next"]);
+  assert.ok(!yml.includes("npm dist-tag"), "CI never runs npm dist-tag");
+  const latest = yml.split("\n").filter((l) => l.includes("latest") && !l.includes("-latest") && !l.trim().startsWith("- name:"));
+  assert.deepEqual(latest, [], "no release.yml command names latest (runner labels and step names aside)");
+});
