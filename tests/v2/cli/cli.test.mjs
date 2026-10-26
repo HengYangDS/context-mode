@@ -45,7 +45,7 @@ rl.on("line", (l) => {
   setTimeout(() => process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id: m.id, result }) + "\\n"), delay);
 });
 `;
-const FAKE_HOOK = `let s = ""; process.stdin.on("data", (d) => { s += d; }); process.stdin.on("end", () => { JSON.parse(s); });\n`;
+const FAKE_HOOK = `let s = ""; process.stdin.on("data", (d) => { s += d; }); process.stdin.on("end", () => { const p = JSON.parse(s); if (!JSON.stringify(p).includes("context-mode-doctor-hook-runs")) return; const t = "deny: run ctx_execute; ctx_search( finds the rest"; process.stderr.write(t + "\\n"); process.stdout.write(JSON.stringify({ decision: "deny", reason: t })); });\n`;
 
 /** A fake installed package: the real bundled cli.mjs next to fake server.mjs and hook.mjs. */
 function makePkg(dir) {
