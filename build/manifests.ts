@@ -6,7 +6,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { ADAPTERS, hasReplace } from "../src/adapters/table.ts";
 import type { AgentId } from "../src/core/contracts/agents.ts";
-import { RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
+import { KIRO_TOOL_MATCHERS, RELEASE_SUMS_FILE, SERVER_KEY } from "../src/core/contracts/constants.ts";
 import type { AdapterRow } from "../src/core/contracts/types.ts";
 
 // Build-tool literals (same rule as build.mjs DEFAULT_OUT/BUNDLES; DEVIATIONS D-M3-A7-5).
@@ -19,7 +19,6 @@ const MS_PER_SECOND = 1000;
 const OWN_TOOL_GLOB = "ctx_.*";
 const MCP_ANY_GLOB = "mcp__.*";
 const TOOL_EVENTS: readonly string[] = ["PreToolUse", "PostToolUse"]; // canonical events that carry the matcher
-const KIRO_TOOL_MATCHER = "@mcp"; // impl/10 §1.5 kiro row
 const HOOKS_DIR = "hooks";
 // D-M3-F-5: Claude Code runs plugin hooks and the plugin MCP server with cwd = the user's project, so a bare
 // "hook.mjs"/"server.mjs" is not found (live: MODULE_NOT_FOUND, server "failed"). The host expands this
@@ -86,10 +85,10 @@ function flatShape(row: AdapterRow, timeoutKey: string): JsonObject {
 
 // {version:"v1",hooks:[{name,trigger,matcher,action:{type,command},timeout,enabled}]} — kiro.
 function kiroShape(row: AdapterRow): JsonObject {
-  const hooks: Json[] = events(row).map(([canonical, native]) => {
+  const hooks: Json[] = events(row).flatMap(([canonical, native]) => {
     const entry: JsonObject = { name: SERVER_KEY + "-" + native, trigger: native, action: command(row), timeout: seconds(row), enabled: true };
-    if (isToolEvent(canonical)) entry.matcher = KIRO_TOOL_MATCHER;
-    return entry;
+    if (!isToolEvent(canonical)) return [entry];
+    return KIRO_TOOL_MATCHERS.map(([matcher, tag]) => ({ ...entry, name: SERVER_KEY + "-" + native + "-" + tag, matcher }));
   });
   return { version: "v1", hooks };
 }

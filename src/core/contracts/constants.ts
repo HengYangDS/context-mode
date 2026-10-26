@@ -470,6 +470,9 @@ export const HOOK_HOST_FILE: Readonly<Record<AgentId, {
 export const TOOL_HOOK_EVENTS: readonly string[] = Object.freeze(["PreToolUse", "PostToolUse"]); // canonical events that carry the matcher
 export const HOOK_MATCHER_FIELD = "matcher";
 export const KIRO_TRIGGER_FIELD = "trigger";
+// impl/10 §1.5 kiro row + D-HF-KIRO-SHELL-1: one tool-event entry per [matcher, name tag]: own MCP tools (@mcp)
+// and the native shell tool (Kiro CLI V3 docs hooks-migration, 2026-10-10: matcher "shell" = execute_bash).
+export const KIRO_TOOL_MATCHERS: readonly (readonly [matcher: string, tag: string])[] = Object.freeze([["@mcp", "mcp"], ["shell", "shell"]] as const);
 export const KIRO_ACTION_FIELD = "action";
 export const HOOK_COMMAND_FIELD = "command";
 export const HOOK_GROUP_HOOKS_FIELD = "hooks"; // nested shape: {matcher, hooks:[{command, timeout}]}

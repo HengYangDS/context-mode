@@ -50,7 +50,9 @@ for (const id of Object.keys(SAVING)) {
     const out = mod.encode(ev, d);
     const blocks = out.exitCode === 2 || /deny|block/i.test(out.stdout);
     assert.ok(blocks, id + " encode blocks the call: " + JSON.stringify(out).slice(0, 200));
-    assert.ok(out.stdout.includes("ctx_execute"), id + " the host sees the redirect");
+    // kiro: exit 2 returns STDERR to the agent (D-HF-KIRO-SHELL-1); every other host reads stdout.
+    const seen = id === "kiro" ? out.stderr : out.stdout;
+    assert.ok(seen.includes("ctx_execute"), id + " the host sees the redirect");
   });
 }
 

@@ -19,6 +19,9 @@ const KIRO_EVENTS: Readonly<Record<string, CanonicalEventName>> = {
 };
 const PROMPT_ENV = "USER_PROMPT"; // impl/10 §8: the prompt is an env var, not a stdin field
 const MCP_PREFIX = "mcp_";
+// Kiro CLI V3 docs (hooks-migration, 2026-10-10): matcher "shell" selects execute_bash; hook input tool_name "execute_bash".
+export const SHELL_TOOL_NAME = "execute_bash";
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { [SHELL_TOOL_NAME]: "Bash" };
 const MCP_SEP = "_";
 
 type Source = NonNullable<CanonicalHookEvent["source"]>;
@@ -28,6 +31,7 @@ const KIRO_SOURCES: Readonly<Record<string, Source>> = { startup: "startup", res
 // (same rule as the VS Code family, DEVIATIONS D-M3-A4-3 / D-M3-A5-2); native names unchanged.
 function canonicalName(name: string): string {
   if (name.startsWith(TOOL_NAME_PREFIX)) return name.slice(TOOL_NAME_PREFIX.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
   if (!name.startsWith(MCP_PREFIX)) return name;
   const rest = name.slice(MCP_PREFIX.length);
   const sep = rest.indexOf(MCP_SEP);
@@ -64,8 +68,8 @@ export function decode(raw: unknown): CanonicalHookEvent {
 }
 
 // PromptSubmit: stdout "" exit 0 for every decision (A28, v1 PromptSubmit rule, GP3 promptsubmit.json).
-// hint -> plain text stdout, exit 0. deny -> plain text reason (rewrite first), exit 2; the reason rides in
-// HookOutput.stdout because HookOutput has no stderr field (DEVIATIONS D-M3-A5-1). replace -> no-op.
+// hint -> plain text stdout, exit 0. deny -> plain text reason (rewrite first) on stderr, exit 2: Kiro blocks the
+// tool and returns STDERR to the agent (Kiro CLI 2.x reference; D-HF-KIRO-SHELL-1, was D-M3-A5-1). replace -> no-op.
 export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): HookOutput {
   if (ev.event === "UserPromptSubmit") return { stdout: "", exitCode: 0 };
   switch (d.kind) {
@@ -74,7 +78,7 @@ export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): Ho
     case "hint":
       return { stdout: d.text, exitCode: 0 };
     case "deny":
-      return { stdout: d.rewritten === undefined ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
+      return { stdout: "", stderr: d.rewritten === undefined ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
     case "replace":
       return { stdout: "", exitCode: 0 };
   }

@@ -53,7 +53,9 @@ test("decode PreToolUse: own prefix to bare ctx_*, other mcp server to mcp:<serv
   const other = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp_linear_get_issue", tool_input: {} });
   assert.equal(other.tool.canonicalName, "mcp:linear:get_issue");
   const native = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "execute_bash", tool_input: { command: "ls" } });
-  assert.equal(native.tool.canonicalName, "execute_bash");
+  assert.equal(native.tool.canonicalName, "Bash"); // D-HF-KIRO-SHELL-1: execute_bash is the shell tool
+  const other2 = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "fs_write", tool_input: {} });
+  assert.equal(other2.tool.canonicalName, "fs_write", "other native names unchanged");
   const odd = decode({ ...base, hook_event_name: "PreToolUse", tool_name: "mcp_x", tool_input: [1] });
   assert.deepEqual(odd.tool, { name: "mcp_x", canonicalName: "mcp_x", input: {} });
 });
@@ -125,11 +127,12 @@ test("encode hint is plain text stdout exit 0, never JSON; empty text is \"\"", 
   }
 });
 
-test("encode deny exits 2 with the plain-text reason, rewritten command first, never JSON", () => {
-  assert.deepEqual(encode(ev("PreToolUse"), { kind: "deny", reason: "why" }), { stdout: "why", exitCode: 2 });
+// D-HF-KIRO-SHELL-1: exit 2 returns STDERR to the agent (Kiro CLI 2.x reference), so the reason goes on stderr.
+test("encode deny exits 2 with the plain-text reason on stderr, rewritten command first, never JSON", () => {
+  assert.deepEqual(encode(ev("PreToolUse"), { kind: "deny", reason: "why" }), { stdout: "", stderr: "why", exitCode: 2 });
   const out = encode(ev("PreToolUse"), { kind: "deny", reason: "why", rewritten: "node /x/run.mjs abc" });
-  assert.deepEqual(out, { stdout: "node /x/run.mjs abc\nwhy", exitCode: 2 });
-  assert.throws(() => JSON.parse(out.stdout));
+  assert.deepEqual(out, { stdout: "", stderr: "node /x/run.mjs abc\nwhy", exitCode: 2 });
+  assert.throws(() => JSON.parse(out.stderr));
 });
 
 test("encode replace is a no-op on Kiro (no replace channel, Q24 item 7)", () => {

@@ -8,7 +8,7 @@ import {
   AGENT_ARG, AGENT_HOME_DIR, CODEX_FEATURES_HOOKS_KEY, CONFIG_TOML_FILE, D3_DETAIL, D3_PARTS, D4_REASON_JOIN,
   D5B_DETAIL, D5B_FIX, DOCTOR_FIX_UPGRADE, DOCTOR_LABEL, DOCTOR_PASS_DETAIL, HOOK_COMMAND_FIELD, HOOK_COMMAND_SEP,
   HOOK_ENTRY_FILE, HOOK_GROUP_HOOKS_FIELD, HOOK_HOST_FILE, HOOK_MATCHER_FIELD, HOST_CONFIG_DIR_NAME, HOST_NODE_COMMAND,
-  HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
+  HOOKS_KEY, MCP_ANY_MATCH, POST_TOOL_USE, KIRO_ACTION_FIELD, KIRO_TOOL_MATCHERS, KIRO_TRIGGER_FIELD, MATCHER_ALT, MATCHER_ANY, MATCHER_CLOSE, MATCHER_OPEN,
   OPENCODE_BASE_CONFIG_FILE, OWN_MCP_ENTRY, OWN_TOOL_PREFIX, PI_AGENT_DIR, PI_AGENT_DIR_ENV, REGEX_ESCAPE,
   REGEX_SPECIAL_CHARS, SETTINGS_FILE, SHELL_QUOTE, TOOL_HOOK_EVENTS, V1_PATH_SEPS, VSCODE_CLAUDE_HOOKS_SETTING,
   VSCODE_DIR_NAME, VSCODE_SETTINGS_FILE,
@@ -140,6 +140,13 @@ function hookParts(row: AdapterRow, home: string, env: NodeJS.ProcessEnv, worktr
   for (const [canonical, native] of Object.entries(row.eventMap)) {
     if (native === undefined) continue;
     const own = ownHooks(block, spec.shape, spec.timeoutKey, native, row.id);
+    if (spec.shape === "kiro" && TOOL_HOOK_EVENTS.includes(canonical)) { // one entry per matcher (D-HF-KIRO-SHELL-1)
+      const got = own.map((h) => h.matcher).sort();
+      const want = KIRO_TOOL_MATCHERS.map(([m]) => m).sort();
+      if (JSON.stringify(got) !== JSON.stringify(want)) hooksBad = true;
+      for (const h of own) if (!validTimeout(h.timeout)) timeoutBad = true;
+      continue;
+    }
     if (own.length !== 1) { hooksBad = true; continue; }
     if (spec.matcher && TOOL_HOOK_EVENTS.includes(canonical) && own[0].matcher !== composeMatcher(row, canonical)) hooksBad = true;
     if (!validTimeout(own[0].timeout)) timeoutBad = true;

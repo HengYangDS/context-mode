@@ -153,9 +153,11 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   assert.deepEqual(vs.hooks.PreToolUse, [{ command: cmd("vscode"), timeout: 5, type: "command" }]);
   const kiro = readJson(dir, "hooks/kiro.json");
   assert.equal(kiro.version, "v1");
-  assert.deepEqual(kiro.hooks.find((h) => h.trigger === "PreToolUse"), {
-    action: { command: cmd("kiro"), type: "command" }, enabled: true, matcher: "@mcp", name: "context-mode-PreToolUse", timeout: 5, trigger: "PreToolUse",
-  });
+  // D-HF-KIRO-SHELL-1: one tool-event entry for own MCP tools (@mcp) and one for the native shell tool.
+  assert.deepEqual(kiro.hooks.filter((h) => h.trigger === "PreToolUse"), [
+    { action: { command: cmd("kiro"), type: "command" }, enabled: true, matcher: "@mcp", name: "context-mode-PreToolUse-mcp", timeout: 5, trigger: "PreToolUse" },
+    { action: { command: cmd("kiro"), type: "command" }, enabled: true, matcher: "shell", name: "context-mode-PreToolUse-shell", timeout: 5, trigger: "PreToolUse" },
+  ]);
   assert.equal("matcher" in kiro.hooks.find((h) => h.trigger === "UserPromptSubmit"), false);
   const z = readJson(dir, "hooks/zcode.json");
   assert.equal(z.hooks.enabled, true);

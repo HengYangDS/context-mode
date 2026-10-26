@@ -17,6 +17,7 @@ function isAgentId(s: string): s is AgentId {
 function finish(out: HookOutput): void {
   process.exitCode = out.exitCode;
   if (out.stdout !== "") writeOut(out.stdout);
+  if (out.stderr !== undefined && out.stderr !== "") process.stderr.write(out.stderr + "\n"); // kiro deny (D-HF-KIRO-SHELL-1)
 }
 
 export async function main(argv: string[], env: NodeJS.ProcessEnv): Promise<void> {

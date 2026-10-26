@@ -76,8 +76,10 @@ test("ADR-0020: setup writes the hook channel for every file agent with the abso
     const file = path.join(s.home, getAdapter(id).hookChannel.path);
     assert.ok(existsSync(file), id + " hook file " + file);
     const cmds = commands(JSON.parse(readFileSync(file, "utf8")));
-    const events = Object.keys(getAdapter(id).eventMap).filter((e) => e !== "Usage").length;
-    assert.equal(cmds.filter((c) => c === hookCmd(s.pkgDir, id)).length, events, id + " one command per event");
+    const names = Object.keys(getAdapter(id).eventMap).filter((e) => e !== "Usage");
+    // kiro: PreToolUse/PostToolUse each have an @mcp and a shell entry (D-HF-KIRO-SHELL-1).
+    const events = names.length + (id === "kiro" ? names.filter((e) => e === "PreToolUse" || e === "PostToolUse").length : 0);
+    assert.equal(cmds.filter((c) => c === hookCmd(s.pkgDir, id)).length, events, id + " one command per event (and per kiro matcher)");
   }
   const zc = JSON.parse(readFileSync(path.join(s.home, ".zcode", "cli", "config.json"), "utf8"));
   assert.equal(zc.hooks.enabled, true, "zcode hooks.enabled");

@@ -2,7 +2,7 @@
 // ADR-0020: the one host hook shape per spawn agent (impl/10 §1.5), with the hook command given by the caller.
 // build/manifests.ts writes these with the package-relative command; setup writes them with the absolute one.
 // pi and opencode are in process (no file). Matcher text comes from composeMatcher (no regex is compiled here).
-import { SERVER_KEY } from "../core/contracts/constants.ts";
+import { KIRO_TOOL_MATCHERS, SERVER_KEY } from "../core/contracts/constants.ts";
 import type { AdapterRow, AgentId } from "../core/contracts/types.ts";
 import { composeMatcher } from "../core/ops/doctor-config.ts";
 
@@ -11,7 +11,6 @@ export type JsonObject = { [key: string]: Json };
 
 const MS_PER_SECOND = 1000;
 const TOOL_EVENTS: readonly string[] = ["PreToolUse", "PostToolUse"]; // canonical events that carry the matcher
-const KIRO_TOOL_MATCHER = "@mcp"; // impl/10 §1.5 kiro row
 
 const seconds = (row: AdapterRow): number => row.hookTimeoutMs / MS_PER_SECOND;
 const entry = (cmd: string): JsonObject => ({ type: "command", command: cmd });
@@ -38,10 +37,10 @@ function flatShape(row: AdapterRow, cmd: string, timeoutKey: string): JsonObject
 
 // {version:"v1",hooks:[{name,trigger,matcher,action:{type,command},timeout,enabled}]} — kiro.
 function kiroShape(row: AdapterRow, cmd: string): JsonObject {
-  const hooks: Json[] = events(row).map(([canonical, native]) => {
+  const hooks: Json[] = events(row).flatMap(([canonical, native]) => {
     const e: JsonObject = { name: SERVER_KEY + "-" + native, trigger: native, action: entry(cmd), timeout: seconds(row), enabled: true };
-    if (isToolEvent(canonical)) e.matcher = KIRO_TOOL_MATCHER;
-    return e;
+    if (!isToolEvent(canonical)) return [e];
+    return KIRO_TOOL_MATCHERS.map(([matcher, tag]) => ({ ...e, name: SERVER_KEY + "-" + native + "-" + tag, matcher }));
   });
   return { version: "v1", hooks };
 }

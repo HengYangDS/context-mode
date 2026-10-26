@@ -39,7 +39,9 @@ export type Decision =
   | { kind: "deny"; reason: string; rewritten?: string }       // ADR-0008: reason carries the rewrite; never allow+updatedInput (Q3)
   | { kind: "replace"; output: string };                        // case C, PostToolUse updatedToolOutput (ADR-0016)
 
-export interface HookOutput { stdout: string; exitCode: 0 | 2; } // native shape produced by adapter.encode
+// native shape produced by adapter.encode; stderr is set only by the kiro encode (exit 2 returns STDERR to the agent,
+// Kiro CLI 2.x reference; D-HF-KIRO-SHELL-1).
+export interface HookOutput { stdout: string; stderr?: string; exitCode: 0 | 2; }
 
 export type EventKind = "prompt" | "edit" | "cmd" | "toolerr" | "index" | "cost" | "decision"; // ADR-0009 §1 + GP10 + DECISIONS-r6 D3
 export interface JournalRow {
