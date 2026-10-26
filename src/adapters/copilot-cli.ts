@@ -6,7 +6,9 @@
 // Decisions not fixed by the docs: DEVIATIONS D-M3-A3-1..4.
 import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, ToolCall, ToolResultInfo } from "../core/contracts/types.ts";
 
-export const TOOL_NAME_PREFIX = "mcp_context-mode_"; // impl/10 §1.3, A1 (S-NAMES open)
+// Copilot CLI 1.0.103 names MCP tools <server>-<tool> ("github-mcp-server-search_code",
+// "playwright-browser_take_screenshot" in the shipped bundle); server key "context-mode" (D-HQ-COPILOT-NAMES-2).
+export const TOOL_NAME_PREFIX = "context-mode-";
 
 type Source = NonNullable<CanonicalHookEvent["source"]>;
 type Casing = "camel" | "snake";
@@ -34,8 +36,6 @@ const KEYS: Readonly<Record<Casing, { event: string; session: string; tool: stri
   snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_result" },
 };
 
-const MCP_PREFIX = "mcp_";
-const MCP_SEP = "_";
 const RESULT_SUCCESS = "success";
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -45,16 +45,12 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 // copilot-cli 1.0.103 native shell tool id -> canonical name (D-HA-COPILOT-NAMES-1, SDK docs toolName "bash").
 const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { bash: "Bash" };
 
-// Own tool -> bare ctx_* name; mcp_<server>_<tool> -> "mcp:<server>:<tool>"; native names unchanged
-// (impl/10 §7 single-underscore rule, shared by the Copilot family).
+// Own tool -> bare ctx_* name; native names mapped; any other name unchanged. Another server's
+// <server>-<tool> name cannot be split (both parts may hold "-"), so it stays whole (D-HQ-COPILOT-NAMES-2).
 function canonicalName(name: string): string {
   if (name.startsWith(TOOL_NAME_PREFIX)) return name.slice(TOOL_NAME_PREFIX.length);
   if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
-  if (!name.startsWith(MCP_PREFIX)) return name;
-  const rest = name.slice(MCP_PREFIX.length);
-  const sep = rest.indexOf(MCP_SEP);
-  if (sep < 0) return name;
-  return "mcp:" + rest.slice(0, sep) + ":" + rest.slice(sep + MCP_SEP.length);
+  return name;
 }
 
 // toolArgs arrives as an object or as a JSON-encoded string (D-M3-A3-3); anything else is {}.
