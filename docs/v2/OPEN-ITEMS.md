@@ -88,6 +88,7 @@ Result: `docs/v2/spikes/hooks-all/RESULT.md`. Rules: ADR-0020. Merged into v2-de
 | H6 | opencode saving not recorded in `ctx_stats` (0 B; no execute rows in the journal) | closed | D-HF-INPROC-JOURNAL-1 (in-process ctx_* calls write the server row), D-HF-OPENCODE-SHELL-1 (bash is routed) |
 | H7 | No run used a logged-in model session; kiro not run | open | Live session per host when a login exists |
 | H8 | claude-code setup fails when a shim is first on PATH | closed | D-HF-CLAUDE-SHIM-1 (setup/doctor run the real claude past a shim; the row prints `bin: <file>`) |
+| H9 | gemini hooks-fast round 1: AfterTool replace had no FATAL line; the handle line hint (`queries:["cat big.log"], source:"s1"`) gave No hits | answerOk: closed (probe sent AfterTool with no BeforeAgent; Gemini CLI 0.65.0 fires BeforeAgent with the prompt first, pinned in `tests/v2/hooks/gemini-live-order.test.mjs`). Hint: open | The handle-line query is the intent; when the output holds none of its words a source-scoped ctx_search returns No hits. Shared code (`REPLACE_HANDLE_LINE`, `ctx_search` source path): needs a design call, not a gemini fix |
 
 ## Method limits
 
