@@ -244,3 +244,21 @@ test("ADR-0020: codex doctor fails hook-registered when a trusted_hash does not 
   assert.equal(reg.ok, false);
   assert.match(reg.detail, /not trusted/);
 });
+
+// Copilot CLI 1.0.103 and VS Code both read ~/.copilot/skills (bundle help text: "Personal: ~/.copilot/skills/"),
+// and their own tool names differ (context-mode-ctx_* vs mcp_context-mode_ctx_*). One shared SKILL.md names both,
+// so the second agent's setup never rewrites the first agent's skill (D-HQ-COPILOT-NAMES-2).
+test("D-HQ-COPILOT-NAMES-2: copilot-cli and vscode share ~/.copilot/skills; each SKILL.md names both hosts' tools; doctor passes skills for both", async (t) => {
+  const s = sandbox(t);
+  const { runDoctor } = await import("../../../src/setup/index.ts");
+  for (const agents of [["copilot-cli"], ["vscode"], ["copilot-cli", "vscode"]]) {
+    await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents, runId: "r-" + agents.join("-") });
+    for (const name of SKILLS) {
+      const text = readFileSync(path.join(s.home, ".copilot", "skills", name, "SKILL.md"), "utf8");
+      const tool = name.replace("ctx-", "ctx_");
+      for (const id of ["copilot-cli", "vscode"]) assert.ok(text.includes(getAdapter(id).toolNamePrefix + tool), agents + " " + name + " names " + id);
+    }
+  }
+  const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["copilot-cli", "vscode"] });
+  for (const a of d.agents) assert.equal(a.checks.find((c) => c.name === "skills")?.ok, true, a.id + " skills " + JSON.stringify(a.checks.find((c) => c.name === "skills")));
+});
