@@ -369,3 +369,20 @@ exit 0`);
   const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["gemini"], runId: "r" });
   assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
 });
+
+// D-HF-OPENCODE-LIST-1: with our plugin entry in opencode.json, OpenCode 1.19.4 first installs @opencode-ai/plugin
+// (30-60 s, network) before `mcp list` prints, so the 10 s list check timed out and setup rolled back on a fresh
+// HOME. `mcp list --pure` (run without external plugins) lists the MCP servers without that install.
+test("setup: the opencode list check does not load plugins (D-HF-OPENCODE-LIST-1)", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  const log = path.join(s.root, "opencode.log");
+  fakeBin(s.root, "opencode", `echo "$@" >> "${log}"
+case " $* " in
+  *" --pure "*) echo "context-mode connected" ;;
+  *) exit 1 ;;
+esac
+exit 0`);
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["opencode"], runId: "r" });
+  assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+  assert.ok(readFileSync(log, "utf8").includes("mcp list --pure"), readFileSync(log, "utf8"));
+});
