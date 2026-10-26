@@ -11146,6 +11146,12 @@ config(en_default());
 // src/core/contracts/constants.ts
 var SERVER_KEY = "context-mode";
 var TOOL_ORDER = Object.freeze(["ctx_execute", "ctx_batch", "ctx_index", "ctx_search", "ctx_resume", "ctx_stats", "ctx_doctor", "ctx_upgrade", "ctx_purge"]);
+function prefixToolNames(text, prefix) {
+  if (prefix === "") return text;
+  let out = text;
+  for (const name of TOOL_ORDER) out = out.split(name).join(prefix + name);
+  return out;
+}
 var OUTPUT_CAP = 16384;
 var STATE_BUDGET = 2048;
 var RESUME_CAP = 2048;
@@ -11156,15 +11162,21 @@ var INDEX_WRITE_CHUNK = 1048576;
 var SYNC_INDEX_MAX_BYTES = 65536;
 var REPLACE_TRIGGER_BYTES = 4096;
 var REPLACE_RETURN_BYTES = 96;
+var SHAPE_RETURN_BYTES = 256;
 var REPLACE_CHUNK_BYTES = 48;
+function REPLACE_HANDLE_LINE(intent, handle, bytes4, prefix = "") {
+  return prefix + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output (" + bytes4 + " B).";
+}
 var MAX_CHUNK_BYTES = 4096;
 var SEARCH_PAGE_SIZE = 20;
 var SNIPPET_MAX_BYTES = 800;
-var READ_MAX_LINES = 200;
+var SNIPPET_CODE_MAX_BYTES = 2048;
 var MAX_CANDIDATES = 85;
 var MAX_CANDIDATES_TOTAL = 340;
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var RATIO_SECTION_DECAY = 0.7;
+var MMR_RELEVANCE_WEIGHT = 0.7;
+var MMR_REDUNDANCY_WEIGHT = 0.3;
 var DECAY_X1000 = Object.freeze([
   1e3,
   881,
@@ -11297,6 +11309,7 @@ var DECAY_X1000 = Object.freeze([
 ]);
 var COMPACT_POINTER_LINE = 'context-mode: earlier work of this session is in ctx_resume (state block) and ctx_search(scope:"session", sort:"timeline").';
 var RRF_K = 60;
+var SOURCE_HANDLE_MAX_DIGITS = 10;
 var EXEC_TIMEOUT_MS = 6e5;
 var KILL_GRACE_MS = 1e3;
 var DB_TIMEOUT_MS = 5e3;
@@ -11314,7 +11327,7 @@ var TOOLS_TTL_MS = 36e5;
 var IN_PROCESS_TIMEOUT_MS = 0;
 var MS_PER_DAY = 864e5;
 var PROJECT_KEY_HEX_LEN = 16;
-var SCHEMA_VERSION = 2;
+var SCHEMA_VERSION = 5;
 var RETENTION_IDLE_DAYS = 30;
 var RETENTION_SIZE_CAP_BYTES = 524288e3;
 var PROJECT_DEAD_IDLE_DAYS = 14;
@@ -11335,6 +11348,8 @@ var SOURCE_LABEL_MAX_CHARS = 80;
 var CANCELLED_LINE = "Cancelled.";
 var BACKGROUND_REPLY_PREFIX = "started in background, pid ";
 var PLAIN_OUTPUT_ENV = Object.freeze({ NO_COLOR: "1", FORCE_COLOR: "0" });
+var RUN_SESSION_PREFIX = "mcp:";
+var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
 var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
 var INTERNAL_ERROR_LINE = "Internal error. Fix: run ctx_doctor.";
@@ -11361,9 +11376,6 @@ function readHintEvery(raw) {
 }
 var MCP_HINT_EVERY = readHintEvery(process.env.CTX_MCP_HINT_EVERY);
 var MAX_NEST_DEPTH = 32;
-function READ_DENY_MESSAGE(path4, size) {
-  return `context-mode: this file is ${size} bytes, more than the ${OUTPUT_CAP} byte limit for one read. Pick one: read part of it with Read(file_path, offset, limit), for example limit ${READ_MAX_LINES}; or run code on it with ctx_execute(language, code, file="${path4}"), which gives your code the path in CTX_FILE and returns only stdout, up to ${OUTPUT_CAP} bytes; or search it with a bounded command such as grep -n or tail.`;
-}
 var DENY_PREFIX = "context-mode: ";
 var DENY_WHAT = Object.freeze({
   curl: "This curl/wget call",
@@ -11420,6 +11432,8 @@ var RECALL_BUDGET_BYTES = 2048;
 var RECALL_MIN_SCORE = 5;
 var RECALL_MAX_ROWS = 340;
 var COMPACTED_META_PREFIX = "compacted:";
+var RECALL_UNITS_SEEN_META_PREFIX = "recall_units_seen:";
+var RECALL_UNIT_CANDIDATES = 64;
 var RECALL_SEEN_META_PREFIX = "recall_seen:";
 var RECALL_OPEN_TAG = "<context_mode_recall>";
 var RECALL_CLOSE_TAG = "</context_mode_recall>";
@@ -11460,13 +11474,13 @@ var DECISION_OPTION_KEY = "option";
 var DECISION_LABEL_JOIN = " | ";
 var RELEASE_REPO_URL = "https://github.com/mksglu/context-mode.git";
 var RELEASE_BRANCH = "release";
-var BUNDLE_SHA = true ? "5ca804119183ec9624d9c13ebb624d126ada9fd3" : void 0;
+var BUNDLE_SHA = true ? "6b7dcd462c6c919cda27e527518b40419d7a1e15" : void 0;
 var DOCTOR_CHECK_ORDER = Object.freeze(["D1", "D2", "D3", "D4", "D5", "D5b", "D6", "D7", "D8", "D9", "D10"]);
 var DOCTOR_LABEL = Object.freeze({
   D1: "version",
   D2: "node",
   D3: "host config",
-  D4: "v1 leftovers",
+  D4: "old entries",
   D5: "hook round trip",
   D5b: "double-fire",
   D6: "MCP",
@@ -11480,6 +11494,7 @@ var HOOK_FIXTURE_FILE = "hook-roundtrip.json";
 var HOOK_ENTRY_FILE = "hook.mjs";
 var REPORT_HEADER = "| Check | Status | Detail | Fix |";
 var REPORT_HEADER_RULE = "|---|---|---|---|";
+var REPORT_COMMAND_PREFIX = "Run in a terminal: ";
 var REPORT_TRUNCATED_LINE = `(report truncated at ${REPORT_CAP} B; run ctx_doctor again after the first fix)`;
 function DOCTOR_FAIL_LINE(host, check2, cause, command) {
   return `FAIL ${host}: ${check2} \u2014 ${cause}. Fix: ${command}`;
@@ -11626,6 +11641,7 @@ var HOOK_HOST_FILE = Object.freeze({
 var TOOL_HOOK_EVENTS = Object.freeze(["PreToolUse", "PostToolUse"]);
 var HOOK_MATCHER_FIELD = "matcher";
 var KIRO_TRIGGER_FIELD = "trigger";
+var KIRO_TOOL_MATCHERS = Object.freeze([["@mcp", "mcp"], ["shell", "shell"]]);
 var KIRO_ACTION_FIELD = "action";
 var HOOK_COMMAND_FIELD = "command";
 var HOOK_GROUP_HOOKS_FIELD = "hooks";
@@ -11634,6 +11650,8 @@ var SHELL_QUOTE = '"';
 var MATCHER_OPEN = "^(";
 var MATCHER_CLOSE = ")$";
 var MATCHER_ALT = "|";
+var MCP_ANY_MATCH = "mcp__.*";
+var POST_TOOL_USE = "PostToolUse";
 var MATCHER_ANY = ".*";
 var REGEX_SPECIAL_CHARS = ".*+?^${}()|[]\\";
 var REGEX_ESCAPE = "\\";
@@ -11729,25 +11747,25 @@ var PI_AGENT_DIR_ENV = "PI_CODING_AGENT_DIR";
 var PI_PACKAGE_SOURCE_KEY = "source";
 var V1_PATH_SEPS = Object.freeze(["/", "\\"]);
 var V1_REASON = Object.freeze({
-  hook: "v1 hook entry: command contains context-mode and a v1 script name or context-mode hook",
-  cacheHealHook: "v1 cache-heal SessionStart hook entry",
-  cacheHealFile: "v1 cache-heal script file",
-  statusLine: "v1 statusLine (context-mode statusline): report only, never removed",
-  mcpEntry: "v1 MCP entry mcpServers.context-mode",
-  codexHook: "v1 Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
-  codexToml: "v1 config.toml [mcp_servers.context-mode*] section",
-  hookFile: "v1 hook file context-mode.json (runs context-mode hook)",
-  vscodeMcp: "v1 MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
-  kiroHook: "v1 Kiro flat hook entry: command contains context-mode and a v1 script name or context-mode hook",
-  kiroAgentFile: "v1 Kiro agent file agents/*.json with name context-mode",
-  kiroSteering: "v1 Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
-  piNpm: "v1 Pi package npm:context-mode",
-  opencodePlugin: "v1 OpenCode plugin spec context-mode",
-  zcodeHook: "v1 ZCode hook entry: command contains context-mode hook",
-  dataDir: "v1 data dir <agent home>/context-mode/",
-  dataDirShared: "v1 data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
-  dataRoot: "v1 content under ~/.context-mode/",
-  tmpFile: "v1 temp file context-mode-* under the OS temp dir"
+  hook: "old context-mode hook entry: command contains context-mode and an old script name or context-mode hook",
+  cacheHealHook: "old context-mode cache-heal SessionStart hook entry",
+  cacheHealFile: "old context-mode cache-heal script file",
+  statusLine: "old context-mode statusLine (context-mode statusline): report only, never removed",
+  mcpEntry: "old context-mode MCP entry mcpServers.context-mode",
+  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
+  codexToml: "old context-mode config.toml [mcp_servers.context-mode*] section",
+  hookFile: "old context-mode hook file context-mode.json (runs context-mode hook)",
+  vscodeMcp: "old context-mode MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
+  kiroHook: "old Kiro hook entry: command contains context-mode and an old script name or context-mode hook",
+  kiroAgentFile: "old context-mode Kiro agent file agents/*.json with name context-mode",
+  kiroSteering: "old context-mode Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
+  piNpm: "old context-mode Pi package npm:context-mode",
+  opencodePlugin: "old context-mode OpenCode plugin spec context-mode",
+  zcodeHook: "old context-mode ZCode hook entry: command contains context-mode hook",
+  dataDir: "old context-mode data dir <agent home>/context-mode/",
+  dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
+  dataRoot: "old context-mode content under ~/.context-mode/",
+  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, no action needed"
 });
 var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering]);
 var PLUGIN_NAME = SERVER_KEY;
@@ -11759,11 +11777,17 @@ var HOST_CONFIG_TEXT_PATH = "(given text)";
 var JSON_INDENT_UNIT = "  ";
 var MCP_COMMAND_FIELD = "command";
 var MCP_ARGS_FIELD = "args";
+var ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"]);
 var OWN_MCP_ENTRY = Object.freeze({
   codex: { file: [".codex", "config.toml"], key: ["mcp_servers", SERVER_KEY] },
   vscode: { file: [".vscode", "mcp.json"], key: ["servers", SERVER_KEY] },
   kiro: { file: [".kiro", "settings", "mcp.json"], key: ["mcpServers", SERVER_KEY] },
-  zcode: { file: [".zcode", "cli", "config.json"], key: ["mcpServers", SERVER_KEY] }
+  zcode: {
+    file: [".zcode", "cli", "config.json"],
+    key: ["mcp", "servers", SERVER_KEY],
+    fields: { type: "stdio", enabled: true, timeoutMs: EXEC_TIMEOUT_MS },
+    also: [[ZCODE_MCP_FEATURE_KEY, true]]
+  }
 });
 var REPORT_INVALID = "<invalid>";
 var REPORT_ENV_PREFIX = "env.";
@@ -11780,6 +11804,7 @@ var PI_EVENTS = {
   tool_call: { event: "PreToolUse" },
   tool_result: { event: "PostToolUse" }
 };
+var NATIVE_TO_CANONICAL = { bash: "Bash", read: "Read" };
 function record2(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
 }
@@ -11800,7 +11825,7 @@ function decode(raw) {
   if (row5.event === "UserPromptSubmit" && typeof p.message === "string") ev.prompt = p.message;
   if (row5.event === "PreToolUse" || row5.event === "PostToolUse") {
     const name = String(p.toolName ?? "");
-    ev.tool = { name, canonicalName: name, input: record2(p.input) };
+    ev.tool = { name, canonicalName: Object.hasOwn(NATIVE_TO_CANONICAL, name) ? NATIVE_TO_CANONICAL[name] : name, input: record2(p.input) };
     if (typeof p.toolCallId === "string") ev.tool.callId = p.toolCallId;
   }
   if (row5.event === "PostToolUse") ev.result = readResult(p);
@@ -11919,6 +11944,7 @@ function canonicalName(name, ownPrefix) {
 function outputOf(resp) {
   if (resp === void 0) return "";
   if (typeof resp === "string") return resp;
+  if (Array.isArray(resp)) return blocksOf(resp).text;
   if (typeof resp === "object" && resp !== null) {
     const r = resp;
     if (typeof r.stdout === "string" || typeof r.stderr === "string") {
@@ -11927,12 +11953,39 @@ function outputOf(resp) {
       return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
+  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return resp.content;
   return JSON.stringify(resp);
+}
+function isGrepContent(resp) {
+  const r = resp;
+  return r.mode === "content" && typeof r.content === "string";
+}
+function blocksOf(resp) {
+  const parts = [];
+  let keep = false;
+  for (const b of resp) {
+    const blk = typeof b === "object" && b !== null ? b : {};
+    if (blk.type === "text" && typeof blk.text === "string") parts.push(blk.text);
+    else keep = true;
+  }
+  return { text: parts.join("\n"), keep };
 }
 function readResult2(resp) {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
-  return { isError, bytes: Buffer.byteLength(text), text };
+  const info = { isError, bytes: Buffer.byteLength(text), text };
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp;
+  if (Array.isArray(resp)) {
+    info.blocks = true;
+    if (blocksOf(resp).keep) info.keep = true;
+  }
+  if (typeof resp === "object" && resp !== null) {
+    const r = resp;
+    if (typeof r.persistedOutputPath === "string" && r.persistedOutputPath !== "" && typeof r.persistedOutputSize === "number" && r.persistedOutputSize > info.bytes) {
+      info.persistedPath = r.persistedOutputPath;
+    }
+  }
+  return info;
 }
 function decodeClaudeShape(raw, agent, ownPrefix, sources) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(agent + ": hook payload is not a JSON object");
@@ -11957,7 +12010,10 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources) {
   return ev;
 }
 function replaceShape(ev, output) {
-  return ev.tool?.canonicalName === "Bash" ? { stdout: output, stderr: "", interrupted: false } : output;
+  if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
+  if (ev.result?.shape !== void 0) return { ...ev.result.shape, content: output };
+  if (ev.result?.blocks === true) return [{ type: "text", text: output }];
+  return output;
 }
 function encodeClaudeShape(ev, d, hasReplace2) {
   const out = (fields) => ({
@@ -12035,8 +12091,15 @@ var EMPTY = { stdout: "", exitCode: 0 };
 function own(p, key) {
   return Object.hasOwn(p, key) ? p[key] : void 0;
 }
+var NATIVE_TO_CANONICAL2 = {
+  run_shell_command: "Bash",
+  read_file: "Read",
+  grep_search: "Grep",
+  web_fetch: "WebFetch"
+};
 function canonicalName2(name, mcp) {
   if (name.startsWith(TOOL_NAME_PREFIX4)) return name.slice(TOOL_NAME_PREFIX4.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL2, name)) return NATIVE_TO_CANONICAL2[name];
   if (typeof mcp !== "object" || mcp === null) return name;
   const m = mcp;
   const server = own(m, "server_name");
@@ -12045,8 +12108,10 @@ function canonicalName2(name, mcp) {
   return "mcp:" + server + ":" + tool;
 }
 function readResult3(resp) {
-  const text = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
-  const err = typeof resp === "object" && resp !== null ? own(resp, "error") : void 0;
+  const obj = typeof resp === "object" && resp !== null ? resp : void 0;
+  const llm = obj === void 0 ? void 0 : own(obj, "llmContent");
+  const text = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : JSON.stringify(resp);
+  const err = obj === void 0 ? void 0 : own(obj, "error");
   return { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
 }
 function decode4(raw) {
@@ -12083,14 +12148,15 @@ function encode4(ev, d, _extra) {
       if (!DENY_EVENTS.includes(ev.event)) return EMPTY;
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
-      return EMPTY;
+      if (ev.event !== "PostToolUse") return EMPTY;
+      return { stdout: JSON.stringify({ decision: "deny", reason: d.output }), exitCode: 0 };
   }
 }
 
 // src/adapters/qwen.ts
 var TOOL_NAME_PREFIX5 = "mcp__context-mode__";
 var QWEN_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
-var NATIVE_TO_CANONICAL = {
+var NATIVE_TO_CANONICAL3 = {
   run_shell_command: "Bash",
   Shell: "Bash",
   read_file: "Read",
@@ -12102,7 +12168,7 @@ function decode5(raw) {
   const failure3 = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
   const payload = failure3 ? { ...raw, hook_event_name: "PostToolUse" } : raw;
   const ev = decodeClaudeShape(payload, "qwen", TOOL_NAME_PREFIX5, QWEN_SOURCES);
-  if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL[ev.tool.name];
+  if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL3, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL3[ev.tool.name];
   if (failure3) {
     const error42 = raw.error;
     const text = typeof error42 === "string" ? error42 : error42 === void 0 ? "" : JSON.stringify(error42);
@@ -12115,7 +12181,7 @@ function encode5(ev, d, _extra) {
 }
 
 // src/adapters/copilot-cli.ts
-var TOOL_NAME_PREFIX6 = "mcp_context-mode_";
+var TOOL_NAME_PREFIX6 = "context-mode-";
 var NATIVE_EVENTS = {
   sessionStart: { event: "SessionStart", casing: "camel", failure: false },
   userPromptSubmitted: { event: "UserPromptSubmit", casing: "camel", failure: false },
@@ -12131,21 +12197,17 @@ var NATIVE_EVENTS = {
 var COPILOT_SOURCES = { startup: "startup", resume: "resume", new: "startup" };
 var KEYS = {
   camel: { event: "hookEventName", session: "sessionId", tool: "toolName", args: "toolArgs", result: "toolResult" },
-  snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_response" }
+  snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_result" }
 };
-var MCP_PREFIX2 = "mcp_";
-var MCP_SEP2 = "_";
 var RESULT_SUCCESS = "success";
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
+var NATIVE_TO_CANONICAL4 = { bash: "Bash" };
 function canonicalName3(name) {
   if (name.startsWith(TOOL_NAME_PREFIX6)) return name.slice(TOOL_NAME_PREFIX6.length);
-  if (!name.startsWith(MCP_PREFIX2)) return name;
-  const rest = name.slice(MCP_PREFIX2.length);
-  const sep3 = rest.indexOf(MCP_SEP2);
-  if (sep3 < 0) return name;
-  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP2.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL4, name)) return NATIVE_TO_CANONICAL4[name];
+  return name;
 }
 function readArgs(v) {
   if (isRecord(v)) return v;
@@ -12157,20 +12219,31 @@ function readArgs(v) {
     return {};
   }
 }
+var RESULT_KEYS = {
+  camel: { type: "resultType", text: "textResultForLlm" },
+  snake: { type: "result_type", text: "text_result_for_llm" }
+};
 function readResult4(v, casing, failure3) {
-  if (casing === "camel") {
-    const r = isRecord(v) ? v : {};
-    const text2 = typeof r.textResultForLlm === "string" ? r.textResultForLlm : "";
-    const isError2 = failure3 || typeof r.resultType === "string" && r.resultType !== RESULT_SUCCESS;
-    return { isError: isError2, bytes: Buffer.byteLength(text2), text: text2 };
-  }
-  const text = v === void 0 ? "" : typeof v === "string" ? v : JSON.stringify(v);
-  const isError = failure3 || isRecord(v) && v.is_error === true;
+  const k = RESULT_KEYS[casing];
+  const r = isRecord(v) ? v : {};
+  const text = typeof r[k.text] === "string" ? r[k.text] : "";
+  const isError = failure3 || typeof r[k.type] === "string" && r[k.type] !== RESULT_SUCCESS;
   return { isError, bytes: Buffer.byteLength(text), text };
+}
+var EVENT_BY_KEY = [
+  ["toolResult", "postToolUse"],
+  ["toolName", "preToolUse"],
+  ["prompt", "userPromptSubmitted"],
+  ["source", "sessionStart"]
+];
+function eventName(raw) {
+  if (typeof raw.hookEventName === "string") return raw.hookEventName;
+  if (raw.hook_event_name !== void 0) return raw.hook_event_name;
+  return EVENT_BY_KEY.find(([key]) => Object.hasOwn(raw, key))?.[1];
 }
 function decode6(raw) {
   if (!isRecord(raw)) throw new Error("copilot-cli: hook payload is not a JSON object");
-  const name = typeof raw.hookEventName === "string" ? raw.hookEventName : raw.hook_event_name;
+  const name = eventName(raw);
   const native = typeof name === "string" ? NATIVE_EVENTS[name] : void 0;
   if (native === void 0) throw new Error("copilot-cli: unknown hook event " + String(name));
   const k = KEYS[native.casing];
@@ -12200,23 +12273,27 @@ function encode6(ev, d, _extra) {
         exitCode: 0
       };
     case "replace":
-      return EMPTY2;
+      if (ev.event !== "PostToolUse") return EMPTY2;
+      return { stdout: JSON.stringify({ modifiedResult: { resultType: RESULT_SUCCESS, textResultForLlm: d.output } }), exitCode: 0 };
   }
 }
 
 // src/adapters/vscode.ts
 var TOOL_NAME_PREFIX7 = "mcp_context-mode_";
 var VSCODE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact"];
-var MCP_PREFIX3 = "mcp_";
-var MCP_SEP3 = "_";
+var MCP_PREFIX2 = "mcp_";
+var MCP_SEP2 = "_";
 var SESSION_START_NEW = "new";
+var SHELL_TOOL_NAME = "run_in_terminal";
+var NATIVE_TO_CANONICAL5 = { [SHELL_TOOL_NAME]: "Bash" };
 function canonicalName4(name) {
   if (name.startsWith(TOOL_NAME_PREFIX7)) return name.slice(TOOL_NAME_PREFIX7.length);
-  if (!name.startsWith(MCP_PREFIX3)) return name;
-  const rest = name.slice(MCP_PREFIX3.length);
-  const sep3 = rest.indexOf(MCP_SEP3);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL5, name)) return NATIVE_TO_CANONICAL5[name];
+  if (!name.startsWith(MCP_PREFIX2)) return name;
+  const rest = name.slice(MCP_PREFIX2.length);
+  const sep3 = rest.indexOf(MCP_SEP2);
   if (sep3 <= 0 || sep3 === rest.length - 1) return name;
-  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP3.length);
+  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP2.length);
 }
 function readResult5(resp) {
   const text = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
@@ -12255,16 +12332,19 @@ var KIRO_EVENTS = {
   PostToolUse: "PostToolUse"
 };
 var PROMPT_ENV = "USER_PROMPT";
-var MCP_PREFIX4 = "mcp_";
-var MCP_SEP4 = "_";
+var MCP_PREFIX3 = "mcp_";
+var SHELL_TOOL_NAME2 = "execute_bash";
+var NATIVE_TO_CANONICAL6 = { [SHELL_TOOL_NAME2]: "Bash" };
+var MCP_SEP3 = "_";
 var KIRO_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 function canonicalName5(name) {
   if (name.startsWith(TOOL_NAME_PREFIX8)) return name.slice(TOOL_NAME_PREFIX8.length);
-  if (!name.startsWith(MCP_PREFIX4)) return name;
-  const rest = name.slice(MCP_PREFIX4.length);
-  const sep3 = rest.indexOf(MCP_SEP4);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL6, name)) return NATIVE_TO_CANONICAL6[name];
+  if (!name.startsWith(MCP_PREFIX3)) return name;
+  const rest = name.slice(MCP_PREFIX3.length);
+  const sep3 = rest.indexOf(MCP_SEP3);
   if (sep3 <= 0 || sep3 === rest.length - 1) return name;
-  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP4.length);
+  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP3.length);
 }
 function readResult6(resp) {
   const text = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
@@ -12298,7 +12378,7 @@ function encode8(ev, d, _extra) {
     case "hint":
       return { stdout: d.text, exitCode: 0 };
     case "deny":
-      return { stdout: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
+      return { stdout: "", stderr: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
     case "replace":
       return { stdout: "", exitCode: 0 };
   }
@@ -12337,10 +12417,11 @@ var OPENCODE_EVENTS = {
   compaction: "PreCompact",
   "step-finish": "Usage"
 };
-var NATIVE_TO_CANONICAL2 = { webfetch: "WebFetch" };
+var SHELL_TOOL_NAME3 = "bash";
+var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [SHELL_TOOL_NAME3]: "Bash" };
 function toCanonicalTool(name) {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
-  return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL2, name) ? NATIVE_TO_CANONICAL2[name] : name;
+  return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL7, name) ? NATIVE_TO_CANONICAL7[name] : name;
 }
 function record3(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
@@ -12398,6 +12479,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/claude-code.json" },
+    skillChannel: { kind: "package", path: "claude-code/skills" },
+    // ADR-0020, D-HQ-SKILLS-2
     decode: decode2,
     encode: encode2
   },
@@ -12413,6 +12497,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".codex/hooks.json" },
+    skillChannel: { kind: "home-dir", path: ".codex/skills" },
+    // ADR-0020
     decode: decode3,
     encode: encode3
   },
@@ -12421,7 +12508,8 @@ var ADAPTERS = Object.freeze([
     installMode: "extension",
     projectSource: "spawn-cwd",
     toolNamePrefix: TOOL_NAME_PREFIX4,
-    nativeTools: { shell: [] },
+    // D-HA-GEMINI-NAMES-1: gemini-cli 0.65.0 *_TOOL_NAME constants.
+    nativeTools: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
     execReadOnlyHint: false,
     // D-FU-GCH-1: no SessionStart. Claude Code also loads hooks/hooks.json (Gemini's file) and would run a SessionStart
     // entry through /bin/sh, which fails on ${extensionPath}. Gemini's SessionStart only sent the resume hint (compact never
@@ -12431,6 +12519,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/hooks.json" },
+    skillChannel: { kind: "package", path: "skills" },
+    // ADR-0020
     decode: decode4,
     encode: encode4
   },
@@ -12446,6 +12537,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/qwen.json" },
+    skillChannel: { kind: "home-dir", path: ".qwen/skills" },
+    // ADR-0020
     decode: decode5,
     encode: encode5
   },
@@ -12454,13 +12548,16 @@ var ADAPTERS = Object.freeze([
     installMode: "plugin",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX6,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: ["bash"] },
     execReadOnlyHint: false,
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode.json" },
+    skillChannel: { kind: "home-dir", path: ".copilot/skills" },
+    // ADR-0020
     decode: decode6,
     encode: encode6
   },
@@ -12470,13 +12567,16 @@ var ADAPTERS = Object.freeze([
     projectSource: "arg:workspaceFolder",
     toolNamePrefix: TOOL_NAME_PREFIX7,
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
-    nativeTools: { shell: [] },
+    nativeTools: { shell: [SHELL_TOOL_NAME] },
     execReadOnlyHint: false,
     eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode-vscode.json" },
+    skillChannel: { kind: "home-dir", path: ".copilot/skills" },
+    // ADR-0020
     decode: decode7,
     encode: encode7
   },
@@ -12485,13 +12585,17 @@ var ADAPTERS = Object.freeze([
     installMode: "mcp-entry",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX8,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: [SHELL_TOOL_NAME2] },
     execReadOnlyHint: false,
+    // D-HF-KIRO-SHELL-1
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "hint-only",
+    hookChannel: { kind: "home-file", path: ".kiro/hooks/context-mode.json" },
+    skillChannel: { kind: "home-dir", path: ".kiro/skills" },
+    // ADR-0020
     decode: decode8,
     encode: encode8
   },
@@ -12508,6 +12612,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".zcode/cli/config.json" },
+    skillChannel: { kind: "home-dir", path: ".zcode/skills" },
+    // ADR-0020
     decode: decode9,
     encode: encode9
   },
@@ -12516,13 +12623,16 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "pi:ctx.cwd",
     toolNamePrefix: TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: ["bash"], read: ["read"] },
     execReadOnlyHint: false,
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag",
     compactSummary: "none",
     hookTimeoutMs: IN_PROCESS_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "pi/index.js" },
+    skillChannel: { kind: "package", path: "pi/skills" },
+    // ADR-0020
     decode,
     encode,
     checkPermission
@@ -12532,21 +12642,25 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "spawn-cwd",
     toolNamePrefix: TOOL_NAME_PREFIX10,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: [SHELL_TOOL_NAME3] },
     execReadOnlyHint: false,
+    // D-HF-OPENCODE-SHELL-1
     // Usage: step-finish cost row (DEVIATIONS D-M5-arch-2).
     eventMap: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     compactDelivery: "opencode-cache",
     compactSummary: "none",
     hookTimeoutMs: IN_PROCESS_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "opencode/plugin.js" },
+    skillChannel: { kind: "home-dir", path: ".config/opencode/skills" },
+    // ADR-0020
     decode: decode10,
     encode: encode10,
     toCanonicalTool
   }
 ]);
 var BY_ID = new Map(ADAPTERS.map((r) => [r.id, r]));
-var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "pi"]);
+var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "gemini", "copilot-cli", "pi"]);
 function hasReplace(row5) {
   return REPLACE_ROWS.has(row5.id);
 }
@@ -12559,7 +12673,6 @@ function getAdapter(id) {
 }
 
 // src/core/policy/decide.ts
-import { statSync } from "node:fs";
 import { resolve } from "node:path";
 
 // src/core/policy/lexer.ts
@@ -13501,12 +13614,11 @@ function parseShell(cmd) {
 }
 
 // src/core/policy/subagent.ts
-import { readFileSync } from "node:fs";
 import { join as join2 } from "node:path";
 
 // src/core/project/config-dir.ts
-import { mkdirSync, realpathSync } from "node:fs";
 import { join } from "node:path";
+var { mkdirSync, realpathSync } = process.getBuiltinModule("node:fs");
 function homeDirOf(env) {
   const home = env.HOME;
   if (home !== void 0 && home !== "") return home;
@@ -13526,6 +13638,7 @@ function resolveConfigDir(env) {
 }
 
 // src/core/policy/subagent.ts
+var { readFileSync } = process.getBuiltinModule("node:fs");
 function isSubagentCall(ev) {
   return ev.agentId !== void 0 && ev.agentId !== "";
 }
@@ -13816,8 +13929,8 @@ function unwrap(commands) {
 }
 
 // src/core/policy/user-deny.ts
-import { readFileSync as readFileSync2 } from "node:fs";
 import { isAbsolute, join as join3, relative, sep } from "node:path";
+var { readFileSync: readFileSync2 } = process.getBuiltinModule("node:fs");
 var CLAUDE_DIR = ".claude";
 var CLAUDE_CONFIG_DIR_ENV = "CLAUDE_CONFIG_DIR";
 var LOCAL_SETTINGS = "settings.local.json";
@@ -13974,7 +14087,30 @@ function matchesAnyDenyPattern(text, patterns, subject = BASH_SUBJECT) {
   return null;
 }
 
+// src/prompt/_generated.ts
+var INSTRUCTIONS = "context-mode keeps large output out of the conversation.\n\nWhen a step counts, sums, filters or finds something in over about 20 lines of data (logs, test or build output, big JSON or CSV, long files, web pages), use ctx_execute and print only the answer, not a raw Bash or Read result.\n\nA large tool result is indexed and cut to its best-matching parts; ctx_search finds the rest. A large file's Read is denied: use offset and limit, or ctx_execute with file set. Use normal tools for small output and edits.\n";
+var TOOL_DESCRIPTIONS = Object.freeze({
+  ctx_execute: "Runs code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.\n",
+  ctx_batch: "Runs several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.",
+  ctx_index: "Stores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.",
+  ctx_search: "Searches content stored with ctx_index and earlier sandbox output in this project. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.",
+  ctx_resume: "Returns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
+  ctx_stats: "Reports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.",
+  ctx_doctor: "Checks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause and the fix in one line. It changes nothing. Use it when the user asks whether context-mode works, or after a context-mode error.",
+  ctx_upgrade: "Updates context-mode to the latest release for this agent and rewrites only context-mode's own entries in the host config. User entries and user settings such as hook timeouts are kept, and old entries are erased. Returns a table of what changed and whether a restart is needed. Use it only when the user asks to update context-mode.",
+  ctx_purge: "Deletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data."
+});
+var READ_DENY_TEMPLATE = 'context-mode: {size}-byte file, over the one-read limit. Run ctx_execute(language, code, file="{path}") and print only the answer.';
+
+// src/core/policy/read-deny.ts
+var SIZE = "{size}";
+var PATH = "{path}";
+function READ_DENY_MESSAGE(path4, size, prefix = "") {
+  return prefixToolNames(READ_DENY_TEMPLATE, prefix).split(SIZE).join(String(size)).split(PATH).join(path4);
+}
+
 // src/core/policy/decide.ts
+var { statSync } = process.getBuiltinModule("node:fs");
 var BASH = "Bash";
 var READ = "Read";
 var WEBFETCH = "WebFetch";
@@ -14002,7 +14138,7 @@ function decide(ev, row5, userDeny) {
   const input = tool.input;
   let rules;
   if (userDeny === null) {
-    if (process.env[REQUIRE_SECURITY_ENV] === FLAG_ON) return deny(POLICY_UNREADABLE_LINE);
+    if (process.env[REQUIRE_SECURITY_ENV] === FLAG_ON) return deny(prefixToolNames(POLICY_UNREADABLE_LINE, row5.toolNamePrefix));
     process.stderr.write(POLICY_UNREADABLE_WARNING + "\n");
     rules = [];
   } else rules = userDeny;
@@ -14010,7 +14146,7 @@ function decide(ev, row5, userDeny) {
   if (hit !== null) return deny(USER_DENY_REASON_PREFIX + hit);
   if (canonical === WEBFETCH) return webFetch(input, row5);
   if (canonical === BASH) return bash(ev, row5, input, rules);
-  if (canonical === READ) return read(ev, input);
+  if (canonical === READ) return read(ev, row5, input);
   return ALLOW;
 }
 function denyMessage(kind, match, row5, intent) {
@@ -14080,7 +14216,7 @@ function webFetch(input, row5) {
 function bash(ev, row5, input, rules) {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(PARSE_ERROR_DENY_LINE) : ALLOW;
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row5.toolNamePrefix)) : ALLOW;
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -14134,19 +14270,19 @@ function fileSize(abs) {
     return -1;
   }
 }
-function read(ev, input) {
+function read(ev, row5, input) {
   if (!present(input.offset) && !present(input.limit)) {
     const p = readPath(input);
     if (p !== void 0) {
       const abs = resolve(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size));
+      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row5.toolNamePrefix));
     }
   }
   return ALLOW;
 }
 function shellDump(cmds, cwd, row5) {
-  if (row5.nativeTools.read !== void 0 && row5.nativeTools.read.length > 0) return null;
+  if (row5.nativeTools.read !== void 0 && row5.nativeTools.read.length > 0 && hasReplace(row5)) return null;
   if (cmds.length !== 1) return null;
   const c = cmds[0];
   if (c.redirectsToFile || c.endsInBoundedSink) return null;
@@ -14157,7 +14293,7 @@ function shellDump(cmds, cwd, row5) {
   if (d.bounded) return ALLOW;
   const abs = resolve(cwd, d.file);
   const size = fileSize(abs);
-  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size)) : null;
+  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size, row5.toolNamePrefix)) : null;
 }
 var allDigits2 = (s) => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");
 function countFlag(a) {
@@ -14216,12 +14352,11 @@ function dumpTarget(name, args) {
 }
 
 // src/core/project/resolve.ts
-import { existsSync, readFileSync as readFileSync3, realpathSync as realpathSync3, statSync as statSync2 } from "node:fs";
 import { basename, dirname as dirname2, join as join4, resolve as resolve2 } from "node:path";
 
 // src/core/project/contain.ts
-import { realpathSync as realpathSync2 } from "node:fs";
 import { dirname, sep as sep2 } from "node:path";
+var { realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
 function real(p) {
   try {
     return realpathSync2.native(p);
@@ -14374,6 +14509,7 @@ function sha256Hex(text) {
 }
 
 // src/core/project/resolve.ts
+var { existsSync, readFileSync: readFileSync3, realpathSync: realpathSync3, statSync: statSync2 } = process.getBuiltinModule("node:fs");
 function sourceOf(agent) {
   switch (agent) {
     case "claude-code":
@@ -14491,16 +14627,14 @@ function resolveProject(agent, src) {
   };
 }
 
-// src/core/store/db.ts
-import { existsSync as existsSync2, linkSync, mkdirSync as mkdirSync2, rmSync } from "node:fs";
-
 // src/core/store/schema.ts
 var SCHEMA_VERSION2 = SCHEMA_VERSION;
 var PRAGMAS = `
 PRAGMA busy_timeout = ${DB_TIMEOUT_MS};
 PRAGMA journal_mode = WAL;
 `;
-var FTS_TOKENIZE = "tokenize = 'unicode61 remove_diacritics 2'";
+var FTS_TOKENIZE = "tokenize = 'porter unicode61 remove_diacritics 2'";
+var FTS_TOKENIZE_V1 = "tokenize = 'unicode61 remove_diacritics 2'";
 var DDL = `
 CREATE TABLE IF NOT EXISTS events (
   seq            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -14546,7 +14680,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
   agent UNINDEXED,
   ord UNINDEXED,
   body,
-  ${FTS_TOKENIZE}
+  ${FTS_TOKENIZE_V1}
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -14557,9 +14691,47 @@ CREATE TABLE IF NOT EXISTS meta (
 var DDL_V2 = `
 CREATE UNIQUE INDEX IF NOT EXISTS idx_events_cost_session_turn ON events(session_id, turn) WHERE kind = 'cost';
 `;
+var DDL_V3 = `
+CREATE VIRTUAL TABLE chunks_v3 USING fts5(
+  source_id UNINDEXED,
+  session_id UNINDEXED,
+  worktree UNINDEXED,
+  agent UNINDEXED,
+  ord UNINDEXED,
+  body,
+  title,
+  ${FTS_TOKENIZE}
+);
+INSERT INTO chunks_v3(rowid, source_id, session_id, worktree, agent, ord, body, title)
+  SELECT rowid, source_id, session_id, worktree, agent, ord, body, '' FROM chunks;
+DROP TABLE chunks;
+ALTER TABLE chunks_v3 RENAME TO chunks;
+`;
+var DDL_V4 = `
+CREATE VIRTUAL TABLE chunks_tri USING fts5(
+  body,
+  title,
+  tokenize = 'trigram',
+  content = ''
+);
+INSERT INTO chunks_tri(rowid, body, title) SELECT rowid, body, title FROM chunks;
+CREATE VIRTUAL TABLE chunks_vocab USING fts5vocab(chunks, 'row');
+`;
+var DDL_V5 = `
+CREATE VIRTUAL TABLE line_units USING fts5(
+  body,
+  source_id UNINDEXED,
+  session_id UNINDEXED,
+  ord UNINDEXED,
+  ${FTS_TOKENIZE}
+);
+`;
 var MIGRATIONS = [
   { version: 1, sql: DDL },
-  { version: 2, sql: DDL_V2 }
+  { version: 2, sql: DDL_V2 },
+  { version: 3, sql: DDL_V3 },
+  { version: 4, sql: DDL_V4 },
+  { version: 5, sql: DDL_V5 }
 ];
 function applyMigrations(db, fromVersion) {
   if (fromVersion === SCHEMA_VERSION2) return;
@@ -14581,6 +14753,7 @@ function applyMigrations(db, fromVersion) {
 }
 
 // src/core/store/db.ts
+var { existsSync: existsSync2, linkSync, mkdirSync: mkdirSync2, rmSync } = process.getBuiltinModule("node:fs");
 function versionParts(v) {
   const bare2 = v.startsWith("v") ? v.slice(1) : v;
   return bare2.split(".").map((p) => Number.parseInt(p, 10));
@@ -14776,6 +14949,26 @@ function canonicalKey(tool, code) {
   }
   return tool + ":" + out;
 }
+function ownCallRow(project, ctx, name, reply4) {
+  const facts = reply4.journal;
+  return {
+    session_id: ctx.sessionId,
+    worktree: project.worktree,
+    agent: project.agent,
+    kind: reply4.isError ? "toolerr" : facts?.kind ?? "cmd",
+    // an error is toolerr, as the hook writes it
+    tool: name,
+    key: facts?.key ?? null,
+    path: facts?.path ?? null,
+    ok: reply4.isError ? 0 : 1,
+    exit_code: facts?.exit_code ?? null,
+    bytes: reply4.sandboxBytes,
+    body: reply4.text,
+    turn: ctx.turn,
+    sandbox_bytes: reply4.sandboxBytes,
+    returned_bytes: Buffer.byteLength(reply4.text, "utf8")
+  };
+}
 
 // src/core/journal/read.ts
 function readSessionEvents(db, sessionId, kind) {
@@ -14794,191 +14987,1934 @@ function readLastPrompt(db, sessionId) {
   const row5 = db.raw.prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq DESC LIMIT 1").get(sessionId);
   return row5 === void 0 ? "" : row5.body;
 }
+function readFirstPrompt(db, sessionId) {
+  if (sessionId === "") return "";
+  const row5 = db.raw.prepare("SELECT body FROM events WHERE session_id = ? AND kind = 'prompt' ORDER BY seq ASC LIMIT 1").get(sessionId);
+  return row5 === void 0 ? "" : row5.body;
+}
 function readRecallRows(db, sessionId, worktree, limit) {
   if (sessionId === "") return [];
   return db.raw.prepare("SELECT * FROM events WHERE kind <> 'cost' AND (session_id = ? OR worktree = ?) ORDER BY seq DESC LIMIT ?").all(sessionId, worktree, limit);
 }
+function hasAgentRows(db, worktree, agent) {
+  return db.raw.prepare("SELECT 1 FROM events WHERE worktree = ? AND agent = ? LIMIT 1").get(worktree, agent) !== void 0;
+}
+function hasSessionRows(db, sessionId) {
+  return db.raw.prepare("SELECT 1 FROM events WHERE session_id = ? LIMIT 1").get(sessionId) !== void 0;
+}
 
-// src/core/compaction/candidates.ts
-function firstLine2(body) {
-  const nl = body.indexOf("\n");
-  return (nl < 0 ? body : body.slice(0, nl)).replaceAll("\r", " ");
+// src/core/store/snippet.ts
+var K1 = 1.2;
+var B = 0.75;
+var MAX_POSITIONS = 4096;
+function isAlnum(c) {
+  return c >= 48 && c <= 57 || c >= 97 && c <= 122 || c >= 65 && c <= 90 || c > 127;
 }
-function make(section, row5, text, repeatCount, query) {
-  const bytes3 = Buffer.byteLength(text, "utf8");
-  if (bytes3 < 1) throw new Error("compaction: empty candidate line (DECISIONS-r9 M9).");
-  return { section, seq: row5.seq, turn: row5.turn, text, bytes: bytes3, repeatCount, pinned: section === "last_request", query };
+function isUpper(c) {
+  return c >= 65 && c <= 90;
 }
-function capSection(list3) {
-  return list3.length > MAX_CANDIDATES ? list3.slice(list3.length - MAX_CANDIDATES) : list3;
+function isLowerOrDigit(c) {
+  return c >= 97 && c <= 122 || c >= 48 && c <= 57;
 }
-function emptySet() {
-  return { lastRequest: null, openErrors: [], changedFiles: [], decisions: [], earlierRequests: [], indexedSources: [] };
-}
-function buildCandidates(rows, sessionId) {
-  if (!sessionId) return emptySet();
-  const own4 = rows.filter((r) => r.session_id === sessionId).sort((a, b) => a.seq - b.seq);
-  const prompts = own4.filter((r) => r.kind === "prompt");
-  const last = prompts.length > 0 ? prompts[prompts.length - 1] : void 0;
-  const lastRequest = last === void 0 ? null : make("last_request", last, "now: " + firstLine2(last.body), 1, null);
-  const earlierRequests = prompts.slice(0, prompts.length - 1).map((r) => make("earlier_requests", r, "asked #" + r.seq + ": " + firstLine2(r.body), 1, null));
-  const failures = /* @__PURE__ */ new Map();
-  const lastOk = /* @__PURE__ */ new Map();
-  for (const r of own4) {
-    if (r.kind !== "cmd" && r.kind !== "toolerr" || r.key === null) continue;
-    if (r.ok === 1) {
-      lastOk.set(r.key, r.seq);
+function identParts(w) {
+  const parts = [];
+  let cur = "";
+  for (let i = 0; i < w.length; i++) {
+    const c = w.charCodeAt(i);
+    if (!isAlnum(c)) {
+      if (cur !== "") parts.push(cur);
+      cur = "";
       continue;
     }
-    failures.set(r.key, { row: r, count: (failures.get(r.key)?.count ?? 0) + 1 });
+    if (cur !== "" && isUpper(c) && isLowerOrDigit(w.charCodeAt(i - 1))) {
+      parts.push(cur);
+      cur = "";
+    }
+    cur += w[i];
   }
-  const openErrors = [];
-  for (const [key, f] of failures) {
-    if ((lastOk.get(key) ?? 0) > f.row.seq) continue;
-    openErrors.push(make("open_errors", f.row, "error #" + f.row.seq + " " + (f.row.tool ?? "") + ": " + key, f.count, key));
-  }
-  openErrors.sort((a, b) => a.seq - b.seq);
-  const edits = /* @__PURE__ */ new Map();
-  for (const r of own4) {
-    if (r.kind !== "edit" || r.path === null) continue;
-    edits.set(r.path, { row: r, count: (edits.get(r.path)?.count ?? 0) + 1 });
-  }
-  const changedFiles = [];
-  for (const [path4, e] of edits) {
-    const c = make("changed_files", e.row, "edited " + path4 + " x" + e.count, e.count, path4);
-    changedFiles.push({ ...c, editCount: e.count });
-  }
-  changedFiles.sort((a, b) => a.seq - b.seq);
-  const decided = /* @__PURE__ */ new Map();
-  for (const r of own4) {
-    if (r.kind !== "decision" || r.body === "") continue;
-    const key = r.key ?? r.body;
-    decided.set(key, { row: r, count: (decided.get(key)?.count ?? 0) + 1 });
-  }
-  const decisions = [];
-  for (const [key, d] of decided) decisions.push(make("decisions", d.row, "decided #" + d.row.seq + ": " + firstLine2(d.row.body), d.count, key));
-  decisions.sort((a, b) => a.seq - b.seq);
-  const indexedSources = own4.filter((r) => r.kind === "index").map((r) => make("indexed_sources", r, "indexed " + (r.key ?? ""), 1, r.key));
-  const set2 = {
-    lastRequest,
-    openErrors: capSection(openErrors),
-    changedFiles: capSection(changedFiles),
-    decisions: capSection(decisions),
-    earlierRequests: capSection(earlierRequests),
-    indexedSources: capSection(indexedSources)
+  if (cur !== "") parts.push(cur);
+  return parts;
+}
+function snippetTerms(words) {
+  const out = /* @__PURE__ */ new Map();
+  const add = (text, weight, symbol2) => {
+    if (text === "") return;
+    const prev = out.get(text);
+    if (!prev || prev.weight < weight) out.set(text, { text, weight, symbol: symbol2 });
   };
-  const rest = [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources];
-  const total = rest.length + (lastRequest === null ? 0 : 1);
-  if (total <= MAX_CANDIDATES_TOTAL) return set2;
-  const drop = new Set(rest.map((c) => c.seq).sort((a, b) => a - b).slice(0, total - MAX_CANDIDATES_TOTAL));
-  return {
-    lastRequest,
-    openErrors: set2.openErrors.filter((c) => !drop.has(c.seq)),
-    changedFiles: set2.changedFiles.filter((c) => !drop.has(c.seq)),
-    decisions: set2.decisions.filter((c) => !drop.has(c.seq)),
-    earlierRequests: set2.earlierRequests.filter((c) => !drop.has(c.seq)),
-    indexedSources: set2.indexedSources.filter((c) => !drop.has(c.seq))
-  };
-}
-
-// src/core/compaction/score.ts
-function scoreCandidate(input) {
-  if (!Object.hasOwn(WEIGHT, input.section)) {
-    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, decision, prompt, edit and index rows are scored (ADR-0009 \xA73, DECISIONS-r11).`);
+  for (const raw of words) {
+    let a = 0;
+    let b = raw.length;
+    while (a < b && !isAlnum(raw.charCodeAt(a))) a++;
+    while (b > a && !isAlnum(raw.charCodeAt(b - 1))) b--;
+    const w = raw.slice(a, b);
+    if (w === "") continue;
+    const parts = identParts(w);
+    if (parts.length > 1) {
+      add(w.toLowerCase(), 2, true);
+      for (const p of parts) if (p.length >= 2) add(p.toLowerCase(), 1, false);
+    } else {
+      add(w.toLowerCase(), 1, false);
+    }
   }
-  const age = Math.max(0, input.currentTurn - input.itemTurn);
-  const decay = DECAY_X1000[Math.min(age, DECAY_X1000.length - 1)];
-  let bonus = 1;
-  for (let n = Math.max(1, input.repeatCount); n > 1; n >>= 1) bonus += 1;
-  return Math.round(WEIGHT[input.section] * decay * bonus / DECAY_SCALE);
+  return [...out.values()];
 }
-function weightKey(section) {
-  switch (section) {
-    case "last_request":
-    case "earlier_requests":
-      return "prompt";
-    case "open_errors":
-      return "toolerr";
-    case "changed_files":
-      return "edit";
-    case "decisions":
-      return "decision";
-    case "indexed_sources":
-      return "index";
-  }
-}
-function scoreCandidates(candidates2, currentTurn) {
-  return candidates2.map((c) => ({
-    ...c,
-    score: scoreCandidate({ section: weightKey(c.section), currentTurn, itemTurn: c.turn, repeatCount: c.repeatCount })
-  }));
-}
-
-// src/core/compaction/render.ts
-function bytesOf(s) {
+function byteLen(s) {
   return Buffer.byteLength(s, "utf8");
 }
-function lineOf(c) {
-  return c.bytes > POINTER_MIN ? "#" + c.seq + " (" + c.bytes + " B) ctx_resume(seq:" + c.seq + ")" : c.text;
-}
-function moreLine(queries) {
-  return "more: ctx_search(queries:" + JSON.stringify(queries) + ', scope:"session")';
-}
-function renderState(rows, turn) {
-  let newest;
-  for (const r of rows) if (newest === void 0 || r.seq > newest.seq) newest = r;
-  const sessionId = newest === void 0 ? "" : newest.session_id;
-  const upto = newest === void 0 || sessionId === "" ? 0 : newest.seq;
-  const set2 = buildCandidates(rows, sessionId);
-  const openTag = `<context_mode_state session="${sessionId}" upto="${upto}">`;
-  const emptyMoreBytes = bytesOf(moreLine([]));
-  const budget = STATE_BUDGET - (bytesOf(openTag) + 1 + emptyMoreBytes + 1 + bytesOf(STATE_CLOSE_TAG));
-  let used = 0;
-  const pinnedLine = set2.lastRequest === null ? null : lineOf(set2.lastRequest);
-  if (pinnedLine !== null) used += bytesOf(pinnedLine) + 1;
-  const remaining = scoreCandidates(
-    [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources],
-    turn
-  );
-  const k = /* @__PURE__ */ new Map();
-  const taken = [];
-  const skipped = [];
-  while (remaining.length > 0) {
-    let best = 0;
-    let bestRatio = -Infinity;
-    for (let i = 0; i < remaining.length; i++) {
-      const c2 = remaining[i];
-      const ratio = c2.score * RATIO_SECTION_DECAY ** (k.get(c2.section) ?? 0) / c2.bytes;
-      if (ratio > bestRatio || ratio === bestRatio && c2.seq > remaining[best].seq) {
-        best = i;
-        bestRatio = ratio;
+function buildSnippet(row5, given, maxBytes, codeMaxBytes = SNIPPET_CODE_MAX_BYTES) {
+  if (row5 === "") return "";
+  const codeCap = Math.max(maxBytes, codeMaxBytes);
+  const ls = [];
+  const le = [];
+  for (let p = 0; ; ) {
+    const n = row5.indexOf("\n", p);
+    ls.push(p);
+    if (n < 0) {
+      le.push(row5.length);
+      break;
+    }
+    le.push(n);
+    p = n + 1;
+  }
+  const L = ls.length;
+  const lb = new Array(L);
+  const cb = new Array(L);
+  let acc = 0;
+  for (let i = 0; i < L; i++) {
+    cb[i] = acc;
+    lb[i] = L === 1 ? byteLen(row5) : byteLen(row5.slice(ls[i], le[i]));
+    acc += lb[i] + 1;
+  }
+  const rangeBytes = (i, j) => cb[j] + lb[j] - cb[i];
+  const slice = (i, j) => row5.slice(ls[i], le[j]);
+  const fenceOf2 = (i) => {
+    let p = ls[i];
+    const end = Math.min(le[i], p + 3);
+    while (p < end && row5.charCodeAt(p) === 32) p++;
+    const c = row5.charCodeAt(p);
+    if (c !== 96 && c !== 126 || row5.charCodeAt(p + 1) !== c || row5.charCodeAt(p + 2) !== c || p + 2 >= le[i]) return "";
+    return row5.slice(p, p + 3);
+  };
+  const blank = (i) => {
+    for (let p = ls[i]; p < le[i]; p++) {
+      const c = row5.charCodeAt(p);
+      if (c !== 32 && c !== 9 && c !== 13) return false;
+    }
+    return true;
+  };
+  const blocks = [];
+  const fenceClose = /* @__PURE__ */ new Map();
+  for (let i = 0; i < L; ) {
+    const f = fenceOf2(i);
+    if (f !== "") {
+      let j2 = i + 1;
+      while (j2 < L && fenceOf2(j2) !== f) j2++;
+      const closed = j2 < L;
+      fenceClose.set(blocks.length, closed ? j2 : -1);
+      blocks.push({ first: i, last: closed ? j2 : L - 1, code: true });
+      i = (closed ? j2 : L - 1) + 1;
+      continue;
+    }
+    if (blank(i)) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < L && !blank(j + 1) && fenceOf2(j + 1) === "") j++;
+    blocks.push({ first: i, last: j, code: false });
+    i = j + 1;
+  }
+  if (blocks.length === 0) return clipLine(row5, 0, row5.length, -1, maxBytes);
+  const lower = row5.toLowerCase();
+  const hay = lower.length === row5.length ? lower : row5;
+  const find = (t) => {
+    const out = [];
+    if (t.text === "") return out;
+    for (let p = hay.indexOf(t.text); p >= 0 && out.length < MAX_POSITIONS; p = hay.indexOf(t.text, p + 1)) {
+      const prev = p === 0 ? 32 : row5.charCodeAt(p - 1);
+      if (!isAlnum(prev) || isLowerOrDigit(prev) && isUpper(row5.charCodeAt(p))) out.push(p);
+    }
+    return out;
+  };
+  let terms = given;
+  let pos = terms.map(find);
+  if (pos.every((p) => p.length === 0)) {
+    terms = given.filter((t) => t.text.length >= 5).map((t) => ({ ...t, text: t.text.slice(0, Math.max(4, t.text.length - 2)) }));
+    pos = terms.map(find);
+  }
+  const count = (ti, a, b) => {
+    const ps = pos[ti];
+    let lo = 0, hi = ps.length;
+    while (lo < hi) {
+      const m = lo + hi >> 1;
+      if (ps[m] < a) lo = m + 1;
+      else hi = m;
+    }
+    let n = 0;
+    for (let k = lo; k < ps.length && ps[k] < b; k++) n++;
+    return n;
+  };
+  const N = blocks.length;
+  const blen = blocks.map((bk2) => rangeBytes(bk2.first, bk2.last));
+  const avg = blen.reduce((a, b) => a + b, 0) / N || 1;
+  const tf = blocks.map((bk2) => terms.map((_, ti) => count(ti, ls[bk2.first], le[bk2.last])));
+  const idf = terms.map((_, ti) => {
+    let df = 0;
+    for (let k = 0; k < N; k++) if (tf[k][ti] > 0) df++;
+    return Math.log(1 + (N - df + 0.5) / (df + 0.5));
+  });
+  const weight = (ti, code) => terms[ti].weight * (terms[ti].symbol && code ? 2 : 1) * idf[ti];
+  const scores = blocks.map((bk2, k) => {
+    let s = 0;
+    const norm2 = K1 * (1 - B + B * blen[k] / avg);
+    terms.forEach((_, ti) => {
+      const f = tf[k][ti];
+      if (f > 0) s += weight(ti, bk2.code) * f * (K1 + 1) / (f + norm2);
+    });
+    return s;
+  });
+  let best = 0;
+  for (let k = 1; k < N; k++) if (scores[k] > scores[best]) best = k;
+  const bk = blocks[best];
+  const lineScore = (i) => {
+    let s = 0;
+    terms.forEach((_, ti) => {
+      if (count(ti, ls[i], le[i]) > 0) s += weight(ti, bk.code);
+    });
+    return s;
+  };
+  const firstHit = (i) => {
+    let at2 = -1;
+    let w = -1;
+    terms.forEach((_, ti) => {
+      const c = count(ti, ls[i], le[i]);
+      if (c === 0 || weight(ti, bk.code) <= w) return;
+      const ps = pos[ti];
+      let lo = 0, hi = ps.length;
+      while (lo < hi) {
+        const m = lo + hi >> 1;
+        if (ps[m] < ls[i]) lo = m + 1;
+        else hi = m;
+      }
+      at2 = ps[lo];
+      w = weight(ti, bk.code);
+    });
+    return at2;
+  };
+  const lineWindow = (a, b, budget) => {
+    let anchor4 = a;
+    let top2 = -1;
+    for (let i2 = a; i2 <= b; i2++) {
+      const s = lineScore(i2);
+      if (s > top2) {
+        top2 = s;
+        anchor4 = i2;
       }
     }
-    const c = remaining.splice(best, 1)[0];
-    const lineBytes = bytesOf(lineOf(c)) + 1;
-    if (used + lineBytes <= budget) {
-      used += lineBytes;
-      taken.push(c);
-      k.set(c.section, (k.get(c.section) ?? 0) + 1);
-    } else {
-      skipped.push(c);
+    if (lb[anchor4] > budget) return null;
+    let i = anchor4, j = anchor4;
+    for (; ; ) {
+      const up = i > a && rangeBytes(i - 1, j) <= budget;
+      const down = j < b && rangeBytes(i, j + 1) <= budget;
+      if (!up && !down) break;
+      if (up && down) {
+        if (lineScore(i - 1) > lineScore(j + 1)) i--;
+        else j++;
+      } else if (up) i--;
+      else j++;
+    }
+    return [i, j];
+  };
+  if (bk.code) {
+    if (blen[best] <= codeCap) return grow(best);
+    const close = fenceClose.get(best) ?? -1;
+    const open3 = bk.first;
+    const innerA = open3 + 1;
+    const innerB = close >= 0 ? close - 1 : bk.last;
+    const total = innerB - innerA + 1;
+    const openText = slice(open3, open3);
+    const closeText = close >= 0 ? slice(close, close) : fenceOf2(open3);
+    const markerMax = byteLen(`
+[lines ${total}-${total} of ${total}]`);
+    const budget = codeCap - lb[open3] - 1 - 1 - byteLen(closeText) - markerMax;
+    if (total <= 0) return clipLine(row5, ls[open3], le[bk.last], -1, codeCap);
+    const win2 = lineWindow(innerA, innerB, budget);
+    if (win2 === null) {
+      let anchor4 = innerA, top2 = -1;
+      for (let i2 = innerA; i2 <= innerB; i2++) {
+        const s = lineScore(i2);
+        if (s > top2) {
+          top2 = s;
+          anchor4 = i2;
+        }
+      }
+      const body = clipLine(row5, ls[anchor4], le[anchor4], firstHit(anchor4), Math.max(0, budget));
+      const n = anchor4 - innerA + 1;
+      return `${openText}
+${body}
+${closeText}
+[lines ${n}-${n} of ${total}]`;
+    }
+    const [i, j] = win2;
+    return `${openText}
+${slice(i, j)}
+${closeText}
+[lines ${i - innerA + 1}-${j - innerA + 1} of ${total}]`;
+  }
+  if (blen[best] <= maxBytes) return grow(best);
+  const win = lineWindow(bk.first, bk.last, maxBytes);
+  if (win !== null) return slice(win[0], win[1]);
+  let anchor3 = bk.first, top = -1;
+  for (let i = bk.first; i <= bk.last; i++) {
+    const s = lineScore(i);
+    if (s > top) {
+      top = s;
+      anchor3 = i;
     }
   }
-  const lines = [openTag];
-  if (pinnedLine !== null) lines.push(pinnedLine);
-  for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"]) {
-    for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c));
+  return clipLine(row5, ls[anchor3], le[anchor3], firstHit(anchor3), maxBytes);
+  function grow(k) {
+    let a = k, b = k;
+    let code = blocks[k].code;
+    const fits = (i, j, c) => rangeBytes(blocks[i].first, blocks[j].last) <= (c ? codeCap : maxBytes);
+    for (; ; ) {
+      const up = a > 0 && fits(a - 1, b, code || blocks[a - 1].code);
+      const down = b < N - 1 && fits(a, b + 1, code || blocks[b + 1].code);
+      if (!up && !down) break;
+      if (up && down) {
+        if (scores[a - 1] > scores[b + 1]) a--;
+        else b++;
+      } else if (up) a--;
+      else b++;
+      code = code || blocks[a].code || blocks[b].code;
+    }
+    return slice(blocks[a].first, blocks[b].last);
   }
-  const queries = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const c of skipped.sort((a, b) => a.seq - b.seq)) {
-    if (c.query === null || seen.has(c.query)) continue;
-    if (bytesOf(moreLine([...queries, c.query])) - emptyMoreBytes > budget - used) break;
-    queries.push(c.query);
-    seen.add(c.query);
+}
+function clipLine(row5, s, e, hit, budget) {
+  if (budget <= 0) return "";
+  let start = s;
+  if (hit > s) {
+    start = Math.max(s, hit - (budget >> 2));
+    if (start > s) {
+      const sp = row5.indexOf(" ", start);
+      start = sp >= 0 && sp < hit ? sp + 1 : start;
+    }
   }
-  lines.push(moreLine(queries), STATE_CLOSE_TAG);
-  return lines.join("\n");
+  const cu = row5.charCodeAt(start);
+  if (start > s && cu >= 56320 && cu <= 57343) start++;
+  let used = 0;
+  let end = start;
+  while (end < e) {
+    const c = row5.charCodeAt(end);
+    const pair = c >= 55296 && c <= 56319 && end + 1 < e;
+    const n = c < 128 ? 1 : c < 2048 ? 2 : pair ? 4 : 3;
+    if (used + n > budget) break;
+    used += n;
+    end += pair ? 2 : 1;
+  }
+  if (end < e) {
+    const sp = row5.lastIndexOf(" ", end - 1);
+    if (sp > start && sp - start >= end - start >> 1) end = sp;
+  }
+  return row5.slice(start, end);
+}
+
+// src/core/store/words.ts
+var WORD_RANGES = Object.freeze([
+  170,
+  170,
+  178,
+  179,
+  181,
+  181,
+  185,
+  186,
+  188,
+  190,
+  192,
+  214,
+  216,
+  246,
+  248,
+  705,
+  710,
+  721,
+  736,
+  740,
+  748,
+  748,
+  750,
+  750,
+  880,
+  884,
+  886,
+  887,
+  890,
+  893,
+  895,
+  895,
+  902,
+  902,
+  904,
+  906,
+  908,
+  908,
+  910,
+  929,
+  931,
+  1013,
+  1015,
+  1153,
+  1162,
+  1327,
+  1329,
+  1366,
+  1369,
+  1369,
+  1376,
+  1416,
+  1488,
+  1514,
+  1519,
+  1522,
+  1568,
+  1610,
+  1632,
+  1641,
+  1646,
+  1647,
+  1649,
+  1747,
+  1749,
+  1749,
+  1765,
+  1766,
+  1774,
+  1788,
+  1791,
+  1791,
+  1808,
+  1808,
+  1810,
+  1839,
+  1869,
+  1957,
+  1969,
+  1969,
+  1984,
+  2026,
+  2036,
+  2037,
+  2042,
+  2042,
+  2048,
+  2069,
+  2074,
+  2074,
+  2084,
+  2084,
+  2088,
+  2088,
+  2112,
+  2136,
+  2144,
+  2154,
+  2160,
+  2183,
+  2185,
+  2191,
+  2208,
+  2249,
+  2308,
+  2361,
+  2365,
+  2365,
+  2384,
+  2384,
+  2392,
+  2401,
+  2406,
+  2415,
+  2417,
+  2432,
+  2437,
+  2444,
+  2447,
+  2448,
+  2451,
+  2472,
+  2474,
+  2480,
+  2482,
+  2482,
+  2486,
+  2489,
+  2493,
+  2493,
+  2510,
+  2510,
+  2524,
+  2525,
+  2527,
+  2529,
+  2534,
+  2545,
+  2548,
+  2553,
+  2556,
+  2556,
+  2565,
+  2570,
+  2575,
+  2576,
+  2579,
+  2600,
+  2602,
+  2608,
+  2610,
+  2611,
+  2613,
+  2614,
+  2616,
+  2617,
+  2649,
+  2652,
+  2654,
+  2654,
+  2662,
+  2671,
+  2674,
+  2676,
+  2693,
+  2701,
+  2703,
+  2705,
+  2707,
+  2728,
+  2730,
+  2736,
+  2738,
+  2739,
+  2741,
+  2745,
+  2749,
+  2749,
+  2768,
+  2768,
+  2784,
+  2785,
+  2790,
+  2799,
+  2809,
+  2809,
+  2821,
+  2828,
+  2831,
+  2832,
+  2835,
+  2856,
+  2858,
+  2864,
+  2866,
+  2867,
+  2869,
+  2873,
+  2877,
+  2877,
+  2908,
+  2909,
+  2911,
+  2913,
+  2918,
+  2927,
+  2929,
+  2935,
+  2947,
+  2947,
+  2949,
+  2954,
+  2958,
+  2960,
+  2962,
+  2965,
+  2969,
+  2970,
+  2972,
+  2972,
+  2974,
+  2975,
+  2979,
+  2980,
+  2984,
+  2986,
+  2990,
+  3001,
+  3024,
+  3024,
+  3046,
+  3058,
+  3077,
+  3084,
+  3086,
+  3088,
+  3090,
+  3112,
+  3114,
+  3129,
+  3133,
+  3133,
+  3160,
+  3162,
+  3164,
+  3165,
+  3168,
+  3169,
+  3174,
+  3183,
+  3192,
+  3198,
+  3200,
+  3200,
+  3205,
+  3212,
+  3214,
+  3216,
+  3218,
+  3240,
+  3242,
+  3251,
+  3253,
+  3257,
+  3261,
+  3261,
+  3292,
+  3294,
+  3296,
+  3297,
+  3302,
+  3311,
+  3313,
+  3314,
+  3332,
+  3340,
+  3342,
+  3344,
+  3346,
+  3386,
+  3389,
+  3389,
+  3406,
+  3406,
+  3412,
+  3414,
+  3416,
+  3425,
+  3430,
+  3448,
+  3450,
+  3455,
+  3461,
+  3478,
+  3482,
+  3505,
+  3507,
+  3515,
+  3517,
+  3517,
+  3520,
+  3526,
+  3558,
+  3567,
+  3585,
+  3632,
+  3634,
+  3635,
+  3648,
+  3654,
+  3664,
+  3673,
+  3713,
+  3714,
+  3716,
+  3716,
+  3718,
+  3722,
+  3724,
+  3747,
+  3749,
+  3749,
+  3751,
+  3760,
+  3762,
+  3763,
+  3773,
+  3773,
+  3776,
+  3780,
+  3782,
+  3782,
+  3792,
+  3801,
+  3804,
+  3807,
+  3840,
+  3840,
+  3872,
+  3891,
+  3904,
+  3911,
+  3913,
+  3948,
+  3976,
+  3980,
+  4096,
+  4138,
+  4159,
+  4169,
+  4176,
+  4181,
+  4186,
+  4189,
+  4193,
+  4193,
+  4197,
+  4198,
+  4206,
+  4208,
+  4213,
+  4225,
+  4238,
+  4238,
+  4240,
+  4249,
+  4256,
+  4293,
+  4295,
+  4295,
+  4301,
+  4301,
+  4304,
+  4346,
+  4348,
+  4680,
+  4682,
+  4685,
+  4688,
+  4694,
+  4696,
+  4696,
+  4698,
+  4701,
+  4704,
+  4744,
+  4746,
+  4749,
+  4752,
+  4784,
+  4786,
+  4789,
+  4792,
+  4798,
+  4800,
+  4800,
+  4802,
+  4805,
+  4808,
+  4822,
+  4824,
+  4880,
+  4882,
+  4885,
+  4888,
+  4954,
+  4969,
+  4988,
+  4992,
+  5007,
+  5024,
+  5109,
+  5112,
+  5117,
+  5121,
+  5740,
+  5743,
+  5759,
+  5761,
+  5786,
+  5792,
+  5866,
+  5870,
+  5880,
+  5888,
+  5905,
+  5919,
+  5937,
+  5952,
+  5969,
+  5984,
+  5996,
+  5998,
+  6e3,
+  6016,
+  6067,
+  6103,
+  6103,
+  6108,
+  6108,
+  6112,
+  6121,
+  6128,
+  6137,
+  6160,
+  6169,
+  6176,
+  6264,
+  6272,
+  6276,
+  6279,
+  6312,
+  6314,
+  6314,
+  6320,
+  6389,
+  6400,
+  6430,
+  6470,
+  6509,
+  6512,
+  6516,
+  6528,
+  6571,
+  6576,
+  6601,
+  6608,
+  6618,
+  6656,
+  6678,
+  6688,
+  6740,
+  6784,
+  6793,
+  6800,
+  6809,
+  6823,
+  6823,
+  6917,
+  6963,
+  6981,
+  6988,
+  6992,
+  7001,
+  7043,
+  7072,
+  7086,
+  7141,
+  7168,
+  7203,
+  7232,
+  7241,
+  7245,
+  7293,
+  7296,
+  7306,
+  7312,
+  7354,
+  7357,
+  7359,
+  7401,
+  7404,
+  7406,
+  7411,
+  7413,
+  7414,
+  7418,
+  7418,
+  7424,
+  7615,
+  7680,
+  7957,
+  7960,
+  7965,
+  7968,
+  8005,
+  8008,
+  8013,
+  8016,
+  8023,
+  8025,
+  8025,
+  8027,
+  8027,
+  8029,
+  8029,
+  8031,
+  8061,
+  8064,
+  8116,
+  8118,
+  8124,
+  8126,
+  8126,
+  8130,
+  8132,
+  8134,
+  8140,
+  8144,
+  8147,
+  8150,
+  8155,
+  8160,
+  8172,
+  8178,
+  8180,
+  8182,
+  8188,
+  8304,
+  8305,
+  8308,
+  8313,
+  8319,
+  8329,
+  8336,
+  8348,
+  8450,
+  8450,
+  8455,
+  8455,
+  8458,
+  8467,
+  8469,
+  8469,
+  8473,
+  8477,
+  8484,
+  8484,
+  8486,
+  8486,
+  8488,
+  8488,
+  8490,
+  8493,
+  8495,
+  8505,
+  8508,
+  8511,
+  8517,
+  8521,
+  8526,
+  8526,
+  8528,
+  8585,
+  9312,
+  9371,
+  9450,
+  9471,
+  10102,
+  10131,
+  11264,
+  11492,
+  11499,
+  11502,
+  11506,
+  11507,
+  11517,
+  11517,
+  11520,
+  11557,
+  11559,
+  11559,
+  11565,
+  11565,
+  11568,
+  11623,
+  11631,
+  11631,
+  11648,
+  11670,
+  11680,
+  11686,
+  11688,
+  11694,
+  11696,
+  11702,
+  11704,
+  11710,
+  11712,
+  11718,
+  11720,
+  11726,
+  11728,
+  11734,
+  11736,
+  11742,
+  11823,
+  11823,
+  12293,
+  12295,
+  12321,
+  12329,
+  12337,
+  12341,
+  12344,
+  12348,
+  12353,
+  12438,
+  12445,
+  12447,
+  12449,
+  12538,
+  12540,
+  12543,
+  12549,
+  12591,
+  12593,
+  12686,
+  12690,
+  12693,
+  12704,
+  12735,
+  12784,
+  12799,
+  12832,
+  12841,
+  12872,
+  12879,
+  12881,
+  12895,
+  12928,
+  12937,
+  12977,
+  12991,
+  13312,
+  19903,
+  19968,
+  42124,
+  42192,
+  42237,
+  42240,
+  42508,
+  42512,
+  42539,
+  42560,
+  42606,
+  42623,
+  42653,
+  42656,
+  42735,
+  42775,
+  42783,
+  42786,
+  42888,
+  42891,
+  42972,
+  42993,
+  43009,
+  43011,
+  43013,
+  43015,
+  43018,
+  43020,
+  43042,
+  43056,
+  43061,
+  43072,
+  43123,
+  43138,
+  43187,
+  43216,
+  43225,
+  43250,
+  43255,
+  43259,
+  43259,
+  43261,
+  43262,
+  43264,
+  43301,
+  43312,
+  43334,
+  43360,
+  43388,
+  43396,
+  43442,
+  43471,
+  43481,
+  43488,
+  43492,
+  43494,
+  43518,
+  43520,
+  43560,
+  43584,
+  43586,
+  43588,
+  43595,
+  43600,
+  43609,
+  43616,
+  43638,
+  43642,
+  43642,
+  43646,
+  43695,
+  43697,
+  43697,
+  43701,
+  43702,
+  43705,
+  43709,
+  43712,
+  43712,
+  43714,
+  43714,
+  43739,
+  43741,
+  43744,
+  43754,
+  43762,
+  43764,
+  43777,
+  43782,
+  43785,
+  43790,
+  43793,
+  43798,
+  43808,
+  43814,
+  43816,
+  43822,
+  43824,
+  43866,
+  43868,
+  43881,
+  43888,
+  44002,
+  44016,
+  44025,
+  44032,
+  55203,
+  55216,
+  55238,
+  55243,
+  55291,
+  63744,
+  64109,
+  64112,
+  64217,
+  64256,
+  64262,
+  64275,
+  64279,
+  64285,
+  64285,
+  64287,
+  64296,
+  64298,
+  64310,
+  64312,
+  64316,
+  64318,
+  64318,
+  64320,
+  64321,
+  64323,
+  64324,
+  64326,
+  64433,
+  64467,
+  64829,
+  64848,
+  64911,
+  64914,
+  64967,
+  65008,
+  65019,
+  65136,
+  65140,
+  65142,
+  65276,
+  65296,
+  65305,
+  65313,
+  65338,
+  65345,
+  65370,
+  65382,
+  65470,
+  65474,
+  65479,
+  65482,
+  65487,
+  65490,
+  65495,
+  65498,
+  65500,
+  65536,
+  65547,
+  65549,
+  65574,
+  65576,
+  65594,
+  65596,
+  65597,
+  65599,
+  65613,
+  65616,
+  65629,
+  65664,
+  65786,
+  65799,
+  65843,
+  65856,
+  65912,
+  65930,
+  65931,
+  66176,
+  66204,
+  66208,
+  66256,
+  66273,
+  66299,
+  66304,
+  66339,
+  66349,
+  66378,
+  66384,
+  66421,
+  66432,
+  66461,
+  66464,
+  66499,
+  66504,
+  66511,
+  66513,
+  66517,
+  66560,
+  66717,
+  66720,
+  66729,
+  66736,
+  66771,
+  66776,
+  66811,
+  66816,
+  66855,
+  66864,
+  66915,
+  66928,
+  66938,
+  66940,
+  66954,
+  66956,
+  66962,
+  66964,
+  66965,
+  66967,
+  66977,
+  66979,
+  66993,
+  66995,
+  67001,
+  67003,
+  67004,
+  67008,
+  67059,
+  67072,
+  67382,
+  67392,
+  67413,
+  67424,
+  67431,
+  67456,
+  67461,
+  67463,
+  67504,
+  67506,
+  67514,
+  67584,
+  67589,
+  67592,
+  67592,
+  67594,
+  67637,
+  67639,
+  67640,
+  67644,
+  67644,
+  67647,
+  67669,
+  67672,
+  67702,
+  67705,
+  67742,
+  67751,
+  67759,
+  67808,
+  67826,
+  67828,
+  67829,
+  67835,
+  67867,
+  67872,
+  67897,
+  67904,
+  67929,
+  67968,
+  68023,
+  68028,
+  68047,
+  68050,
+  68096,
+  68112,
+  68115,
+  68117,
+  68119,
+  68121,
+  68149,
+  68160,
+  68168,
+  68192,
+  68222,
+  68224,
+  68255,
+  68288,
+  68295,
+  68297,
+  68324,
+  68331,
+  68335,
+  68352,
+  68405,
+  68416,
+  68437,
+  68440,
+  68466,
+  68472,
+  68497,
+  68521,
+  68527,
+  68608,
+  68680,
+  68736,
+  68786,
+  68800,
+  68850,
+  68858,
+  68899,
+  68912,
+  68921,
+  68928,
+  68965,
+  68975,
+  68997,
+  69216,
+  69246,
+  69248,
+  69289,
+  69296,
+  69297,
+  69314,
+  69319,
+  69376,
+  69415,
+  69424,
+  69445,
+  69457,
+  69460,
+  69488,
+  69505,
+  69552,
+  69579,
+  69600,
+  69622,
+  69635,
+  69687,
+  69714,
+  69743,
+  69745,
+  69746,
+  69749,
+  69749,
+  69763,
+  69807,
+  69840,
+  69864,
+  69872,
+  69881,
+  69891,
+  69926,
+  69942,
+  69951,
+  69956,
+  69956,
+  69959,
+  69959,
+  69968,
+  70002,
+  70006,
+  70006,
+  70019,
+  70066,
+  70081,
+  70084,
+  70096,
+  70106,
+  70108,
+  70108,
+  70113,
+  70132,
+  70144,
+  70161,
+  70163,
+  70187,
+  70207,
+  70208,
+  70272,
+  70278,
+  70280,
+  70280,
+  70282,
+  70285,
+  70287,
+  70301,
+  70303,
+  70312,
+  70320,
+  70366,
+  70384,
+  70393,
+  70405,
+  70412,
+  70415,
+  70416,
+  70419,
+  70440,
+  70442,
+  70448,
+  70450,
+  70451,
+  70453,
+  70457,
+  70461,
+  70461,
+  70480,
+  70480,
+  70493,
+  70497,
+  70528,
+  70537,
+  70539,
+  70539,
+  70542,
+  70542,
+  70544,
+  70581,
+  70583,
+  70583,
+  70609,
+  70609,
+  70611,
+  70611,
+  70656,
+  70708,
+  70727,
+  70730,
+  70736,
+  70745,
+  70751,
+  70753,
+  70784,
+  70831,
+  70852,
+  70853,
+  70855,
+  70855,
+  70864,
+  70873,
+  71040,
+  71086,
+  71128,
+  71131,
+  71168,
+  71215,
+  71236,
+  71236,
+  71248,
+  71257,
+  71296,
+  71338,
+  71352,
+  71352,
+  71360,
+  71369,
+  71376,
+  71395,
+  71424,
+  71450,
+  71472,
+  71483,
+  71488,
+  71494,
+  71680,
+  71723,
+  71840,
+  71922,
+  71935,
+  71942,
+  71945,
+  71945,
+  71948,
+  71955,
+  71957,
+  71958,
+  71960,
+  71983,
+  71999,
+  71999,
+  72001,
+  72001,
+  72016,
+  72025,
+  72096,
+  72103,
+  72106,
+  72144,
+  72161,
+  72161,
+  72163,
+  72163,
+  72192,
+  72192,
+  72203,
+  72242,
+  72250,
+  72250,
+  72272,
+  72272,
+  72284,
+  72329,
+  72349,
+  72349,
+  72368,
+  72440,
+  72640,
+  72672,
+  72688,
+  72697,
+  72704,
+  72712,
+  72714,
+  72750,
+  72768,
+  72768,
+  72784,
+  72812,
+  72818,
+  72847,
+  72960,
+  72966,
+  72968,
+  72969,
+  72971,
+  73008,
+  73030,
+  73030,
+  73040,
+  73049,
+  73056,
+  73061,
+  73063,
+  73064,
+  73066,
+  73097,
+  73112,
+  73112,
+  73120,
+  73129,
+  73136,
+  73179,
+  73184,
+  73193,
+  73440,
+  73458,
+  73474,
+  73474,
+  73476,
+  73488,
+  73490,
+  73523,
+  73552,
+  73561,
+  73648,
+  73648,
+  73664,
+  73684,
+  73728,
+  74649,
+  74752,
+  74862,
+  74880,
+  75075,
+  77712,
+  77808,
+  77824,
+  78895,
+  78913,
+  78918,
+  78944,
+  82938,
+  82944,
+  83526,
+  90368,
+  90397,
+  90416,
+  90425,
+  92160,
+  92728,
+  92736,
+  92766,
+  92768,
+  92777,
+  92784,
+  92862,
+  92864,
+  92873,
+  92880,
+  92909,
+  92928,
+  92975,
+  92992,
+  92995,
+  93008,
+  93017,
+  93019,
+  93025,
+  93027,
+  93047,
+  93053,
+  93071,
+  93504,
+  93548,
+  93552,
+  93561,
+  93760,
+  93846,
+  93856,
+  93880,
+  93883,
+  93907,
+  93952,
+  94026,
+  94032,
+  94032,
+  94099,
+  94111,
+  94176,
+  94177,
+  94179,
+  94179,
+  94194,
+  94198,
+  94208,
+  101589,
+  101631,
+  101662,
+  101760,
+  101874,
+  110576,
+  110579,
+  110581,
+  110587,
+  110589,
+  110590,
+  110592,
+  110882,
+  110898,
+  110898,
+  110928,
+  110930,
+  110933,
+  110933,
+  110948,
+  110951,
+  110960,
+  111355,
+  113664,
+  113770,
+  113776,
+  113788,
+  113792,
+  113800,
+  113808,
+  113817,
+  118e3,
+  118009,
+  119488,
+  119507,
+  119520,
+  119539,
+  119648,
+  119672,
+  119808,
+  119892,
+  119894,
+  119964,
+  119966,
+  119967,
+  119970,
+  119970,
+  119973,
+  119974,
+  119977,
+  119980,
+  119982,
+  119993,
+  119995,
+  119995,
+  119997,
+  120003,
+  120005,
+  120069,
+  120071,
+  120074,
+  120077,
+  120084,
+  120086,
+  120092,
+  120094,
+  120121,
+  120123,
+  120126,
+  120128,
+  120132,
+  120134,
+  120134,
+  120138,
+  120144,
+  120146,
+  120485,
+  120488,
+  120512,
+  120514,
+  120538,
+  120540,
+  120570,
+  120572,
+  120596,
+  120598,
+  120628,
+  120630,
+  120654,
+  120656,
+  120686,
+  120688,
+  120712,
+  120714,
+  120744,
+  120746,
+  120770,
+  120772,
+  120779,
+  120782,
+  120831,
+  122624,
+  122654,
+  122661,
+  122666,
+  122928,
+  122989,
+  123136,
+  123180,
+  123191,
+  123197,
+  123200,
+  123209,
+  123214,
+  123214,
+  123536,
+  123565,
+  123584,
+  123627,
+  123632,
+  123641,
+  124112,
+  124139,
+  124144,
+  124153,
+  124368,
+  124397,
+  124400,
+  124410,
+  124608,
+  124638,
+  124640,
+  124642,
+  124644,
+  124645,
+  124647,
+  124653,
+  124656,
+  124660,
+  124670,
+  124671,
+  124896,
+  124902,
+  124904,
+  124907,
+  124909,
+  124910,
+  124912,
+  124926,
+  124928,
+  125124,
+  125127,
+  125135,
+  125184,
+  125251,
+  125259,
+  125259,
+  125264,
+  125273,
+  126065,
+  126123,
+  126125,
+  126127,
+  126129,
+  126132,
+  126209,
+  126253,
+  126255,
+  126269,
+  126464,
+  126467,
+  126469,
+  126495,
+  126497,
+  126498,
+  126500,
+  126500,
+  126503,
+  126503,
+  126505,
+  126514,
+  126516,
+  126519,
+  126521,
+  126521,
+  126523,
+  126523,
+  126530,
+  126530,
+  126535,
+  126535,
+  126537,
+  126537,
+  126539,
+  126539,
+  126541,
+  126543,
+  126545,
+  126546,
+  126548,
+  126548,
+  126551,
+  126551,
+  126553,
+  126553,
+  126555,
+  126555,
+  126557,
+  126557,
+  126559,
+  126559,
+  126561,
+  126562,
+  126564,
+  126564,
+  126567,
+  126570,
+  126572,
+  126578,
+  126580,
+  126583,
+  126585,
+  126588,
+  126590,
+  126590,
+  126592,
+  126601,
+  126603,
+  126619,
+  126625,
+  126627,
+  126629,
+  126633,
+  126635,
+  126651,
+  127232,
+  127244,
+  130032,
+  130041,
+  131072,
+  173791,
+  173824,
+  178205,
+  178208,
+  183981,
+  183984,
+  191456,
+  191472,
+  192093,
+  194560,
+  195101,
+  196608,
+  201546,
+  201552,
+  210041
+]);
+function isWordChar2(cp) {
+  if (cp < 128) return cp >= 48 && cp <= 57 || cp >= 65 && cp <= 90 || cp >= 97 && cp <= 122 || cp === 95;
+  let lo = 0;
+  let hi = WORD_RANGES.length / 2 - 1;
+  while (lo <= hi) {
+    const mid = lo + hi >> 1;
+    const first = WORD_RANGES[2 * mid];
+    const last = WORD_RANGES[2 * mid + 1];
+    if (cp < first) hi = mid - 1;
+    else if (cp > last) lo = mid + 1;
+    else return true;
+  }
+  return false;
+}
+function isBlank2(cp) {
+  if (cp === 0 || cp === 32 || cp >= 9 && cp <= 13) return true;
+  return cp === 160 || cp === 5760 || cp >= 8192 && cp <= 8202 || cp === 8232 || cp === 8233 || cp === 8239 || cp === 8287 || cp === 12288 || cp === 65279;
+}
+function splitRuns(s, isSeparator) {
+  const out = [];
+  let start = -1;
+  let i = 0;
+  for (const ch of s) {
+    if (isSeparator(ch.codePointAt(0))) {
+      if (start >= 0) {
+        out.push(s.slice(start, i));
+        start = -1;
+      }
+    } else if (start < 0) {
+      start = i;
+    }
+    i += ch.length;
+  }
+  if (start >= 0) out.push(s.slice(start));
+  return out;
+}
+function wordTokens(s) {
+  return splitRuns(s, (cp) => !isWordChar2(cp));
+}
+function blankTokens(s) {
+  return splitRuns(s, isBlank2);
 }
 
 // src/core/store/fts.ts
@@ -14987,35 +16923,88 @@ INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk
 VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_count, :created_ts, :created_at, :created_ts)
 RETURNING id`;
 var INSERT_CHUNK = `
-INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?, ?, ?, ?, ?, ?)`;
-var QUERY = `
-WITH m AS (
+INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+var TITLE_WEIGHT = 1;
+var PORTER_MATCH = `
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
-         chunks.worktree AS worktree, chunks.ord AS ord, s.label AS label, s.created_ts AS created_ts, bm25(chunks) AS bm
+         chunks.worktree AS worktree, chunks.ord AS ord, s.created_ts AS created_ts,
+         bm25(chunks, 0, 0, 0, 0, 0, 1.0, ${TITLE_WEIGHT}) AS bm,
+         (chunks.rowid IN (SELECT rowid FROM chunks WHERE chunks MATCH :all)) AS full
   FROM chunks JOIN sources s ON s.id = chunks.source_id
   WHERE chunks MATCH :match
     AND (:scope <> 'session' OR chunks.session_id = :session_id)
     AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
-    AND (:source IS NULL OR s.label = :source)
+    AND (:source IS NULL OR s.label = :source)`;
+var PORTER_ORDER = `
+ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
+var PORTER_RANK_PROJECT = `
+WITH m AS (${PORTER_MATCH}
 ), r AS (
   SELECT *,
-         ROW_NUMBER() OVER (ORDER BY bm ASC, source_id DESC, ord ASC) AS rank_a,
+         ROW_NUMBER() OVER (ORDER BY full DESC, bm ASC, source_id DESC, ord ASC) AS rank_a,
          ROW_NUMBER() OVER (ORDER BY created_ts DESC, source_id DESC, ord ASC) AS rank_b
   FROM m
-), p AS (
-  SELECT rid, source_id, session_id, worktree, label, ord,
-         CASE WHEN :scope = 'project' THEN 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) ELSE -bm END AS score
-  FROM r
-  ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, score DESC, source_id DESC, ord ASC
-  LIMIT :limit OFFSET :offset
 )
-SELECT p.source_id AS source_id, p.label AS label, p.ord AS ord, c.body AS body, p.score AS score
-FROM p JOIN chunks c ON c.rowid = p.rid
-ORDER BY (p.session_id = :session_id) DESC, (p.worktree = :worktree) DESC, p.score DESC, p.source_id DESC, p.ord ASC`;
-var ESCAPES = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
+SELECT rid, source_id, session_id, worktree, ord, full, 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) AS score
+FROM r${PORTER_ORDER}`;
+var PORTER_RANK_BM25 = `
+WITH m AS (${PORTER_MATCH}
+)
+SELECT rid, source_id, session_id, worktree, ord, full, -bm AS score
+FROM m${PORTER_ORDER}`;
+function porterRankSql(scope) {
+  return scope === "project" ? PORTER_RANK_PROJECT : PORTER_RANK_BM25;
+}
+var TRI_RANK = `
+SELECT t.rowid AS rid, c.source_id AS source_id, c.session_id AS session_id, c.worktree AS worktree, c.ord AS ord
+FROM chunks_tri t JOIN chunks c ON c.rowid = t.rowid JOIN sources s ON s.id = c.source_id
+WHERE chunks_tri MATCH :match
+  AND (:scope <> 'session' OR c.session_id = :session_id)
+  AND (:scope <> 'worktree' OR c.worktree = :worktree)
+  AND (:source IS NULL OR s.label = :source)
+ORDER BY bm25(chunks_tri, 1.0, ${TITLE_WEIGHT}) ASC, c.source_id DESC, c.ord ASC`;
+var PAGE_ROWS = `
+SELECT c.rowid AS rid, c.source_id AS source_id, c.ord AS ord, c.body AS body, s.label AS label
+FROM chunks c JOIN sources s ON s.id = c.source_id
+WHERE c.rowid IN (SELECT value FROM json_each(:ids))`;
+var INSERT_TRI = "INSERT INTO chunks_tri(rowid, body, title) VALUES (?, ?, ?)";
+var TRI_DELETE = "INSERT INTO chunks_tri(chunks_tri, rowid, body, title) SELECT 'delete', rowid, body, title FROM chunks";
 function ftsInsert(db, src, chunks) {
+  const id = reserveSource(db, src, chunks);
+  insertChunks(db, id, src, chunks);
+  return id;
+}
+function reserveSource(db, src, chunks) {
   let total = 0;
   for (const c of chunks) total += c.bytes;
+  return withWrite(db, (h) => {
+    const row5 = h.raw.prepare(INSERT_SOURCE).get({
+      session_id: src.sessionId,
+      worktree: src.worktree,
+      agent: src.agent,
+      kind: src.kind,
+      label: src.label,
+      bytes_total: total,
+      chunk_count: chunks.length,
+      created_ts: src.createdAt,
+      created_at: new Date(src.createdAt).toISOString()
+    });
+    return Number(row5.id);
+  });
+}
+function finishReserved(db, id, src, chunks, units) {
+  try {
+    insertChunks(db, id, src, chunks);
+    insertUnits(db, id, src.sessionId, units);
+  } catch (err) {
+    withWrite(db, (h) => {
+      deleteChunkRows(h.raw, { sourceId: id });
+      h.raw.prepare("DELETE FROM sources WHERE id = ?").run(id);
+    });
+    throw err;
+  }
+}
+function insertChunks(db, id, src, chunks) {
   const batches = [];
   let batch = [];
   let batchBytes = 0;
@@ -15028,35 +17017,35 @@ function ftsInsert(db, src, chunks) {
     batch.push(c);
     batchBytes += c.bytes;
   }
-  batches.push(batch);
-  let id = 0;
-  batches.forEach((rows, i) => {
+  if (batch.length > 0) batches.push(batch);
+  for (const rows of batches) {
     withWrite(db, (h) => {
-      if (i === 0) {
-        const row5 = h.raw.prepare(INSERT_SOURCE).get({
-          session_id: src.sessionId,
-          worktree: src.worktree,
-          agent: src.agent,
-          kind: src.kind,
-          label: src.label,
-          bytes_total: total,
-          chunk_count: chunks.length,
-          created_ts: src.createdAt,
-          created_at: new Date(src.createdAt).toISOString()
-        });
-        id = Number(row5.id);
-      }
       const ins = h.raw.prepare(INSERT_CHUNK);
-      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text);
+      const tri = h.raw.prepare(INSERT_TRI);
+      for (const c of rows) {
+        const title = c.title ?? "";
+        const rid = ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text, title).lastInsertRowid;
+        tri.run(rid, c.text, title);
+      }
     });
-  });
-  return id;
+  }
+}
+function deleteChunkRows(raw, scope) {
+  if (scope === "all") {
+    raw.exec("INSERT INTO chunks_tri(chunks_tri) VALUES ('delete-all')");
+    raw.exec("DELETE FROM line_units");
+    return Number(raw.prepare("DELETE FROM chunks").run().changes);
+  }
+  const [where, arg] = "sourceId" in scope ? ["source_id = ?", scope.sourceId] : ["source_id IN (SELECT id FROM sources WHERE label = ?)", scope.label];
+  raw.prepare(TRI_DELETE + " WHERE " + where).run(arg);
+  raw.prepare("DELETE FROM line_units WHERE " + where).run(arg);
+  return Number(raw.prepare("DELETE FROM chunks WHERE " + where).run(arg).changes);
 }
 function toMatch(q) {
   const words = [];
   let cur = "";
   for (const ch of q) {
-    if (ch.trim() === "") {
+    if (ch.trim() === "" || ch === "\0") {
       if (cur !== "") words.push(cur);
       cur = "";
     } else {
@@ -15070,26 +17059,204 @@ function toMatchAny(q) {
   const terms = new Set(toMatch(q).split(" ").filter((t) => t !== ""));
   return [...terms].join(" OR ");
 }
+var STOPWORDS = /* @__PURE__ */ new Set([
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "of",
+  "to",
+  "in",
+  "on",
+  "at",
+  "by",
+  "is",
+  "be",
+  "it",
+  "as",
+  "do",
+  "i",
+  "for",
+  "are",
+  "but",
+  "not",
+  "you",
+  "all",
+  "can",
+  "had",
+  "her",
+  "was",
+  "one",
+  "our",
+  "out",
+  "has",
+  "his",
+  "how",
+  "its",
+  "may",
+  "who",
+  "did",
+  "get",
+  "got",
+  "let",
+  "she",
+  "too",
+  "will",
+  "with",
+  "this",
+  "that",
+  "from",
+  "they",
+  "been",
+  "have",
+  "some",
+  "them",
+  "than",
+  "each",
+  "into",
+  "your",
+  "could",
+  "would",
+  "about",
+  "which",
+  "their",
+  "there",
+  "other",
+  "should",
+  "also",
+  "very",
+  "when",
+  "what",
+  "then",
+  "these",
+  "those",
+  "being",
+  "does",
+  "both",
+  "while",
+  "where",
+  "here",
+  "were",
+  "much",
+  "any",
+  "my",
+  "me",
+  "we"
+]);
+function searchTerms(q) {
+  const all = [...new Set(toMatch(q).split(" ").filter((t) => t !== ""))];
+  const kept = all.filter((t) => !STOPWORDS.has(t.slice(1, -2).toLowerCase()));
+  return kept.length > 0 ? kept : all;
+}
+function trigramMatch(q) {
+  const words = blankTokens(q);
+  const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
+  const parts = new Set((kept.length > 0 ? kept : words).filter((w) => [...w].length >= 3));
+  const whole = words.join(" ");
+  if (words.length > 1 && [...whole].length >= 3) parts.add(whole);
+  return [...parts].map((w) => `"${w.replaceAll('"', '""')}"`).join(" OR ");
+}
+function editDistance(a, b, max) {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let low = i;
+    for (let j = 1; j <= b.length; j++) {
+      const v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      cur.push(v);
+      if (v < low) low = v;
+    }
+    if (low > max) return max + 1;
+    prev = cur;
+  }
+  return prev[b.length];
+}
+var STMTS = /* @__PURE__ */ new WeakMap();
+function stmt(raw, sql) {
+  let m = STMTS.get(raw);
+  if (m === void 0) {
+    m = /* @__PURE__ */ new Map();
+    STMTS.set(raw, m);
+  }
+  let st = m.get(sql);
+  if (st === void 0) {
+    st = raw.prepare(sql);
+    m.set(sql, st);
+  }
+  return st;
+}
+function queryStems(q) {
+  const sqlite = process.getBuiltinModule("node:sqlite");
+  if (sqlite === void 0) throw new CtxError("NO_SQLITE");
+  const mem = new sqlite.DatabaseSync(":memory:");
+  try {
+    mem.exec(`CREATE VIRTUAL TABLE q USING fts5(body, ${FTS_TOKENIZE}); CREATE VIRTUAL TABLE v USING fts5vocab(q, 'row');`);
+    mem.prepare("INSERT INTO q(body) VALUES (?)").run(q);
+    return mem.prepare("SELECT term FROM v").all().map((r) => r.term);
+  } finally {
+    mem.close();
+  }
+}
+var TYPO_MIN_LEN = 5;
+var TYPO_MAX_DIST = 2;
+function typoTerms(db, words) {
+  const has2 = stmt(db.raw, "SELECT 1 AS x FROM chunks_vocab WHERE term = ?");
+  const near = stmt(db.raw, "SELECT term, doc FROM chunks_vocab WHERE length(term) BETWEEN ? AND ?");
+  let changed = false;
+  const out = [];
+  for (const stem of queryStems(words.join(" "))) {
+    if (has2.get(stem) !== void 0 || [...stem].length < TYPO_MIN_LEN) {
+      out.push(stem);
+      continue;
+    }
+    let best = null;
+    for (const r of near.all(stem.length - TYPO_MAX_DIST, stem.length + TYPO_MAX_DIST)) {
+      const d = editDistance(stem, r.term, TYPO_MAX_DIST);
+      if (d > TYPO_MAX_DIST) continue;
+      if (best === null || d < best.d || d === best.d && (r.doc > best.doc || r.doc === best.doc && r.term < best.term)) {
+        best = { term: r.term, d, doc: Number(r.doc) };
+      }
+    }
+    if (best !== null) {
+      out.push(best.term);
+      changed = true;
+    }
+  }
+  return changed ? out.map((t) => `"${t.replaceAll('"', '""')}"*`) : null;
+}
 function ftsQuery(db, q, scope, ctx, sessionId, limit, offset, source) {
-  const match = toMatch(q);
-  if (match === "") return [];
-  const rows = db.raw.prepare(QUERY).all({
-    match,
-    scope,
-    session_id: sessionId,
-    worktree: ctx.worktree,
-    source: source ?? null,
-    k: RRF_K,
-    limit,
-    offset
+  const terms = searchTerms(q);
+  if (terms.length === 0) return [];
+  const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
+  const rrf = scope === "project" ? { k: RRF_K } : {};
+  const porter = (t) => stmt(db.raw, porterRankSql(scope)).all({ ...filter, match: t.join(" OR "), all: t.join(" "), ...rrf });
+  let pList = porter(terms);
+  if (pList.length === 0) {
+    const fixed = typoTerms(db, terms.map((t) => t.slice(1, -2).replaceAll('""', '"')));
+    if (fixed !== null) pList = porter(fixed);
+  }
+  const tm = trigramMatch(q);
+  const tList = tm === "" ? [] : stmt(db.raw, TRI_RANK).all({ ...filter, match: tm });
+  const fused = /* @__PURE__ */ new Map();
+  pList.forEach((r, i) => fused.set(Number(r.rid), { r, s: 1 / (RRF_K + i + 1), full: Number(r.full ?? 0), p: i }));
+  tList.forEach((r, i) => {
+    const e = fused.get(Number(r.rid));
+    if (e) e.s += 1 / (RRF_K + i + 1);
+    else fused.set(Number(r.rid), { r, s: 1 / (RRF_K + i + 1), full: 0, p: Number.MAX_SAFE_INTEGER });
   });
-  return rows.map((r) => ({
-    sourceId: Number(r.source_id),
-    label: r.label,
-    ord: Number(r.ord),
-    snippet: highlight(r.body, q, SNIPPET_MAX_BYTES),
-    score: r.score
-  }));
+  const tier = (r) => (r.session_id === sessionId ? 2 : 0) + (r.worktree === ctx.worktree ? 1 : 0);
+  const page2 = [...fused.values()].sort((a, b) => tier(b.r) - tier(a.r) || b.full - a.full || b.s - a.s || a.p - b.p || Number(b.r.source_id) - Number(a.r.source_id) || Number(a.r.ord) - Number(b.r.ord)).slice(offset, offset + limit);
+  if (page2.length === 0) return [];
+  const rows = /* @__PURE__ */ new Map();
+  for (const r of stmt(db.raw, PAGE_ROWS).all({ ids: JSON.stringify(page2.map((e) => Number(e.r.rid))) })) {
+    rows.set(Number(r.rid), r);
+  }
+  return page2.map((e) => {
+    const r = rows.get(Number(e.r.rid));
+    return { sourceId: Number(r.source_id), label: r.label, ord: Number(r.ord), snippet: highlight(r.body, q, SNIPPET_MAX_BYTES), score: e.s };
+  });
 }
 var LIST = `
 WITH p AS (
@@ -15124,19 +17291,10 @@ function ftsListSource(db, source, scope, ctx, sessionId, limit, offset) {
     score: Number(r.score)
   }));
 }
-function highlight(row5, _terms, maxBytes = SNIPPET_MAX_BYTES) {
-  let clipped = "";
-  let used = 0;
-  for (const ch of row5) {
-    const out = ESCAPES[ch] ?? ch;
-    const n = Buffer.byteLength(out, "utf8");
-    if (used + n > maxBytes) break;
-    clipped += ch;
-    used += n;
-  }
-  let escaped = "";
-  for (const ch of clipped) escaped += ESCAPES[ch] ?? ch;
-  return escaped;
+function highlight(row5, terms, maxBytes = SNIPPET_MAX_BYTES) {
+  const words = blankTokens(terms);
+  const kept = words.filter((w) => !STOPWORDS.has(w.toLowerCase()));
+  return buildSnippet(row5, snippetTerms(kept.length > 0 ? kept : words), maxBytes);
 }
 var TL_SCOPE = `
     AND (:scope <> 'session' OR session_id = :session_id)
@@ -15250,10 +17408,253 @@ function rankTexts(texts, q, mode = "all") {
     mem.close();
   }
 }
+var BASE36 = "0123456789abcdefghijklmnopqrstuvwxyz";
+var SOURCE_ID_PREFIX = "s";
+var LABEL_SUFFIX_SEP = "#";
+function sourceHandle(id) {
+  return SOURCE_ID_PREFIX + id.toString(36);
+}
+function parseSourceHandle(s) {
+  if (!s.startsWith(SOURCE_ID_PREFIX) || s.length <= SOURCE_ID_PREFIX.length || s.length > SOURCE_ID_PREFIX.length + SOURCE_HANDLE_MAX_DIGITS) return null;
+  let n = 0;
+  for (const ch of s.slice(SOURCE_ID_PREFIX.length)) {
+    const d = BASE36.indexOf(ch);
+    if (d < 0) return null;
+    n = n * 36 + d;
+  }
+  return n > 0 && sourceHandle(n) === s ? n : null;
+}
+function resolveSourceLabel(db, source) {
+  const id = parseSourceHandle(source);
+  if (id !== null) {
+    const row5 = stmt(db.raw, "SELECT label FROM sources WHERE id = ?").get(id);
+    if (row5 !== void 0) return row5.label;
+  }
+  if (stmt(db.raw, "SELECT 1 AS x FROM sources WHERE label = ? LIMIT 1").get(source) !== void 0) return source;
+  const prefix = source + LABEL_SUFFIX_SEP;
+  const rows = stmt(db.raw, "SELECT label FROM sources WHERE substr(label, 1, ?) = ? ORDER BY id DESC").all(prefix.length, prefix);
+  for (const r of rows) {
+    if (r.label.lastIndexOf(LABEL_SUFFIX_SEP) === source.length) return r.label;
+  }
+  return source;
+}
+function listSessionSources(db, sessionId, limit) {
+  const rows = stmt(db.raw, "SELECT id, label, bytes_total FROM sources WHERE session_id = ? ORDER BY id DESC LIMIT ?").all(sessionId, limit);
+  return rows.map((r) => ({ id: Number(r.id), label: r.label, bytes: Number(r.bytes_total) }));
+}
+function insertUnits(db, sourceId, sessionId, units) {
+  let start = 0;
+  while (start < units.length) {
+    let end = start;
+    let bytes4 = 0;
+    while (end < units.length && (end === start || bytes4 + units[end].body.length <= INDEX_WRITE_CHUNK)) {
+      bytes4 += units[end].body.length;
+      end++;
+    }
+    const from = start;
+    withWrite(db, (h) => {
+      const ins = h.raw.prepare("INSERT INTO line_units(body, source_id, session_id, ord) VALUES (?, ?, ?, ?)");
+      for (let i = from; i < end; i++) {
+        const u = units[i];
+        ins.run(u.body, sourceId, sessionId, u.ord);
+      }
+    });
+    start = end;
+  }
+}
+function recallQueryText(prompt, goal) {
+  return goal === prompt ? prompt : prompt + " " + goal;
+}
+function queryUnits(db, sessionId, q, limit) {
+  const match = searchTerms(q).join(" OR ");
+  if (match === "" || sessionId === "") return [];
+  const rows = db.raw.prepare(
+    "SELECT u.source_id AS source_id, u.ord AS ord, u.body AS body, -bm25(line_units) AS score, s.label AS label FROM line_units u JOIN sources s ON s.id = u.source_id WHERE line_units MATCH ? AND u.session_id = ? ORDER BY bm25(line_units) LIMIT ?"
+  ).all(match, sessionId, limit);
+  return rows.map((r) => ({ sourceId: Number(r.source_id), ord: Number(r.ord), label: r.label, body: r.body, score: r.score }));
+}
+
+// src/core/index/units.ts
+function indentOf(line) {
+  let n = 0;
+  while (n < line.length && (line[n] === " " || line[n] === "	")) n++;
+  return n;
+}
+function buildUnits(text) {
+  const lines = text.split("\n");
+  const stack = [];
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].endsWith("\r") ? lines[i].slice(0, -1) : lines[i];
+    const indent = indentOf(line);
+    if (indent === line.length) continue;
+    while (stack.length > 0 && stack[stack.length - 1].indent >= indent) stack.pop();
+    out.push({ ord: i, body: [...stack.map((s) => s.line), line].join("\n") });
+    stack.push({ indent, line });
+  }
+  return out;
+}
+
+// src/core/compaction/candidates.ts
+function firstLine2(body) {
+  const nl = body.indexOf("\n");
+  return (nl < 0 ? body : body.slice(0, nl)).replaceAll("\r", " ");
+}
+function make(section, row5, text, repeatCount, query) {
+  const bytes4 = Buffer.byteLength(text, "utf8");
+  if (bytes4 < 1) throw new Error("compaction: empty candidate line (DECISIONS-r9 M9).");
+  return { section, seq: row5.seq, turn: row5.turn, text, bytes: bytes4, repeatCount, pinned: section === "last_request", query };
+}
+function capSection(list3) {
+  return list3.length > MAX_CANDIDATES ? list3.slice(list3.length - MAX_CANDIDATES) : list3;
+}
+function emptySet() {
+  return { lastRequest: null, openErrors: [], changedFiles: [], decisions: [], earlierRequests: [], indexedSources: [] };
+}
+function buildCandidates(rows, sessionId) {
+  if (!sessionId) return emptySet();
+  const own4 = rows.filter((r) => r.session_id === sessionId).sort((a, b) => a.seq - b.seq);
+  const prompts = own4.filter((r) => r.kind === "prompt");
+  const last = prompts.length > 0 ? prompts[prompts.length - 1] : void 0;
+  const lastRequest = last === void 0 ? null : make("last_request", last, "now: " + firstLine2(last.body), 1, null);
+  const earlierRequests = prompts.slice(0, prompts.length - 1).map((r) => make("earlier_requests", r, "asked #" + r.seq + ": " + firstLine2(r.body), 1, null));
+  const failures = /* @__PURE__ */ new Map();
+  const lastOk = /* @__PURE__ */ new Map();
+  for (const r of own4) {
+    if (r.kind !== "cmd" && r.kind !== "toolerr" || r.key === null) continue;
+    if (r.ok === 1) {
+      lastOk.set(r.key, r.seq);
+      continue;
+    }
+    failures.set(r.key, { row: r, count: (failures.get(r.key)?.count ?? 0) + 1 });
+  }
+  const openErrors = [];
+  for (const [key, f] of failures) {
+    if ((lastOk.get(key) ?? 0) > f.row.seq) continue;
+    openErrors.push(make("open_errors", f.row, "error #" + f.row.seq + " " + (f.row.tool ?? "") + ": " + key, f.count, key));
+  }
+  openErrors.sort((a, b) => a.seq - b.seq);
+  const edits = /* @__PURE__ */ new Map();
+  for (const r of own4) {
+    if (r.kind !== "edit" || r.path === null) continue;
+    edits.set(r.path, { row: r, count: (edits.get(r.path)?.count ?? 0) + 1 });
+  }
+  const changedFiles = [];
+  for (const [path4, e] of edits) {
+    const c = make("changed_files", e.row, "edited " + path4 + " x" + e.count, e.count, path4);
+    changedFiles.push({ ...c, editCount: e.count });
+  }
+  changedFiles.sort((a, b) => a.seq - b.seq);
+  const decided = /* @__PURE__ */ new Map();
+  for (const r of own4) {
+    if (r.kind !== "decision" || r.body === "") continue;
+    const key = r.key ?? r.body;
+    decided.set(key, { row: r, count: (decided.get(key)?.count ?? 0) + 1 });
+  }
+  const decisions = [];
+  for (const [key, d] of decided) decisions.push(make("decisions", d.row, "decided #" + d.row.seq + ": " + firstLine2(d.row.body), d.count, key));
+  decisions.sort((a, b) => a.seq - b.seq);
+  const indexedSources = own4.filter((r) => r.kind === "index").map((r) => make("indexed_sources", r, "indexed " + (r.key ?? ""), 1, r.key));
+  const set2 = {
+    lastRequest,
+    openErrors: capSection(openErrors),
+    changedFiles: capSection(changedFiles),
+    decisions: capSection(decisions),
+    earlierRequests: capSection(earlierRequests),
+    indexedSources: capSection(indexedSources)
+  };
+  const rest = [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources];
+  const total = rest.length + (lastRequest === null ? 0 : 1);
+  if (total <= MAX_CANDIDATES_TOTAL) return set2;
+  const drop = new Set(rest.map((c) => c.seq).sort((a, b) => a - b).slice(0, total - MAX_CANDIDATES_TOTAL));
+  return {
+    lastRequest,
+    openErrors: set2.openErrors.filter((c) => !drop.has(c.seq)),
+    changedFiles: set2.changedFiles.filter((c) => !drop.has(c.seq)),
+    decisions: set2.decisions.filter((c) => !drop.has(c.seq)),
+    earlierRequests: set2.earlierRequests.filter((c) => !drop.has(c.seq)),
+    indexedSources: set2.indexedSources.filter((c) => !drop.has(c.seq))
+  };
+}
+
+// src/core/compaction/score.ts
+function scoreCandidate(input) {
+  if (!Object.hasOwn(WEIGHT, input.section)) {
+    throw new Error(`compaction: "${String(input.section)}" has no weight; only toolerr, decision, prompt, edit and index rows are scored (ADR-0009 \xA73, DECISIONS-r11).`);
+  }
+  const age = Math.max(0, input.currentTurn - input.itemTurn);
+  const decay = DECAY_X1000[Math.min(age, DECAY_X1000.length - 1)];
+  let bonus = 1;
+  for (let n = Math.max(1, input.repeatCount); n > 1; n >>= 1) bonus += 1;
+  return Math.round(WEIGHT[input.section] * decay * bonus / DECAY_SCALE);
+}
+function weightKey(section) {
+  switch (section) {
+    case "last_request":
+    case "earlier_requests":
+      return "prompt";
+    case "open_errors":
+      return "toolerr";
+    case "changed_files":
+      return "edit";
+    case "decisions":
+      return "decision";
+    case "indexed_sources":
+      return "index";
+  }
+}
+function scoreCandidates(candidates2, currentTurn) {
+  return candidates2.map((c) => ({
+    ...c,
+    score: scoreCandidate({ section: weightKey(c.section), currentTurn, itemTurn: c.turn, repeatCount: c.repeatCount })
+  }));
+}
 
 // src/core/compaction/recall.ts
+function unitKey(u) {
+  return u.sourceId + ":" + u.ord;
+}
+function unitLine(u) {
+  return "@" + u.label + " line " + (u.ord + 1) + ":\n" + u.body;
+}
+function wordsOf(s) {
+  return new Set(wordTokens(s.toLowerCase()));
+}
+function overlap(a, b) {
+  let n = 0;
+  for (const w of a) if (b.has(w)) n++;
+  return a.size + b.size - n === 0 ? 0 : n / (a.size + b.size - n);
+}
+function pickUnits(cands, seen, budget) {
+  const pool = cands.filter((u) => !seen.has(unitKey(u)) && u.score >= RECALL_MIN_SCORE);
+  if (pool.length === 0) return [];
+  const top = Math.max(...pool.map((u) => u.score));
+  const words = pool.map((u) => wordsOf(u.body));
+  const taken = [];
+  const left = new Set(pool.map((_, i) => i));
+  let used = 0;
+  while (left.size > 0) {
+    let best = -1;
+    let bestVal = -Infinity;
+    for (const i of left) {
+      let sim = 0;
+      for (const j of taken) sim = Math.max(sim, overlap(words[i], words[j]));
+      const val = MMR_RELEVANCE_WEIGHT * (pool[i].score / top) - MMR_REDUNDANCY_WEIGHT * sim;
+      if (val > bestVal) {
+        bestVal = val;
+        best = i;
+      }
+    }
+    left.delete(best);
+    const cost = bytesOf(unitLine(pool[best])) + 1;
+    if (used + cost > budget) continue;
+    used += cost;
+    taken.push(best);
+  }
+  return taken.map((i) => pool[i]);
+}
 var NONE2 = { text: "", seqs: [] };
-function bytesOf2(s) {
+function bytesOf(s) {
   return Buffer.byteLength(s, "utf8");
 }
 function textOf(r) {
@@ -15262,24 +17663,104 @@ function textOf(r) {
 function recallLine(r) {
   return "#" + r.seq + " " + r.kind + (r.tool === null ? "" : " " + r.tool) + ": " + textOf(r);
 }
-function pickRecall(rows, prompt, seen) {
+function pickRecall(rows, prompt, seen, units = [], seenUnits = /* @__PURE__ */ new Set()) {
   if (prompt.trim() === "") return NONE2;
   const pool = rows.filter((r) => !seen.has(r.seq) && r.kind !== "cost" && !(r.kind === "prompt" && r.body === prompt) && textOf(r) !== "");
-  if (pool.length === 0) return NONE2;
-  const scores = rankTexts(pool.map(textOf), prompt, "any");
+  const scores = pool.length === 0 ? [] : rankTexts(pool.map(textOf), prompt, "any");
   const order = pool.map((r, i) => ({ r, score: scores[i] })).filter((x) => x.score >= RECALL_MIN_SCORE).sort((a, b) => b.score - a.score || b.r.seq - a.r.seq);
-  if (order.length === 0) return NONE2;
-  let used = bytesOf2(RECALL_OPEN_TAG) + 1 + bytesOf2(RECALL_CLOSE_TAG);
+  let used = bytesOf(RECALL_OPEN_TAG) + 1 + bytesOf(RECALL_CLOSE_TAG);
   const taken = [];
   for (const { r } of order) {
-    const cost = bytesOf2(recallLine(r)) + 1;
+    const cost = bytesOf(recallLine(r)) + 1;
     if (used + cost > RECALL_BUDGET_BYTES) continue;
     used += cost;
     taken.push(r);
   }
-  if (taken.length === 0) return NONE2;
+  const picked = pickUnits(units, seenUnits, RECALL_BUDGET_BYTES - used);
+  if (taken.length === 0 && picked.length === 0) return NONE2;
   taken.sort((a, b) => a.seq - b.seq);
-  return { text: [RECALL_OPEN_TAG, ...taken.map(recallLine), RECALL_CLOSE_TAG].join("\n"), seqs: taken.map((r) => r.seq) };
+  const lines = [...taken.map(recallLine), ...picked.map(unitLine)];
+  return { text: [RECALL_OPEN_TAG, ...lines, RECALL_CLOSE_TAG].join("\n"), seqs: taken.map((r) => r.seq), ...picked.length > 0 ? { units: picked.map(unitKey) } : {} };
+}
+
+// src/core/compaction/render.ts
+function bytesOf2(s) {
+  return Buffer.byteLength(s, "utf8");
+}
+function lineOf(c, prefix) {
+  return c.bytes > POINTER_MIN ? "#" + c.seq + " (" + c.bytes + " B) " + prefix + "ctx_resume(seq:" + c.seq + ")" : c.text;
+}
+function moreLine(queries, prefix) {
+  return "more: " + prefix + "ctx_search(queries:" + JSON.stringify(queries) + ', scope:"session")';
+}
+function renderState(rows, turn, extras, prefix = "") {
+  let newest;
+  for (const r of rows) if (newest === void 0 || r.seq > newest.seq) newest = r;
+  const sessionId = newest === void 0 ? "" : newest.session_id;
+  const upto = newest === void 0 || sessionId === "" ? 0 : newest.seq;
+  const set2 = buildCandidates(rows, sessionId);
+  const openTag = `<context_mode_state session="${sessionId}" upto="${upto}">`;
+  const emptyMoreBytes = bytesOf2(moreLine([], prefix));
+  const budget = STATE_BUDGET - (bytesOf2(openTag) + 1 + emptyMoreBytes + 1 + bytesOf2(STATE_CLOSE_TAG));
+  let used = 0;
+  const pinnedLine = set2.lastRequest === null ? null : lineOf(set2.lastRequest, prefix);
+  if (pinnedLine !== null) used += bytesOf2(pinnedLine) + 1;
+  const remaining = scoreCandidates(
+    [...set2.openErrors, ...set2.changedFiles, ...set2.decisions, ...set2.earlierRequests, ...set2.indexedSources],
+    turn
+  );
+  const k = /* @__PURE__ */ new Map();
+  const taken = [];
+  const skipped = [];
+  while (remaining.length > 0) {
+    let best = 0;
+    let bestRatio = -Infinity;
+    for (let i = 0; i < remaining.length; i++) {
+      const c2 = remaining[i];
+      const ratio = c2.score * RATIO_SECTION_DECAY ** (k.get(c2.section) ?? 0) / c2.bytes;
+      if (ratio > bestRatio || ratio === bestRatio && c2.seq > remaining[best].seq) {
+        best = i;
+        bestRatio = ratio;
+      }
+    }
+    const c = remaining.splice(best, 1)[0];
+    const lineBytes = bytesOf2(lineOf(c, prefix)) + 1;
+    if (used + lineBytes <= budget) {
+      used += lineBytes;
+      taken.push(c);
+      k.set(c.section, (k.get(c.section) ?? 0) + 1);
+    } else {
+      skipped.push(c);
+    }
+  }
+  const lines = [openTag];
+  if (pinnedLine !== null) lines.push(pinnedLine);
+  for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"]) {
+    for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c, prefix));
+  }
+  if (extras !== void 0) {
+    for (const l of extras.sources) {
+      const b = bytesOf2(l) + 1;
+      if (used + b > budget) continue;
+      used += b;
+      lines.push(l);
+    }
+    for (const u of pickUnits(extras.units, /* @__PURE__ */ new Set(), budget - used)) {
+      const l = unitLine(u);
+      used += bytesOf2(l) + 1;
+      lines.push(l);
+    }
+  }
+  const queries = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const c of skipped.sort((a, b) => a.seq - b.seq)) {
+    if (c.query === null || seen.has(c.query)) continue;
+    if (bytesOf2(moreLine([...queries, c.query], prefix)) - emptyMoreBytes > budget - used) break;
+    queries.push(c.query);
+    seen.add(c.query);
+  }
+  lines.push(moreLine(queries, prefix), STATE_CLOSE_TAG);
+  return lines.join("\n");
 }
 
 // src/core/index/chunk.ts
@@ -15304,9 +17785,52 @@ var encoder = new TextEncoder();
 function chunkText(text, kind, maxBytes = MAX_CHUNK_BYTES) {
   const src = normalize(text);
   if (src.length === 0) return [];
-  const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, kind === "md");
   const cap = Math.max(4, Math.min(MAX_CHUNK_BYTES, Math.floor(maxBytes)));
+  if (kind === "md") return mdChunks(src, cap, cap < MAX_CHUNK_BYTES);
+  const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, false);
   return merge2(src, blocks, kind !== "text", cap, cap < MAX_CHUNK_BYTES);
+}
+function mdChunks(src, cap, lineCut) {
+  const out = [];
+  const stack = [];
+  let title = "";
+  let run = [];
+  const push2 = (text, bytes4) => {
+    out.push({ ord: out.length, text, bytes: bytes4, title });
+  };
+  const flush = () => {
+    if (run.length === 0) return;
+    for (const c of merge2(src, run, true, cap, lineCut)) push2(c.text, c.bytes);
+    run = [];
+  };
+  for (const b of lineBlocks(src, true)) {
+    if (b.heading !== void 0) {
+      flush();
+      while (stack.length > 0 && stack[stack.length - 1].level >= b.heading.level) stack.pop();
+      stack.push(b.heading);
+      title = stack.map((h) => h.text).join(" > ");
+    }
+    if (b.fence !== void 0 && utf8Bytes(src.slice(b.start, b.end)) > cap) {
+      const pieces = fencePieces(src, b, b.fence, cap);
+      if (pieces !== void 0) {
+        flush();
+        for (const p of pieces) push2(p, utf8Bytes(p));
+        continue;
+      }
+    }
+    run.push(b);
+  }
+  flush();
+  return out;
+}
+function fencePieces(src, b, f, cap) {
+  const opener = src.slice(b.start, f.openEnd);
+  const closer = f.closeStart >= 0 ? src.slice(f.closeStart, b.end) : f.fence;
+  const innerEnd = f.closeStart >= 0 ? Math.max(f.openEnd + 1, f.closeStart - 1) : b.end;
+  const inner = src.slice(Math.min(f.openEnd + 1, innerEnd), innerEnd);
+  const room = cap - utf8Bytes(opener) - utf8Bytes(closer) - 2;
+  if (room < 16 || inner.length === 0) return void 0;
+  return merge2(inner, lineBlocks(inner, false), true, room, true).map((c) => opener + "\n" + c.text + "\n" + closer);
 }
 function normalize(text) {
   const lf = text.split("\r\n").join("\n");
@@ -15318,9 +17842,18 @@ function lineBlocks(src, md) {
   let end = -1;
   let inTable = false;
   let fence = "";
+  let heading;
+  let fenceInfo;
   const close = () => {
-    if (start >= 0) out.push({ start, end });
+    if (start >= 0) {
+      const span = { start, end };
+      if (heading !== void 0) span.heading = heading;
+      if (fenceInfo !== void 0) span.fence = fenceInfo;
+      out.push(span);
+    }
     start = -1;
+    heading = void 0;
+    fenceInfo = void 0;
   };
   const add = (from, to, table) => {
     if (start < 0) start = from;
@@ -15334,20 +17867,59 @@ function lineBlocks(src, md) {
     const line = src.slice(pos, eol);
     if (fence !== "") {
       add(pos, eol, false);
-      if (closesFence(line, fence)) fence = "";
+      if (closesFence(line, fence)) {
+        fence = "";
+        if (md && fenceInfo !== void 0) {
+          fenceInfo.closeStart = pos;
+          close();
+        }
+      }
     } else if (line.length === 0) {
       close();
     } else {
       const opener = md ? fenceOf(line) : "";
-      const table = md && opener === "" && line.includes("|");
-      if (md && start >= 0 && table !== inTable) close();
+      const head = md && opener === "" ? headingOf(line) : void 0;
+      const table = md && opener === "" && head === void 0 && line.includes("|");
+      if (md && start >= 0 && (table !== inTable || opener !== "" || head !== void 0)) close();
       add(pos, eol, table);
       fence = opener;
+      if (opener !== "") fenceInfo = { fence: opener, openEnd: eol, closeStart: -1 };
+      if (head !== void 0) {
+        heading = head;
+        close();
+      }
     }
     pos = eol + 1;
   }
   close();
   return out;
+}
+function hasMdStructure(text) {
+  let pos = 0;
+  while (pos <= text.length) {
+    const nl = text.indexOf("\n", pos);
+    const eol = nl < 0 ? text.length : nl;
+    const line = text.slice(pos, eol).replace("\r", "");
+    if (fenceOf(line) !== "" || headingOf(line) !== void 0) return true;
+    pos = eol + 1;
+  }
+  return false;
+}
+function headingOf(line) {
+  let i = 0;
+  while (i < line.length && i < 4 && line[i] === " ") i += 1;
+  if (i > 3) return void 0;
+  let level = 0;
+  while (i + level < line.length && line[i + level] === "#") level += 1;
+  if (level < 1 || level > 6) return void 0;
+  const after = line[i + level];
+  if (after !== void 0 && after !== " " && after !== "	") return void 0;
+  let text = line.slice(i + level).trim();
+  let k = text.length;
+  while (k > 0 && text[k - 1] === "#") k -= 1;
+  if (k === 0) text = "";
+  else if (k < text.length && (text[k - 1] === " " || text[k - 1] === "	")) text = text.slice(0, k).trim();
+  return { level, text };
 }
 function fenceOf(line) {
   const t = line.trimStart();
@@ -15472,10 +18044,11 @@ function cutPoint(src, start, end, scratch) {
 function merge2(src, blocks, join24, cap, lineCut) {
   const out = [];
   const scratch = new Uint8Array(cap);
+  let wide;
   let cur;
   let curBytes = 0;
-  const emit = (start, end, bytes3) => {
-    out.push({ ord: out.length, text: src.slice(start, end), bytes: bytes3 });
+  const emit = (start, end, bytes4) => {
+    out.push({ ord: out.length, text: src.slice(start, end), bytes: bytes4 });
   };
   for (const b of blocks) {
     if (cur !== void 0 && !join24) {
@@ -15493,23 +18066,41 @@ function merge2(src, blocks, join24, cap, lineCut) {
       cur = void 0;
     }
     let start = b.start;
-    let bytes3 = utf8Bytes(src.slice(b.start, b.end));
-    while (bytes3 > cap) {
+    let bytes4 = utf8Bytes(src.slice(b.start, b.end));
+    while (bytes4 > cap) {
       const cut = cutPoint(src, start, b.end, scratch);
       const nl = lineCut ? src.lastIndexOf("\n", cut.end - 1) : -1;
       if (nl > start) {
         const w = utf8Bytes(src.slice(start, nl + 1));
         emit(start, nl + 1, w);
         start = nl + 1;
-        bytes3 -= w;
+        bytes4 -= w;
+        continue;
+      }
+      if (lineCut) {
+        const eol = src.indexOf("\n", start);
+        const lineEnd = eol < 0 || eol >= b.end ? b.end : eol + 1;
+        const w = utf8Bytes(src.slice(start, lineEnd));
+        if (w <= MAX_CHUNK_BYTES) {
+          emit(start, lineEnd, w);
+          start = lineEnd;
+          bytes4 -= w;
+          continue;
+        }
+        wide ??= new Uint8Array(MAX_CHUNK_BYTES);
+        const big = cutPoint(src, start, lineEnd, wide);
+        emit(start, big.end, big.written);
+        start = big.end;
+        bytes4 -= big.written;
         continue;
       }
       emit(start, cut.end, cut.written);
       start = cut.end;
-      bytes3 -= cut.written;
+      bytes4 -= cut.written;
     }
+    if (start >= b.end) continue;
     cur = { start, end: b.end };
-    curBytes = bytes3;
+    curBytes = bytes4;
   }
   if (cur !== void 0) emit(cur.start, cur.end, curBytes);
   return out;
@@ -15554,6 +18145,230 @@ function select(chunks, intent, budget, label, rankQuery) {
 function moreLine2(intent, label) {
   const source = label === void 0 ? "" : ", source:" + JSON.stringify(label);
   return "ctx_search({queries:[" + JSON.stringify(intent) + "]" + source + "})";
+}
+
+// src/core/index/shape.ts
+var SHAPE_MIN_ROWS = 20;
+var SHAPE_RARE_MAX = 2;
+var SHAPE_RARE_UNITS_MAX = 9;
+var SHAPE_CATEGORICAL_MAX = 8;
+var SHAPE_DOMINANT = 0.9;
+var SHAPE_SIMILARITY = 0.5;
+var SHAPE_MAX_CLUSTERS = 64;
+var SHAPE_EXTREME_KEYS = 2;
+var SHAPE_COMMON_MAX = 4;
+var SEP2 = "\n";
+var ABSENT = "(absent)";
+var bytes = (s) => Buffer.byteLength(s, "utf8");
+function shapeDigest(text, query, budget) {
+  const shape = jsonShape(text, query) ?? jsonExtremes(text, query) ?? lineShape(text);
+  if (shape === null || query.trim() === "") return null;
+  const scores = shape.direct === true ? shape.units.map(() => 1) : rankTexts(shape.units.map((u) => u.rank), query, "any");
+  const order = shape.units.map((_, i) => i).filter((i) => scores[i] > 0).sort((a, b) => scores[b] - scores[a] || shape.units[a].pos - shape.units[b].pos);
+  const picked = [];
+  let used = 0;
+  for (const i of order) {
+    const sep3 = picked.length > 0 ? bytes(SEP2) : 0;
+    const r = shape.units[i].render(budget - used - sep3);
+    if (r === null || used + sep3 + bytes(r) > budget) continue;
+    picked.push({ pos: shape.units[i].pos, text: r });
+    used += sep3 + bytes(r);
+  }
+  if (picked.length === 0) return null;
+  picked.sort((a, b) => a.pos - b.pos);
+  const body = picked.map((p) => p.text);
+  if (used + bytes(SEP2) + bytes(shape.header) <= budget) body.unshift(shape.header);
+  return body.join(SEP2);
+}
+function firstNonSpace(s) {
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (c !== " " && c !== "\n" && c !== "\r" && c !== "	") return c;
+  }
+  return "";
+}
+function isPlainObject2(v) {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+function rareOfSkewed(n, counts, totals) {
+  if (totals.size < 2 || totals.size > SHAPE_CATEGORICAL_MAX) return [];
+  const sorted = [...totals.entries()].sort((a, b) => b[1] - a[1]);
+  if (totals.size <= SHAPE_RARE_MAX + 1) {
+    if (sorted[0][1] < SHAPE_DOMINANT * n || n - sorted[0][1] > SHAPE_RARE_MAX) return [];
+    return sorted.slice(1).flatMap(([v]) => counts.get(v) ?? []);
+  }
+  const common = sorted.filter(([, c]) => c > SHAPE_RARE_MAX);
+  const oneOff = sorted.filter(([, c]) => c <= SHAPE_RARE_MAX);
+  if (common.length < 2 || oneOff.length === 0) return [];
+  return oneOff.flatMap(([v]) => counts.get(v) ?? []);
+}
+function jsonRows(text) {
+  if (firstNonSpace(text) !== "[") return null;
+  let rows;
+  try {
+    rows = JSON.parse(text);
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(rows) || rows.length < SHAPE_MIN_ROWS || !rows.every(isPlainObject2)) return null;
+  const objs = rows;
+  const keys = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const o of objs) for (const k of Object.keys(o)) if (!seen.has(k)) {
+    seen.add(k);
+    keys.push(k);
+  }
+  return { objs, keys };
+}
+var schemaOf = (n, keys) => n + " objects {" + keys.join(",") + "}";
+function jsonShape(text, query) {
+  const parsedRows = jsonRows(text);
+  if (parsedRows === null) return null;
+  const { objs, keys } = parsedRows;
+  const outliers = /* @__PURE__ */ new Map();
+  for (const k of keys) {
+    const counts = /* @__PURE__ */ new Map();
+    const totals = /* @__PURE__ */ new Map();
+    let scalar = true;
+    for (let i = 0; i < objs.length && scalar; i++) {
+      const v = k in objs[i] ? objs[i][k] : void 0;
+      if (typeof v === "object" && v !== null) {
+        scalar = false;
+        break;
+      }
+      const s = v === void 0 ? ABSENT : JSON.stringify(v);
+      totals.set(s, (totals.get(s) ?? 0) + 1);
+      const at2 = counts.get(s) ?? [];
+      if (at2.length <= SHAPE_RARE_MAX) at2.push(i);
+      counts.set(s, at2);
+      if (totals.size > SHAPE_CATEGORICAL_MAX) break;
+    }
+    if (!scalar) continue;
+    for (const i of rareOfSkewed(objs.length, counts, totals)) outliers.set(i, [...outliers.get(i) ?? [], k]);
+  }
+  if (outliers.size === 0 || outliers.size > SHAPE_RARE_UNITS_MAX) return null;
+  const keyScore = rankTexts(keys, query, "any");
+  const named = new Set(keys.filter((_, i) => keyScore[i] > 0));
+  const units = [...outliers.entries()].map(([i, skewed]) => ({
+    pos: i,
+    rank: JSON.stringify(objs[i]),
+    render: (budget) => renderRow(i, objs[i], skewed, named, budget)
+  }));
+  return { header: schemaOf(objs.length, keys) + ", " + outliers.size + " rare:", units };
+}
+function renderRow(i, row5, skewed, named, budget) {
+  const prefix = "[" + i + "] ";
+  const body = fitRow(row5, skewed, named, budget - bytes(prefix));
+  return body === null ? null : prefix + body;
+}
+function fitRow(row5, skewed, named, budget) {
+  const whole = JSON.stringify(row5);
+  if (bytes(whole) <= budget) return whole;
+  const own4 = Object.keys(row5);
+  const tier = (k) => skewed.includes(k) ? 0 : named.has(k) ? 1 : typeof row5[k] !== "object" || row5[k] === null ? 2 : 3;
+  const order = [...own4].sort((a, b) => tier(a) - tier(b) || own4.indexOf(a) - own4.indexOf(b));
+  const field = (k) => JSON.stringify(k) + ":" + JSON.stringify(row5[k]);
+  const chosen = /* @__PURE__ */ new Set();
+  let used = 2;
+  for (const k of order) {
+    const cost = bytes(field(k)) + (chosen.size > 0 ? 1 : 0);
+    if (used + cost > budget) continue;
+    chosen.add(k);
+    used += cost;
+  }
+  if (!skewed.every((k) => chosen.has(k))) return null;
+  return "{" + own4.filter((k) => chosen.has(k)).map(field).join(",") + "}";
+}
+function namedKeys(keys, query) {
+  const score = rankTexts(keys, query, "any");
+  return new Set(keys.filter((_, i) => score[i] > 0));
+}
+function jsonExtremes(text, query) {
+  const parsedRows = jsonRows(text);
+  if (parsedRows === null) return null;
+  const { objs, keys } = parsedRows;
+  const named = namedKeys(keys, query);
+  const picks = /* @__PURE__ */ new Map();
+  let used = 0;
+  for (const k of keys) {
+    if (!named.has(k) || used >= SHAPE_EXTREME_KEYS) continue;
+    if (!objs.every((o) => typeof o[k] === "number" && Number.isFinite(o[k]))) continue;
+    let hi = 0, lo = 0;
+    for (let i = 1; i < objs.length; i++) {
+      if (objs[i][k] > objs[hi][k]) hi = i;
+      if (objs[i][k] < objs[lo][k]) lo = i;
+    }
+    if (hi === lo) continue;
+    used++;
+    picks.set(hi, k);
+    picks.set(lo, k);
+  }
+  if (picks.size === 0) return null;
+  const units = [...picks.entries()].map(([i, k]) => ({
+    pos: i,
+    rank: "",
+    render: (budget) => renderRow(i, objs[i], [k], named, budget)
+  }));
+  return { header: schemaOf(objs.length, keys) + ", extremes of " + [...new Set(picks.values())].join(",") + ":", units, direct: true };
+}
+function hasDigit(t) {
+  for (let i = 0; i < t.length; i++) if (t[i] >= "0" && t[i] <= "9") return true;
+  return false;
+}
+function similarity(tpl, toks) {
+  let same = 0;
+  for (let i = 0; i < tpl.length; i++) if (tpl[i] === toks[i] || tpl[i] === "<*>" || toks[i] === "<*>") same++;
+  return same / tpl.length;
+}
+function lineShape(text) {
+  const all = text.split("\n");
+  if (all.length > 0 && all[all.length - 1] === "") all.pop();
+  if (all.length < SHAPE_MIN_ROWS) return null;
+  const groups = /* @__PURE__ */ new Map();
+  const clusters = [];
+  for (let n = 0; n < all.length; n++) {
+    const raw = all[n].split(" ").filter((t) => t !== "");
+    const toks = raw.map((t) => hasDigit(t) ? "<*>" : t);
+    const key = toks.length + " " + (toks[0] ?? "");
+    const group = groups.get(key) ?? [];
+    let hit;
+    for (const c of group) if (similarity(c.tpl, toks) >= SHAPE_SIMILARITY) {
+      hit = c;
+      break;
+    }
+    if (hit === void 0) {
+      hit = { tpl: [...toks], count: 0, lines: [], pos: raw.map(() => ({ counts: /* @__PURE__ */ new Map(), totals: /* @__PURE__ */ new Map() })) };
+      group.push(hit);
+      groups.set(key, group);
+      clusters.push(hit);
+      if (clusters.length > SHAPE_MAX_CLUSTERS) return null;
+    } else {
+      for (let i = 0; i < hit.tpl.length; i++) if (hit.tpl[i] !== toks[i]) hit.tpl[i] = "<*>";
+    }
+    hit.count++;
+    if (hit.lines.length <= SHAPE_RARE_MAX) hit.lines.push(n);
+    for (let i = 0; i < hit.pos.length; i++) {
+      const p = hit.pos[i];
+      if (p === null) continue;
+      p.totals.set(raw[i], (p.totals.get(raw[i]) ?? 0) + 1);
+      const at2 = p.counts.get(raw[i]) ?? [];
+      if (at2.length <= SHAPE_RARE_MAX) at2.push(n);
+      p.counts.set(raw[i], at2);
+      if (p.totals.size > SHAPE_RARE_MAX + 1) hit.pos[i] = null;
+    }
+  }
+  const common = clusters.filter((c) => c.count > SHAPE_RARE_MAX);
+  if (common.length === 0 || common.length > SHAPE_COMMON_MAX) return null;
+  if (common.some((c) => c.tpl.every((t) => t === "<*>"))) return null;
+  const rare = new Set(clusters.filter((c) => c.count <= SHAPE_RARE_MAX).flatMap((c) => c.lines));
+  for (const c of common) for (const p of c.pos) if (p !== null) for (const n of rareOfSkewed(c.count, p.counts, p.totals)) rare.add(n);
+  if (rare.size === 0 || rare.size > SHAPE_RARE_UNITS_MAX) return null;
+  const header = all.length + " lines, " + rare.size + " rare:";
+  const units = [...rare].sort((a, b) => a - b).map((n) => {
+    const line = n + 1 + ": " + all[n];
+    return { pos: n, rank: all[n], render: (budget) => bytes(line) <= budget ? line : null };
+  });
+  return { header, units };
 }
 
 // src/core/index/text.ts
@@ -15664,9 +18479,10 @@ function shouldHint(db, sessionId, onceKey, everyN) {
 }
 
 // src/core/hooks/io.ts
-import { writeSync } from "node:fs";
+var { read: read2, writeSync } = process.getBuiltinModule("node:fs");
 
 // src/core/hooks/dispatch.ts
+var { readFileSync: readFileSync4 } = process.getBuiltinModule("node:fs");
 var ALLOW2 = { kind: "allow" };
 var EMPTY4 = { stdout: "", exitCode: 0 };
 var DIGIT_0 = 48;
@@ -15694,7 +18510,8 @@ async function handleHook(agent, raw, env) {
   }
   let project;
   try {
-    project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd });
+    const argv = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, ev.cwd] : process.argv;
+    project = resolveProject(agent, { env, argv, cwd: ev.cwd, piCwd: agent === "pi" ? ev.cwd : void 0 });
   } catch (err) {
     process.stderr.write("hooks: no project: " + String(err.code ?? "ERROR") + " " + message(err) + "\n");
     return row5.encode(ev, ALLOW2);
@@ -15729,8 +18546,8 @@ function withPrefix(template, row5) {
   return template.split(TOOL_PREFIX_SLOT).join(row5.toolNamePrefix);
 }
 function compactText(db, ev, row5) {
-  if (row5.compactSummary === "host") return COMPACT_POINTER_LINE;
-  return renderState(readSessionEvents(db, ev.sessionId), ev.turn ?? 0);
+  if (row5.compactSummary === "host") return prefixToolNames(COMPACT_POINTER_LINE, row5.toolNamePrefix);
+  return renderState(readSessionEvents(db, ev.sessionId), ev.turn ?? 0, void 0, row5.toolNamePrefix);
 }
 async function sessionStart(ev, row5, project) {
   if (ev.source === "compact" && hasRecall(row5)) markCompacted(await openDb(project), ev.sessionId);
@@ -15748,6 +18565,7 @@ async function sessionStart(ev, row5, project) {
 }
 async function userPromptSubmit(ev, row5, project) {
   const body = ev.prompt ?? "";
+  const resume = await firstTurnResume(ev, row5, project);
   appendDetached(project, ev.sessionId, {
     session_id: ev.sessionId,
     worktree: project.worktree,
@@ -15771,7 +18589,16 @@ async function userPromptSubmit(ev, row5, project) {
       return { kind: "hint", text: compactText(db, ev, row5), onceKey: PENDING_COMPACT_KEY };
     }
   }
+  if (resume !== null) return resume;
   return recall(ev, row5, project, body);
+}
+async function firstTurnResume(ev, row5, project) {
+  if (row5.eventMap.SessionStart !== void 0 || ev.sessionId === "") return null;
+  const db = await openDb(project);
+  if (hasSessionRows(db, ev.sessionId)) return null;
+  if (!shouldHint(db, ev.sessionId, RESUME_HINT_KEY)) return null;
+  if (!hasAgentRows(db, project.worktree, ev.agent)) return null;
+  return { kind: "hint", text: withPrefix(RESUME_HINT, row5), onceKey: RESUME_HINT_KEY };
 }
 function markCompacted(db, sessionId) {
   if (sessionId !== "") metaSet(db, COMPACTED_META_PREFIX + sessionId, PENDING_COMPACT_FLAG);
@@ -15785,15 +18612,29 @@ function seenSeqs(value) {
     return [];
   }
 }
+function seenUnitKeys(value) {
+  if (value === null) return [];
+  try {
+    const v = JSON.parse(value);
+    return Array.isArray(v) ? v.filter((k) => typeof k === "string") : [];
+  } catch {
+    return [];
+  }
+}
 async function recall(ev, row5, project, prompt) {
   if (!hasRecall(row5) || ev.sessionId === "") return ALLOW2;
   const db = await openDb(project);
   if (metaGet(db, COMPACTED_META_PREFIX + ev.sessionId) === null) return ALLOW2;
   const seenKey = RECALL_SEEN_META_PREFIX + ev.sessionId;
   const seen = seenSeqs(metaGet(db, seenKey));
-  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen));
+  const unitsKey = RECALL_UNITS_SEEN_META_PREFIX + ev.sessionId;
+  const seenUnits = seenUnitKeys(metaGet(db, unitsKey));
+  const goal = readFirstPrompt(db, ev.sessionId);
+  const units = queryUnits(db, ev.sessionId, recallQueryText(prompt, goal), RECALL_UNIT_CANDIDATES);
+  const picked = pickRecall(readRecallRows(db, ev.sessionId, project.worktree, RECALL_MAX_ROWS), prompt, new Set(seen), units, new Set(seenUnits));
   if (picked.text === "") return ALLOW2;
-  metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  if (picked.seqs.length > 0) metaSet(db, seenKey, JSON.stringify([...seen, ...picked.seqs]));
+  if (picked.units !== void 0) metaSet(db, unitsKey, JSON.stringify([...seenUnits, ...picked.units]));
   return { kind: "hint", text: picked.text, onceKey: RECALL_KEY };
 }
 function optionsKey(sessionId) {
@@ -15872,15 +18713,15 @@ async function preToolUse(ev, row5, project, env) {
 function isShell(tool, row5) {
   return tool.canonicalName === SHELL_TOOL || row5.nativeTools.shell.includes(tool.name);
 }
-function isUserPolicyDeny(reason) {
-  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === POLICY_UNREADABLE_LINE || reason === PARSE_ERROR_DENY_LINE;
+function isUserPolicyDeny(reason, row5) {
+  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === prefixToolNames(POLICY_UNREADABLE_LINE, row5.toolNamePrefix) || reason === prefixToolNames(PARSE_ERROR_DENY_LINE, row5.toolNamePrefix);
 }
 function b64(s) {
   return Buffer.from(s, "utf8").toString("base64url");
 }
 function caseB(ev, row5, d0, userDeny) {
   const tool = ev.tool;
-  if (tool === void 0 || !isShell(tool, row5) || isUserPolicyDeny(d0.reason)) return d0;
+  if (tool === void 0 || !isShell(tool, row5) || isUserPolicyDeny(d0.reason, row5)) return d0;
   const command = tool.input.command;
   if (typeof command !== "string") return d0;
   const wrapper = '"' + join5(dirname3(process.argv[1] ?? ""), RUN_WRAPPER_FILE) + '"';
@@ -15924,7 +18765,8 @@ async function postToolUse(ev, row5, project, env) {
   const tool = ev.tool;
   if (tool === void 0 || tool.canonicalName.startsWith(OWN_TOOL_PREFIX)) return ALLOW2;
   const result = ev.result ?? { isError: false, bytes: 0 };
-  const text = result.text ?? "";
+  const text = wholeOutput(result);
+  if (result.persistedPath !== void 0) result.bytes = Buffer.byteLength(text);
   if (tool.canonicalName === DECISION_TOOL) askDetached(ev, project, tool, text);
   const kind = journalKind(tool, row5, result.isError);
   if (kind !== null) {
@@ -15948,6 +18790,7 @@ async function postToolUse(ev, row5, project, env) {
     });
   }
   if (result.bytes <= REPLACE_TRIGGER_BYTES) return ALLOW2;
+  if (result.keep === true) return ALLOW2;
   let label;
   if (isSubagentCall(ev)) {
     const subCase = pickSubagentCase(ev, toolSetForAgentType(ev, { projectDir: project.worktree, env }));
@@ -15959,16 +18802,39 @@ async function postToolUse(ev, row5, project, env) {
   }
   const intent = [tool.input.description, tool.input.command, tool.input.file_path, tool.input.pattern, tool.input.url].map(str2).find((v) => v.trim() !== "") ?? "";
   const chunks = chunkText(text, "text", REPLACE_CHUNK_BYTES);
+  const db = await openDb(project);
+  let sourceId;
   if (result.bytes <= SYNC_INDEX_MAX_BYTES) {
-    const db = await openDb(project);
-    indexText(db, project, ev.sessionId, label, text, "text", chunks);
+    sourceId = indexText(db, project, ev.sessionId, label, text, "text", chunks).sourceId;
+    insertUnits(db, sourceId, ev.sessionId, buildUnits(text));
   } else {
-    indexDetached(project, ev.sessionId, label, text, chunks);
+    sourceId = reserveSource(db, sourceRowOf(project, ev.sessionId, label), chunks);
+    indexDetached(project, ev.sessionId, sourceId, label, text, chunks);
   }
+  const handle = sourceHandle(sourceId);
   const prompt = await lastPrompt(project, ev.sessionId);
   const rankQuery = prompt.trim() === "" ? void 0 : intent + " " + prompt;
-  const selected = selectChunksInMemory(chunks, intent, REPLACE_RETURN_BYTES, label, rankQuery);
-  return { kind: "replace", output: selected.text + (selected.more !== null ? "\n" + selected.more : "") };
+  const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes, row5.toolNamePrefix);
+  const budget = replaceBudget(handleLine, moreLine2(intent, label));
+  const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES);
+  if (digest !== null) return { kind: "replace", output: replaceOutput(digest, handleLine) };
+  const selected = selectChunksInMemory(chunks, intent, budget, label, rankQuery);
+  return { kind: "replace", output: selected.more !== null ? replaceOutput(selected.text, handleLine) : selected.text };
+}
+function replaceOutput(body, handleLine) {
+  return body === "" ? handleLine : body + "\n" + handleLine;
+}
+function replaceBudget(handleLine, more) {
+  return Math.max(0, REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + more) - 1 - Buffer.byteLength(handleLine));
+}
+function wholeOutput(result) {
+  const head = result.text ?? "";
+  if (result.persistedPath === void 0) return head;
+  try {
+    return readFileSync4(result.persistedPath, "utf8");
+  } catch {
+    return head;
+  }
 }
 async function lastPrompt(project, sessionId) {
   try {
@@ -15983,12 +18849,15 @@ function mainLabel(tool, ev) {
   const head = (tool.canonicalName + ":" + (nl < 0 ? cmd : cmd.slice(0, nl))).slice(0, SOURCE_LABEL_MAX_CHARS);
   return head + "#" + (tool.callId ?? String(ev.turn ?? 0));
 }
-function indexDetached(project, sessionId, label, text, chunks) {
+function indexDetached(project, sessionId, sourceId, label, text, chunks) {
   void openDb(project).then((db) => {
-    indexText(db, project, sessionId, label, text, "text", chunks);
+    finishReserved(db, sourceId, sourceRowOf(project, sessionId, label), chunks, buildUnits(text));
   }).catch((err) => {
     process.stderr.write("hooks: index write failed: " + message(err) + "\n");
   });
+}
+function sourceRowOf(project, sessionId, label) {
+  return { sessionId, worktree: project.worktree, agent: project.agent, kind: "content", label, createdAt: Date.now() };
 }
 async function preCompact(ev, row5, project) {
   const db = await openDb(project);
@@ -16016,19 +18885,23 @@ function usage(ev, project) {
   return Promise.resolve(ALLOW2);
 }
 
-// src/prompt/_generated.ts
-var INSTRUCTIONS = "context-mode keeps large output out of the conversation by running work in a sandbox.\n\nFor the first step of any task that counts, sums, filters or finds something in data over about 20 lines (logs, test or build output, big JSON or CSV, long files, web pages), use ctx_execute and print only the answer. A raw Bash or Read result that long fills the conversation. Search for the tool by name if it is not loaded yet.\n\nA large tool result is indexed and replaced by its best-matching parts; ctx_search finds the rest.\n\nUse normal tools for small output and edits. A large file's Read is denied: use offset and limit, or ctx_execute with file set.\n";
-var TOOL_DESCRIPTIONS = Object.freeze({
-  ctx_execute: "Runs code in a sandboxed subprocess in the project directory and returns only what the code prints. Languages: shell, powershell, javascript, typescript, python, and other runtimes found on PATH. Use it when output may be long, for example tests, builds, logs, git history or API responses, and print just the lines or numbers you need. For a large file, set `file` to its local path instead of reading it: the code gets the path in the CTX_FILE environment variable, and only what the code prints comes back. Set `intent` to a short phrase when output may be large: the matching sections come back and the full output is indexed for ctx_search. Stops after `timeoutMs` (default and maximum 600000) and kills the whole process tree.",
-  ctx_batch: "Runs several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.",
-  ctx_index: "Stores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.",
-  ctx_search: "Searches content stored with ctx_index and earlier sandbox output in this project. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.",
-  ctx_resume: "Returns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
-  ctx_stats: "Reports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.",
-  ctx_doctor: "Checks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause and the fix in one line. It changes nothing. Use it when the user asks whether context-mode works, or after a context-mode error.",
-  ctx_upgrade: "Updates context-mode to the latest release for this agent and rewrites only context-mode's own entries in the host config. User entries and user settings such as hook timeouts are kept, and v1 entries are removed. Returns a table of what changed and whether a restart is needed. Use it only when the user asks to update context-mode.",
-  ctx_purge: "Deletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data."
-});
+// src/core/journal/own-call.ts
+function ownJournal() {
+  const handles = /* @__PURE__ */ new Map();
+  return async (project, ctx, name, reply4) => {
+    let opening = handles.get(project.dbPath);
+    if (opening === void 0) {
+      opening = openDb(project);
+      handles.set(project.dbPath, opening);
+      opening.catch(() => handles.delete(project.dbPath));
+    }
+    try {
+      appendEvent(await opening, ownCallRow(project, ctx, name, reply4));
+    } catch (err) {
+      process.stderr.write("context-mode: no journal row: " + (err instanceof Error ? err.message : String(err)) + "\n");
+    }
+  };
+}
 
 // src/core/sandbox/cap.ts
 import { StringDecoder } from "node:string_decoder";
@@ -16223,7 +19096,7 @@ function runProcess(argv, o) {
 }
 
 // src/core/index/auto-memory.ts
-import { readFileSync as readFileSync4, statSync as statSync4 } from "node:fs";
+import { readFileSync as readFileSync5, statSync as statSync4 } from "node:fs";
 import { join as join6 } from "node:path";
 var CLAUDE_CODE_MEMORY_FILES = Object.freeze([
   Object.freeze(["CLAUDE.md"]),
@@ -16246,7 +19119,7 @@ function readAutoMemory(project) {
         sourceId: null,
         path: path4,
         label: segs.join("/"),
-        text: readFileSync4(path4, "utf8")
+        text: readFileSync5(path4, "utf8")
       });
     } catch {
     }
@@ -16271,7 +19144,7 @@ SELECT COUNT(*) AS n FROM sources
 WHERE (:scope <> 'session' OR session_id = :session_id)
   AND (:scope <> 'worktree' OR worktree = :worktree)
   AND (:source IS NULL OR label = :source)`;
-function bytes(s) {
+function bytes2(s) {
   return Buffer.byteLength(s, "utf8");
 }
 function reply(text, isError) {
@@ -16303,7 +19176,50 @@ function page(db, q, input, scope, ctx, offset) {
   if (input.source === DECISION_SOURCE && q.trim() === "") {
     return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
   }
-  return ftsQuery(db, q, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset, input.source);
+  const hits = ftsQuery(db, q, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset, input.source);
+  if (hits.length > 0 || input.source === void 0) return hits;
+  const any3 = offset === 0 ? hits : ftsQuery(db, q, scope, ctx.project, ctx.sessionId, 1, 0, input.source);
+  if (any3.length > 0) return hits;
+  return ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
+}
+var JSON_ROWS_PAGE = 5;
+var JSON_SOURCE_MAX_BYTES = 8 * 1024 * 1024;
+var JSON_SOURCE = `
+SELECT id, bytes_total FROM sources
+WHERE label = :source
+  AND (:scope <> 'session' OR session_id = :session_id)
+  AND (:scope <> 'worktree' OR worktree = :worktree)
+ORDER BY id DESC LIMIT 1`;
+function jsonRowsReply(db, input, scope, ctx) {
+  if (input.source === void 0 || input.source === DECISION_SOURCE || input.queries.length === 0) return null;
+  const src = db.raw.prepare(JSON_SOURCE).get({ source: input.source, scope, session_id: ctx.sessionId, worktree: ctx.project.worktree });
+  if (src === void 0 || Number(src.bytes_total) > JSON_SOURCE_MAX_BYTES) return null;
+  const bodies = db.raw.prepare("SELECT body FROM chunks WHERE source_id = ? ORDER BY CAST(ord AS INTEGER)").all(Number(src.id)).map((r) => r.body);
+  const parsed = jsonRows(bodies.join("")) ?? jsonRows(bodies.join("\n"));
+  if (parsed === null) return null;
+  const { objs, keys } = parsed;
+  const texts = objs.map((o) => JSON.stringify(o));
+  const offset = input.offset ?? 0;
+  const out = [objs.length + " objects {" + keys.join(",") + "}"];
+  let shown2 = 0;
+  let more = false;
+  for (const q of input.queries) {
+    const scores = rankTexts(texts, q, "any");
+    const order = objs.map((_, i) => i).filter((i) => scores[i] > 0).sort((a, b) => scores[b] - scores[a] || a - b);
+    const named = namedKeys(keys, q);
+    out.push("Query " + JSON.stringify(q) + ":");
+    for (const i of order.slice(offset, offset + JSON_ROWS_PAGE)) {
+      const row5 = fitRow(objs[i], [], named, SNIPPET_MAX_BYTES);
+      if (row5 === null) continue;
+      out.push(input.source + " [" + i + "]: " + row5);
+      shown2++;
+    }
+    if (order.length > offset + JSON_ROWS_PAGE) {
+      out.push("More: " + callText([q], scope, input.source, "offset:" + (offset + JSON_ROWS_PAGE)));
+      more = true;
+    }
+  }
+  return shown2 === 0 && !more ? null : reply(out.join("\n"), false);
 }
 function relevance(db, given, scope, ctx) {
   const input = { ...given, queries: decisionQueries(given) };
@@ -16324,7 +19240,7 @@ function relevance(db, given, scope, ctx) {
   if (entries.length === 0) return zeroHits(db, scope, ctx, input.source);
   const moreLine3 = (q, pos) => "More: " + callText([q], scope, input.source, "offset:" + pos);
   let reserve = 0;
-  for (const q of input.queries) reserve += bytes(moreLine3(q, offset + SEARCH_PAGE_SIZE)) + 1;
+  for (const q of input.queries) reserve += bytes2(moreLine3(q, offset + SEARCH_PAGE_SIZE)) + 1;
   const lines = [];
   const more = [];
   let used = 0;
@@ -16337,16 +19253,16 @@ function relevance(db, given, scope, ctx) {
     }
     const head = "Query " + JSON.stringify(q) + ":";
     lines.push(head);
-    used += bytes(head) + 1;
+    used += bytes2(head) + 1;
     for (const e of mine) {
       const line = e.hit.label + " #" + e.hit.ord + ": " + e.hit.snippet;
-      if (used + bytes(line) + 1 + reserve > OUTPUT_CAP) {
+      if (used + bytes2(line) + 1 + reserve > OUTPUT_CAP) {
         more.push(moreLine3(q, e.pos));
         stopped = true;
         break;
       }
       lines.push(line);
-      used += bytes(line) + 1;
+      used += bytes2(line) + 1;
     }
     if (!stopped && full.has(qi)) more.push(moreLine3(q, offset + SEARCH_PAGE_SIZE));
   });
@@ -16363,7 +19279,7 @@ function timeline(db, input, scope, ctx) {
   const page2 = ftsQueryTimeline(db, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, input.after ?? null, input.source, memory);
   if (page2.rows.length === 0) return zeroHits(db, scope, ctx, input.source);
   const moreLine3 = (ts) => "more: " + callText(input.queries, scope, input.source, 'sort:"timeline", after:' + ts);
-  const reserve = bytes(moreLine3(page2.rows[page2.rows.length - 1].ts)) + 1;
+  const reserve = bytes2(moreLine3(page2.rows[page2.rows.length - 1].ts)) + 1;
   const lines = [];
   let used = 0;
   let lastTs = null;
@@ -16376,7 +19292,7 @@ function timeline(db, input, scope, ctx) {
     while (i < page2.rows.length && page2.rows[i].ts === ts) {
       const line = timelineLine(page2.rows[i]);
       group.push(line);
-      groupBytes += bytes(line) + 1;
+      groupBytes += bytes2(line) + 1;
       i += 1;
     }
     if (lastTs !== null && used + groupBytes + reserve > OUTPUT_CAP) {
@@ -16401,7 +19317,9 @@ async function handler(input, ctx) {
   const scope = input.scope ?? "worktree";
   const db = await openDb(ctx.project, { readOnly: true });
   try {
-    return sort === "timeline" ? timeline(db, input, scope, ctx) : relevance(db, input, scope, ctx);
+    if (input.source !== void 0 && input.source !== DECISION_SOURCE) input = { ...input, source: resolveSourceLabel(db, input.source) };
+    if (sort === "timeline") return timeline(db, input, scope, ctx);
+    return jsonRowsReply(db, input, scope, ctx) ?? relevance(db, input, scope, ctx);
   } finally {
     closeDb(db);
   }
@@ -16527,7 +19445,7 @@ function indexCombined(db, ctx, label, ran, deadline, budgetBytes) {
   const stop = flush() ? null : "deadline";
   return { bodies, indexed, total, stop };
 }
-function bytes2(s) {
+function bytes3(s) {
   return Buffer.byteLength(s, "utf8");
 }
 function answer(db, ctx, label, queries, share, own4) {
@@ -16538,7 +19456,7 @@ function answer(db, ctx, label, queries, share, own4) {
     let hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0, label);
     if (hits.length === 0) hits = ftsQuery(db, q, "session", ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, 0);
     const head = "## " + q;
-    let used = bytes2(head) + 1;
+    let used = bytes3(head) + 1;
     const body = [];
     for (const h of hits) {
       const key = chunkKey(h.sourceId, h.ord);
@@ -16548,7 +19466,7 @@ function answer(db, ctx, label, queries, share, own4) {
         seen.add(key);
         continue;
       }
-      const cost = bytes2(text) + 1;
+      const cost = bytes3(text) + 1;
       if (used + cost > share) continue;
       seen.add(key);
       body.push(text);
@@ -16589,7 +19507,7 @@ async function runBatch(input, ctx, boundMs, budgetBytes) {
       const timeout = formatError2("TIMEOUT", { ms: boundMs });
       const cause = stop ?? (ctx.signal.aborted ? CANCELLED_LINE : idx.stop === "deadline" ? timeout : null);
       notice = cut === null ? stop : cause === null ? cut : cause + " " + cut;
-      const fixed = bytes2(summary) + 1 + (notice === null ? 0 : bytes2(notice) + 1) + bytes2(footer);
+      const fixed = bytes3(summary) + 1 + (notice === null ? 0 : bytes3(notice) + 1) + bytes3(footer);
       const share = Math.floor((OUTPUT_CAP - fixed) / queries.length);
       sections = answer(db, ctx, label, queries, share, idx.bodies);
     } finally {
@@ -16619,14 +19537,14 @@ var ctxBatch = Object.freeze({
 });
 
 // src/core/tools/doctor.ts
-import { readdirSync as readdirSync4, readFileSync as readFileSync9, existsSync as existsSync10 } from "node:fs";
+import { readdirSync as readdirSync4, readFileSync as readFileSync10, existsSync as existsSync10 } from "node:fs";
 import { basename as basename3, dirname as dirname6, join as join12 } from "node:path";
 
 // src/core/ops/doctor-config.ts
 import { join as join10 } from "node:path";
 
 // src/core/ops/detect-v1.ts
-import { existsSync as existsSync3, opendirSync, readdirSync, readFileSync as readFileSync5 } from "node:fs";
+import { existsSync as existsSync3, opendirSync, readdirSync, readFileSync as readFileSync6 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join as join7 } from "node:path";
 var isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -16671,14 +19589,14 @@ function stripJsonc(text) {
 }
 function readJson(file2) {
   try {
-    return JSON.parse(stripJsonc(readFileSync5(file2, "utf8")));
+    return JSON.parse(stripJsonc(readFileSync6(file2, "utf8")));
   } catch {
     return void 0;
   }
 }
 function readText(file2) {
   try {
-    return readFileSync5(file2, "utf8");
+    return readFileSync6(file2, "utf8");
   } catch {
     return "";
   }
@@ -16910,7 +19828,7 @@ function detectV1(agent, home, scope = {}) {
 }
 
 // src/core/ops/host-config.ts
-import { existsSync as existsSync4, readFileSync as readFileSync6, renameSync, writeFileSync } from "node:fs";
+import { existsSync as existsSync4, readFileSync as readFileSync7, renameSync, writeFileSync } from "node:fs";
 import { dirname as dirname4, join as join8 } from "node:path";
 function formatOf(path4) {
   if (path4.endsWith(JSONC_EXT)) return "jsonc";
@@ -16923,7 +19841,7 @@ function readHostConfig(agent, path4) {
     const jsonc = join8(dirname4(path4), OPENCODE_CONFIG_FILES[0]);
     if (existsSync4(jsonc)) file2 = jsonc;
   }
-  const text = existsSync4(file2) ? readFileSync6(file2, "utf8") : "";
+  const text = existsSync4(file2) ? readFileSync7(file2, "utf8") : "";
   return { agent, text, format: formatOf(file2), path: file2 };
 }
 function stripJsonComments(text) {
@@ -17165,7 +20083,7 @@ function setPath(target, path4, value) {
   for (let k = 0; k < path4.length - 1; k += 1) {
     const next = cur[path4[k]];
     if (next === void 0) cur[path4[k]] = {};
-    else if (!isPlainObject2(next)) throw new SyntaxError("key conflict");
+    else if (!isPlainObject3(next)) throw new SyntaxError("key conflict");
     cur = cur[path4[k]];
   }
   if (cur[path4[path4.length - 1]] !== void 0) throw new SyntaxError("duplicate key");
@@ -17193,7 +20111,7 @@ function scanToml(text) {
       let cur = value;
       for (const seg of path4) {
         if (cur[seg] === void 0) cur[seg] = {};
-        if (!isPlainObject2(cur[seg])) throw new SyntaxError("table conflict");
+        if (!isPlainObject3(cur[seg])) throw new SyntaxError("table conflict");
         cur = cur[seg];
       }
       table = cur;
@@ -17223,18 +20141,18 @@ function parseHostConfig(agent, path4, text, format) {
 function hostConfigValueAt(value, path4) {
   let cur = value;
   for (const seg of path4) {
-    if (!isPlainObject2(cur)) return void 0;
+    if (!isPlainObject3(cur)) return void 0;
     cur = cur[seg];
   }
   return cur;
 }
-function isPlainObject2(v) {
+function isPlainObject3(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 function sameValue(a, b) {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, k) => sameValue(x, b[k]));
-  if (isPlainObject2(a) && isPlainObject2(b)) {
+  if (isPlainObject3(a) && isPlainObject3(b)) {
     const ka = Object.keys(a);
     return ka.length === Object.keys(b).length && ka.every((k) => sameValue(a[k], b[k]));
   }
@@ -17308,13 +20226,13 @@ function tomlBlock(path4, value) {
   let out = "[" + path4.map(tomlHeaderKey).join(".") + "]\n";
   const subs = [];
   for (const [k, v] of Object.entries(value)) {
-    if (isPlainObject2(v)) subs.push(tomlBlock([...path4, k], v));
+    if (isPlainObject3(v)) subs.push(tomlBlock([...path4, k], v));
     else out += tomlHeaderKey(k) + " = " + tomlScalar(v) + "\n";
   }
   return [out, ...subs].join("\n");
 }
 function setTomlText(text, path4, value) {
-  if (!isPlainObject2(value)) throw new SyntaxError("TOML edits replace a whole table");
+  if (!isPlainObject3(value)) throw new SyntaxError("TOML edits replace a whole table");
   const doc = scanToml(text);
   const owned = doc.tables.filter((t) => t.path.length >= path4.length && path4.every((seg, k) => t.path[k] === seg));
   const block = tomlBlock(path4, value);
@@ -17356,10 +20274,10 @@ function ownTargets(agent) {
     return [{
       key: mcp.key,
       next(current) {
-        const keep = isPlainObject2(current) ? current : {};
-        return { ...keep, [MCP_COMMAND_FIELD]: HOST_NODE_COMMAND, [MCP_ARGS_FIELD]: [serverScript(), AGENT_ARG, agent] };
+        const keep = isPlainObject3(current) ? current : {};
+        return { ...keep, ...mcp.fields, [MCP_COMMAND_FIELD]: HOST_NODE_COMMAND, [MCP_ARGS_FIELD]: [serverScript(), AGENT_ARG, agent] };
       }
-    }];
+    }, ...(mcp.also ?? []).map(([key, value]) => ({ key, next: () => value }))];
   }
   if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC)];
   if (agent === "pi") return [listTarget(PI_PACKAGES_KEY, PI_GIT_PACKAGE, V1_PI_PACKAGE)];
@@ -17463,11 +20381,13 @@ function readParsed(agent, file2) {
   const cur = readHostConfig(agent, file2);
   return { value: parseHostConfig(agent, cur.path, cur.text, cur.format), text: cur.text, format: cur.format };
 }
-function composeMatcher(row5) {
+function composeMatcher(row5, event) {
   let prefix = "";
   for (const ch of row5.toolNamePrefix) prefix += REGEX_SPECIAL_CHARS.includes(ch) ? REGEX_ESCAPE + ch : ch;
   const names = Object.values(row5.nativeTools).flat();
-  return MATCHER_OPEN + [...names, prefix + OWN_TOOL_PREFIX + MATCHER_ANY].join(MATCHER_ALT) + MATCHER_CLOSE;
+  const alts = [...names, prefix + OWN_TOOL_PREFIX + MATCHER_ANY];
+  if (event === POST_TOOL_USE && hasReplace(row5)) alts.push(MCP_ANY_MATCH);
+  return MATCHER_OPEN + alts.join(MATCHER_ALT) + MATCHER_CLOSE;
 }
 function isOwnCommand(command, agent) {
   if (typeof command !== "string") return false;
@@ -17492,7 +20412,7 @@ function ownHooks(block, shape, timeoutKey, native, agent) {
   const entries = isObject4(block) ? list2(block[native]) : [];
   for (const e of entries) {
     if (!isObject4(e)) continue;
-    if (shape === "nested") {
+    if (shape === "nested" || shape === "zcode") {
       for (const h of list2(e[HOOK_GROUP_HOOKS_FIELD])) {
         if (isObject4(h) && isOwnCommand(h[HOOK_COMMAND_FIELD], agent)) {
           out.push({ command: h[HOOK_COMMAND_FIELD], matcher: e[HOOK_MATCHER_FIELD], timeout: h[timeoutKey] });
@@ -17542,17 +20462,23 @@ function hookParts(row5, home, env, worktree) {
   } catch {
     return [PART_HOOKS];
   }
-  const matcher = composeMatcher(row5);
   let hooksBad = false;
   let timeoutBad = false;
   for (const [canonical, native] of Object.entries(row5.eventMap)) {
     if (native === void 0) continue;
     const own4 = ownHooks(block, spec.shape, spec.timeoutKey, native, row5.id);
+    if (spec.shape === "kiro" && TOOL_HOOK_EVENTS.includes(canonical)) {
+      const got = own4.map((h) => h.matcher).sort();
+      const want = KIRO_TOOL_MATCHERS.map(([m]) => m).sort();
+      if (JSON.stringify(got) !== JSON.stringify(want)) hooksBad = true;
+      for (const h of own4) if (!validTimeout(h.timeout)) timeoutBad = true;
+      continue;
+    }
     if (own4.length !== 1) {
       hooksBad = true;
       continue;
     }
-    if (spec.matcher && TOOL_HOOK_EVENTS.includes(canonical) && own4[0].matcher !== matcher) hooksBad = true;
+    if (spec.matcher && TOOL_HOOK_EVENTS.includes(canonical) && own4[0].matcher !== composeMatcher(row5, canonical)) hooksBad = true;
     if (!validTimeout(own4[0].timeout)) timeoutBad = true;
   }
   return [...hooksBad ? [PART_HOOKS] : [], ...timeoutBad ? [PART_TIMEOUT] : []];
@@ -17561,10 +20487,10 @@ function checkHostConfig(row5, env, worktree) {
   const home = homeDirOf(env);
   if (home === null) return fail2("D3", D3_DETAIL(D3_PARTS), DOCTOR_FIX_UPGRADE);
   const parts = [...mcpWrong(row5, home, env) ? [PART_MCP] : [], ...hookParts(row5, home, env, worktree)];
-  const read2 = row5.id === "pi" ? mcpFile(row5, home, env) : null;
-  if (parts.length === 0) return read2 === null ? pass("D3") : { ...pass("D3"), detail: read2 };
+  const read3 = row5.id === "pi" ? mcpFile(row5, home, env) : null;
+  if (parts.length === 0) return read3 === null ? pass("D3") : { ...pass("D3"), detail: read3 };
   const detail = D3_DETAIL(parts);
-  return fail2("D3", read2 === null ? detail : detail + D4_REASON_JOIN + read2, DOCTOR_FIX_UPGRADE);
+  return fail2("D3", read3 === null ? detail : detail + D4_REASON_JOIN + read3, DOCTOR_FIX_UPGRADE);
 }
 function checkV1Leftovers(agent, home, scope = {}) {
   const findings = detectV1(agent, home, scope);
@@ -17746,7 +20672,7 @@ function checkMode(adapter) {
 }
 
 // src/core/ops/doctor-hook.ts
-import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
 import path3 from "node:path";
 var row = (status, detail, fixCommand) => fixCommand === void 0 ? { id: "D5", label: DOCTOR_LABEL.D5, status, detail } : { id: "D5", label: DOCTOR_LABEL.D5, status, detail, fixCommand };
 function isObject5(v) {
@@ -17757,7 +20683,7 @@ function loadFixture(bundleDir2, agent) {
   if (!existsSync8(file2)) return null;
   let all;
   try {
-    all = JSON.parse(readFileSync7(file2, "utf8"));
+    all = JSON.parse(readFileSync8(file2, "utf8"));
   } catch {
     return null;
   }
@@ -17806,7 +20732,7 @@ async function checkHookRoundTrip(i) {
 import { existsSync as existsSync9, renameSync as renameSync2, rmSync as rmSync3 } from "node:fs";
 
 // src/core/store/owners.ts
-import { mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync8, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync9, rmSync as rmSync2, writeFileSync as writeFileSync2 } from "node:fs";
 import { basename as basename2, join as join11 } from "node:path";
 function ownersDir(configDir, projectKey) {
   return join11(configDir, PROJECTS_DIR_NAME, projectKey, OWNERS_DIR_NAME);
@@ -17850,7 +20776,7 @@ function listLiveOwners(configDir, projectKey) {
     const file2 = join11(dir, name);
     let text;
     try {
-      text = readFileSync8(file2, "utf8");
+      text = readFileSync9(file2, "utf8");
     } catch (err) {
       if (errCode(err) === "ENOENT") continue;
       throw err;
@@ -17941,6 +20867,7 @@ function buildReport(input) {
     REPORT_HEADER,
     REPORT_HEADER_RULE,
     ...input.rows.map((row5) => rowLine(input.agent, row5)),
+    ...input.command === void 0 ? [] : [REPORT_COMMAND_PREFIX + input.command],
     ...Object.keys(input.env).sort().map((key) => envLine(key, input.env[key]))
   ];
   const text = lines.join("\n");
@@ -17997,7 +20924,7 @@ function ownServerId(configDir, projectKey) {
   if (!existsSync10(dir)) return "";
   for (const name of readdirSync4(dir)) {
     if (!name.endsWith(OWNER_PID_EXT)) continue;
-    if (readFileSync9(join12(dir, name), "utf8").trim() === String(process.pid)) return basename3(name, OWNER_PID_EXT);
+    if (readFileSync10(join12(dir, name), "utf8").trim() === String(process.pid)) return basename3(name, OWNER_PID_EXT);
   }
   return "";
 }
@@ -18044,7 +20971,8 @@ async function handler2(_input, ctx) {
   const adapter = getAdapter(ctx.project.agent);
   const host = { env: process.env, bundleDir: dirname6(process.argv[1]), piCwd: void 0 };
   const rows = await runDoctorChecks(ctx, adapter, host);
-  const text = buildReport({ agent: adapter.id, rows, env: reportEnv(process.env) });
+  const command = `context-mode ${rows.some((r) => r.status === "FAIL") ? "setup" : "doctor"} --agents ${adapter.id}`;
+  const text = buildReport({ agent: adapter.id, rows, env: reportEnv(process.env), command });
   return { text, isError: false, sandboxBytes: Buffer.byteLength(text, "utf8") };
 }
 var ctxDoctor = Object.freeze({
@@ -18258,11 +21186,11 @@ var ctxExecute = {
 };
 
 // src/core/tools/index.ts
-import { existsSync as existsSync12, readFileSync as readFileSync11, statSync as statSync6 } from "node:fs";
+import { existsSync as existsSync12, readFileSync as readFileSync12, statSync as statSync6 } from "node:fs";
 import { dirname as dirname8, extname, join as join15, relative as relative3, resolve as resolve4 } from "node:path";
 
 // src/core/index/walk.ts
-import { readdirSync as readdirSync5, readFileSync as readFileSync10, realpathSync as realpathSync6, statSync as statSync5 } from "node:fs";
+import { readdirSync as readdirSync5, readFileSync as readFileSync11, realpathSync as realpathSync6, statSync as statSync5 } from "node:fs";
 import { join as join14 } from "node:path";
 var GITIGNORE = ".gitignore";
 var GIT_DIR = ".git";
@@ -18324,7 +21252,7 @@ function compareFound(a, b) {
 function readRules(file2, base) {
   let body;
   try {
-    body = readFileSync10(file2, "utf8");
+    body = readFileSync11(file2, "utf8");
   } catch {
     return [];
   }
@@ -18606,7 +21534,7 @@ function kindOfType(contentType) {
 }
 function readUtf8(absPath) {
   try {
-    return utf8.decode(readFileSync11(absPath));
+    return utf8.decode(readFileSync12(absPath));
   } catch {
     return void 0;
   }
@@ -18635,7 +21563,8 @@ async function itemsOf(input, ctx) {
   if (input.content !== void 0) {
     const text2 = input.content;
     const label2 = input.source ?? DEFAULT_CONTENT_LABEL;
-    return { items: [{ sourceKind: "content", label: label2, kind: "text", read: () => text2 }], from: label2 };
+    const kind = hasMdStructure(text2) ? "md" : "text";
+    return { items: [{ sourceKind: "content", label: label2, kind, read: () => text2 }], from: label2 };
   }
   if (input.path !== void 0) {
     const items = pathItems({ ...input, path: input.path }, ctx.project);
@@ -18656,13 +21585,13 @@ async function handler4(input, ctx) {
     const db = await openDb(ctx.project);
     let sources = 0;
     let chunks = 0;
-    let bytes3 = 0;
+    let bytes4 = 0;
     try {
       for (const it of items) {
         const text = it.read();
         if (text === void 0) continue;
         chunks += storeText(db, ctx.project, ctx.sessionId, it.sourceKind, it.label, text, it.kind).chunks;
-        bytes3 += Buffer.byteLength(text, "utf8");
+        bytes4 += Buffer.byteLength(text, "utf8");
         sources += 1;
       }
     } finally {
@@ -18672,7 +21601,7 @@ async function handler4(input, ctx) {
     return {
       text: capBytes(line, OUTPUT_CAP).text,
       isError: false,
-      sandboxBytes: bytes3,
+      sandboxBytes: bytes4,
       journal: { kind: "index", key: from, path: from, exit_code: null }
     };
   } catch (err) {
@@ -18712,9 +21641,10 @@ function purgeScope(raw, scope, input) {
   if (scope === "session") return changes(raw, "DELETE FROM events WHERE session_id = ?", input.session);
   if (scope === "source") {
     const label = input.source;
-    return changes(raw, "DELETE FROM chunks WHERE source_id IN (SELECT id FROM sources WHERE label = ?)", label) + changes(raw, "DELETE FROM sources WHERE label = ?", label);
+    return deleteChunkRows(raw, { label }) + changes(raw, "DELETE FROM sources WHERE label = ?", label);
   }
-  return changes(raw, "DELETE FROM events") + changes(raw, "DELETE FROM chunks") + changes(raw, "DELETE FROM sources");
+  const chunks = deleteChunkRows(raw, "all");
+  return changes(raw, "DELETE FROM events") + chunks + changes(raw, "DELETE FROM sources");
 }
 function isBusy(err) {
   const code = err?.errcode;
@@ -18770,7 +21700,11 @@ async function handler6(input, ctx) {
     const rows = readSessionEvents(db, sessionId);
     const newest = rows.at(-1);
     if (newest === void 0) return reply3(RESUME_EMPTY_LINE, false);
-    const block = renderState(rows, newest.turn);
+    const sources = listSessionSources(db, sessionId, MAX_CANDIDATES).map((r) => "source " + sourceHandle(r.id) + ": " + r.label + " (" + r.bytes + " B)");
+    const goal = readFirstPrompt(db, sessionId);
+    const last = readLastPrompt(db, sessionId);
+    const units = queryUnits(db, sessionId, recallQueryText(last, goal), RECALL_UNIT_CANDIDATES).map((u) => ({ ...u, label: sourceHandle(u.sourceId) }));
+    const block = renderState(rows, newest.turn, { sources, units });
     if (Buffer.byteLength(block, "utf8") > RESUME_CAP) throw new Error("ctx_resume: state block over RESUME_CAP (render bug).");
     return reply3(block, false);
   } finally {
@@ -19039,13 +21973,24 @@ function ownEntries(agent, env) {
   const home = homeOf3(env);
   const mcp = OWN_MCP_ENTRY[agent];
   if (mcp !== void 0) {
-    const [parent, own4] = mcp.key;
+    const top = mcp.key[0];
+    const inner = mcp.key.slice(1, -1);
+    const own4 = mcp.key[mcp.key.length - 1];
+    const holder = (v) => inner.reduce((cur, k) => isObj2(cur) ? cur[k] : void 0, v);
+    const without = (v, path4) => {
+      const o = v;
+      if (path4.length === 0) return Object.fromEntries(Object.entries(o).filter(([k]) => k !== own4));
+      return { ...o, [path4[0]]: without(o[path4[0]], path4.slice(1)) };
+    };
     return [{
       file: join19(home, ...mcp.file),
-      key: parent,
+      key: top,
       shown: mcp.key.join(V1_KEY_PATH_SEP),
-      has: (v) => isObj2(v) && Object.hasOwn(v, own4),
-      drop: (v) => Object.fromEntries(Object.entries(v).filter(([k]) => k !== own4))
+      has: (v) => {
+        const h = holder(v);
+        return isObj2(h) && Object.hasOwn(h, own4);
+      },
+      drop: (v) => without(v, inner)
     }];
   }
   if (agent === "opencode") {
@@ -19100,7 +22045,7 @@ function runUninstall(input) {
 }
 
 // src/core/ops/v1-remove.ts
-import { copyFileSync as copyFileSync2, existsSync as existsSync17, readFileSync as readFileSync12, renameSync as renameSync6, rmSync as rmSync9, writeFileSync as writeFileSync6 } from "node:fs";
+import { copyFileSync as copyFileSync2, existsSync as existsSync17, readFileSync as readFileSync13, renameSync as renameSync6, rmSync as rmSync9, writeFileSync as writeFileSync6 } from "node:fs";
 var isObj3 = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var areaOf = (f) => f.path === "" ? f.file : f.file + UPGRADE_AREA_KEY_SEP + f.path;
 var row3 = (f, after) => ({ area: areaOf(f), before: f.reason, after });
@@ -19145,7 +22090,7 @@ function locate(doc, path4) {
   return null;
 }
 function stripJsonEntries(agent, file2, findings, kept, undo) {
-  const text = readFileSync12(file2, "utf8");
+  const text = readFileSync13(file2, "utf8");
   const doc = parseHostConfig(agent, file2, text, "jsonc");
   const hit = /* @__PURE__ */ new Set();
   const byContainer = /* @__PURE__ */ new Map();
@@ -19193,7 +22138,7 @@ function removeV1(agent, findings) {
       continue;
     }
     if (file2.endsWith(TOML_EXT)) {
-      let text = readFileSync12(file2, "utf8");
+      let text = readFileSync13(file2, "utf8");
       for (const f of list3) {
         const next = cutTomlTable(text, f.path);
         if (next === null) {
@@ -19229,7 +22174,7 @@ function removeV1(agent, findings) {
 
 // src/core/ops/verify-sums.ts
 import { createHash } from "node:crypto";
-import { lstatSync as lstatSync2, readdirSync as readdirSync8, readFileSync as readFileSync13 } from "node:fs";
+import { lstatSync as lstatSync2, readdirSync as readdirSync8, readFileSync as readFileSync14 } from "node:fs";
 import { join as join20 } from "node:path";
 function mismatch() {
   return new CtxError("BUNDLE_HASH_MISMATCH");
@@ -19261,14 +22206,14 @@ function verifySums(dir) {
   const sumsPath = join20(dir, RELEASE_SUMS_FILE);
   const sumsStat = lstatSync2(sumsPath, { throwIfNoEntry: false });
   if (sumsStat === void 0 || !sumsStat.isFile()) throw mismatch();
-  const sums = parseSums(readFileSync13(sumsPath, "utf8"));
+  const sums = parseSums(readFileSync14(sumsPath, "utf8"));
   const files = /* @__PURE__ */ new Map();
   walk(dir, "", files);
   if (files.size !== sums.size) throw mismatch();
   for (const [rel, abs] of files) {
     const want = sums.get(rel);
     if (want === void 0) throw mismatch();
-    const got = createHash(SUMS_HASH_ALGORITHM).update(readFileSync13(abs)).digest(HASH_ENCODING);
+    const got = createHash(SUMS_HASH_ALGORITHM).update(readFileSync14(abs)).digest(HASH_ENCODING);
     if (got !== want) throw mismatch();
   }
 }
@@ -19507,7 +22452,7 @@ __export(util_exports2, {
   hide: () => hide,
   installLazyProp: () => installLazyProp,
   isObject: () => isObject6,
-  isPlainObject: () => isPlainObject3,
+  isPlainObject: () => isPlainObject4,
   issue: () => issue2,
   joinValues: () => joinValues2,
   jsonStringifyReplacer: () => jsonStringifyReplacer2,
@@ -19749,7 +22694,7 @@ var allowsEval2 = /* @__PURE__ */ cached2(() => {
     return false;
   }
 });
-function isPlainObject3(o) {
+function isPlainObject4(o) {
   if (isObject6(o) === false)
     return false;
   const ctor = o.constructor;
@@ -19766,7 +22711,7 @@ function isPlainObject3(o) {
   return true;
 }
 function shallowClone(o) {
-  if (isPlainObject3(o))
+  if (isPlainObject4(o))
     return { ...o };
   if (Array.isArray(o))
     return [...o];
@@ -19955,7 +22900,7 @@ function omit2(schema, mask) {
   return clone2(schema, mergeDefs(currDef, { shape: newShape, checks: [] }));
 }
 function extend2(schema, shape) {
-  if (!isPlainObject3(shape)) {
+  if (!isPlainObject4(shape)) {
     throw new Error("Invalid input to extend: expected a plain object");
   }
   const checks = schema._zod.def.checks;
@@ -19977,7 +22922,7 @@ function extended(schema, shape) {
   return newShape;
 }
 function safeExtend(schema, shape) {
-  if (!isPlainObject3(shape)) {
+  if (!isPlainObject4(shape)) {
     throw new Error("Invalid input to safeExtend: expected a plain object");
   }
   return clone2(schema, mergeDefs(schema._zod.def, { shape: extended(schema, shape) }));
@@ -20165,16 +23110,16 @@ function cleanEnum2(obj) {
 }
 function base64ToUint8Array(base645) {
   const binaryString = atob(base645);
-  const bytes3 = new Uint8Array(binaryString.length);
+  const bytes4 = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
-    bytes3[i] = binaryString.charCodeAt(i);
+    bytes4[i] = binaryString.charCodeAt(i);
   }
-  return bytes3;
+  return bytes4;
 }
-function uint8ArrayToBase64(bytes3) {
+function uint8ArrayToBase64(bytes4) {
   let binaryString = "";
-  for (let i = 0; i < bytes3.length; i++) {
-    binaryString += String.fromCharCode(bytes3[i]);
+  for (let i = 0; i < bytes4.length; i++) {
+    binaryString += String.fromCharCode(bytes4[i]);
   }
   return btoa(binaryString);
 }
@@ -20183,22 +23128,22 @@ function base64urlToUint8Array(base64url5) {
   const padding = "=".repeat((4 - base645.length % 4) % 4);
   return base64ToUint8Array(base645 + padding);
 }
-function uint8ArrayToBase64url(bytes3) {
-  return uint8ArrayToBase64(bytes3).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+function uint8ArrayToBase64url(bytes4) {
+  return uint8ArrayToBase64(bytes4).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 function hexToUint8Array(hex) {
   const cleanHex = hex.replace(/^0x/, "");
   if (cleanHex.length % 2 !== 0) {
     throw new Error("Invalid hex string length");
   }
-  const bytes3 = new Uint8Array(cleanHex.length / 2);
+  const bytes4 = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
-    bytes3[i / 2] = Number.parseInt(cleanHex.slice(i, i + 2), 16);
+    bytes4[i / 2] = Number.parseInt(cleanHex.slice(i, i + 2), 16);
   }
-  return bytes3;
+  return bytes4;
 }
-function uint8ArrayToHex(bytes3) {
-  return Array.from(bytes3).map((b) => b.toString(16).padStart(2, "0")).join("");
+function uint8ArrayToHex(bytes4) {
+  return Array.from(bytes4).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 var Class2 = class {
   constructor(..._args) {
@@ -22293,7 +25238,7 @@ function mergeValues2(a, b) {
   if (a instanceof Date && b instanceof Date && +a === +b) {
     return { valid: true, data: a };
   }
-  if (isPlainObject3(a) && isPlainObject3(b)) {
+  if (isPlainObject4(a) && isPlainObject4(b)) {
     const bKeys = Object.keys(b);
     const sharedKeys = Object.keys(a).filter((key) => bKeys.indexOf(key) !== -1);
     const newObj = { ...a, ...b };
@@ -22391,7 +25336,7 @@ var $ZodRecord2 = /* @__PURE__ */ $constructor2("$ZodRecord", (inst, def) => {
   memo4?.attach(inst);
   inst._zod.parse = (payload, ctx) => {
     const input = payload.value;
-    if (!isPlainObject3(input)) {
+    if (!isPlainObject4(input)) {
       payload.issues.push({
         expected: "record",
         code: "invalid_type",
@@ -27088,7 +30033,7 @@ __export(util_exports3, {
   hide: () => hide2,
   installLazyProp: () => installLazyProp2,
   isObject: () => isObject7,
-  isPlainObject: () => isPlainObject4,
+  isPlainObject: () => isPlainObject5,
   issue: () => issue3,
   joinValues: () => joinValues3,
   jsonStringifyReplacer: () => jsonStringifyReplacer3,
@@ -27330,7 +30275,7 @@ var allowsEval3 = /* @__PURE__ */ cached3(() => {
     return false;
   }
 });
-function isPlainObject4(o) {
+function isPlainObject5(o) {
   if (isObject7(o) === false)
     return false;
   const ctor = o.constructor;
@@ -27347,7 +30292,7 @@ function isPlainObject4(o) {
   return true;
 }
 function shallowClone2(o) {
-  if (isPlainObject4(o))
+  if (isPlainObject5(o))
     return { ...o };
   if (Array.isArray(o))
     return [...o];
@@ -27536,7 +30481,7 @@ function omit3(schema, mask) {
   return clone3(schema, mergeDefs2(currDef, { shape: newShape, checks: [] }));
 }
 function extend3(schema, shape) {
-  if (!isPlainObject4(shape)) {
+  if (!isPlainObject5(shape)) {
     throw new Error("Invalid input to extend: expected a plain object");
   }
   const checks = schema._zod.def.checks;
@@ -27558,7 +30503,7 @@ function extended2(schema, shape) {
   return newShape;
 }
 function safeExtend2(schema, shape) {
-  if (!isPlainObject4(shape)) {
+  if (!isPlainObject5(shape)) {
     throw new Error("Invalid input to safeExtend: expected a plain object");
   }
   return clone3(schema, mergeDefs2(schema._zod.def, { shape: extended2(schema, shape) }));
@@ -27746,16 +30691,16 @@ function cleanEnum3(obj) {
 }
 function base64ToUint8Array2(base645) {
   const binaryString = atob(base645);
-  const bytes3 = new Uint8Array(binaryString.length);
+  const bytes4 = new Uint8Array(binaryString.length);
   for (let i = 0; i < binaryString.length; i++) {
-    bytes3[i] = binaryString.charCodeAt(i);
+    bytes4[i] = binaryString.charCodeAt(i);
   }
-  return bytes3;
+  return bytes4;
 }
-function uint8ArrayToBase642(bytes3) {
+function uint8ArrayToBase642(bytes4) {
   let binaryString = "";
-  for (let i = 0; i < bytes3.length; i++) {
-    binaryString += String.fromCharCode(bytes3[i]);
+  for (let i = 0; i < bytes4.length; i++) {
+    binaryString += String.fromCharCode(bytes4[i]);
   }
   return btoa(binaryString);
 }
@@ -27764,22 +30709,22 @@ function base64urlToUint8Array2(base64url5) {
   const padding = "=".repeat((4 - base645.length % 4) % 4);
   return base64ToUint8Array2(base645 + padding);
 }
-function uint8ArrayToBase64url2(bytes3) {
-  return uint8ArrayToBase642(bytes3).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+function uint8ArrayToBase64url2(bytes4) {
+  return uint8ArrayToBase642(bytes4).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 function hexToUint8Array2(hex) {
   const cleanHex = hex.replace(/^0x/, "");
   if (cleanHex.length % 2 !== 0) {
     throw new Error("Invalid hex string length");
   }
-  const bytes3 = new Uint8Array(cleanHex.length / 2);
+  const bytes4 = new Uint8Array(cleanHex.length / 2);
   for (let i = 0; i < cleanHex.length; i += 2) {
-    bytes3[i / 2] = Number.parseInt(cleanHex.slice(i, i + 2), 16);
+    bytes4[i / 2] = Number.parseInt(cleanHex.slice(i, i + 2), 16);
   }
-  return bytes3;
+  return bytes4;
 }
-function uint8ArrayToHex2(bytes3) {
-  return Array.from(bytes3).map((b) => b.toString(16).padStart(2, "0")).join("");
+function uint8ArrayToHex2(bytes4) {
+  return Array.from(bytes4).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 var Class3 = class {
   constructor(..._args) {
@@ -29822,7 +32767,7 @@ function mergeValues3(a, b) {
   if (a instanceof Date && b instanceof Date && +a === +b) {
     return { valid: true, data: a };
   }
-  if (isPlainObject4(a) && isPlainObject4(b)) {
+  if (isPlainObject5(a) && isPlainObject5(b)) {
     const bKeys = Object.keys(b);
     const sharedKeys = Object.keys(a).filter((key) => bKeys.indexOf(key) !== -1);
     const newObj = { ...a, ...b };
@@ -29920,7 +32865,7 @@ var $ZodRecord3 = /* @__PURE__ */ $constructor3("$ZodRecord", (inst, def) => {
   memo4?.attach(inst);
   inst._zod.parse = (payload, ctx) => {
     const input = payload.value;
-    if (!isPlainObject4(input)) {
+    if (!isPlainObject5(input)) {
       payload.issues.push({
         expected: "record",
         code: "invalid_type",
@@ -38155,18 +41100,18 @@ function mergeCapabilities(base, additional) {
   }
   return result;
 }
-function isPlainObject5(value) {
+function isPlainObject6(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 function partitionInputResponses(inputResponses) {
   const accepted = {};
   const droppedKeys = [];
-  if (!isPlainObject5(inputResponses)) return {
+  if (!isPlainObject6(inputResponses)) return {
     accepted,
     droppedKeys
   };
   for (const [key, entry] of Object.entries(inputResponses)) {
-    if (!isPlainObject5(entry) || "method" in entry || "result" in entry) {
+    if (!isPlainObject6(entry) || "method" in entry || "result" in entry) {
       droppedKeys.push(key);
       continue;
     }
@@ -45566,11 +48511,11 @@ function coerceEmbeddedInputRequest(method, key, entry) {
 function syntheticElicitationId() {
   const webCrypto = globalThis.crypto;
   if (webCrypto?.randomUUID !== void 0) return webCrypto.randomUUID();
-  const bytes3 = new Uint8Array(16);
-  webCrypto.getRandomValues(bytes3);
-  bytes3[6] = bytes3[6] & 15 | 64;
-  bytes3[8] = bytes3[8] & 63 | 128;
-  const hex = [...bytes3].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const bytes4 = new Uint8Array(16);
+  webCrypto.getRandomValues(bytes4);
+  bytes4[6] = bytes4[6] & 15 | 64;
+  bytes4[8] = bytes4[8] & 63 | 128;
+  const hex = [...bytes4].map((byte) => byte.toString(16).padStart(2, "0")).join("");
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 function legacyShimFailure(method, message3) {
@@ -47471,7 +50416,7 @@ import { existsSync as existsSync19, readdirSync as readdirSync9, rmSync as rmSy
 import { join as join22 } from "node:path";
 function deleteSource(raw, id) {
   raw.prepare("DELETE FROM sources WHERE id = ?").run(id);
-  raw.prepare("DELETE FROM chunks WHERE source_id = ?").run(id);
+  deleteChunkRows(raw, { sourceId: id });
 }
 function cleanupProject(db, configDir) {
   return withWrite(db, (h) => {
@@ -47484,13 +50429,15 @@ function cleanupProject(db, configDir) {
       deletedSources += 1;
     }
     const sum2 = h.raw.prepare("SELECT SUM(bytes_total) AS n FROM sources").get();
-    let totalBytes = sum2.n ?? 0;
+    const units = h.raw.prepare("SELECT source_id, SUM(LENGTH(CAST(body AS BLOB))) AS n FROM line_units GROUP BY source_id").all();
+    const unitBytes = new Map(units.map((u) => [Number(u.source_id), Number(u.n)]));
+    let totalBytes = (sum2.n ?? 0) + [...unitBytes.values()].reduce((a, b) => a + b, 0);
     if (totalBytes > RETENTION_SIZE_CAP_BYTES) {
       const byAge = h.raw.prepare("SELECT id, bytes_total FROM sources ORDER BY accessed_ts ASC, id ASC").all();
       for (const row5 of byAge) {
         if (totalBytes <= RETENTION_SIZE_CAP_BYTES) break;
         deleteSource(h.raw, row5.id);
-        totalBytes -= row5.bytes_total;
+        totalBytes -= row5.bytes_total + (unitBytes.get(Number(row5.id)) ?? 0);
         deletedSources += 1;
       }
     }
@@ -47590,6 +50537,14 @@ function metaNumber(meta3, key) {
   const v = meta3?.[key];
   return typeof v === "number" && Number.isSafeInteger(v) ? v : void 0;
 }
+function sessionIdOf(meta3, agent, env, serverId) {
+  const fromMeta = metaString(meta3, "sessionId");
+  if (fromMeta !== void 0) return fromMeta;
+  const key = agent === void 0 ? void 0 : HOST_SESSION_ENV[agent];
+  const fromHost = key === void 0 ? void 0 : env[key];
+  if (typeof fromHost === "string" && fromHost !== "") return fromHost;
+  return RUN_SESSION_PREFIX + serverId;
+}
 function errorReply(err) {
   if (err instanceof CtxError) return { text: err.toLine(), isError: true, sandboxBytes: 0 };
   console.error(err);
@@ -47639,24 +50594,7 @@ async function startServer(argv, env) {
   }
   async function journal(project, ctx, name, reply4) {
     const db = await ownDb(project);
-    const facts = reply4.journal;
-    appendEvent(db, {
-      session_id: ctx.sessionId,
-      worktree: project.worktree,
-      agent: project.agent,
-      kind: reply4.isError ? "toolerr" : facts?.kind ?? "cmd",
-      // an error is toolerr, as the hook writes it
-      tool: name,
-      key: facts?.key ?? null,
-      path: facts?.path ?? null,
-      ok: reply4.isError ? 0 : 1,
-      exit_code: facts?.exit_code ?? null,
-      bytes: reply4.sandboxBytes,
-      body: reply4.text,
-      turn: ctx.turn,
-      sandbox_bytes: reply4.sandboxBytes,
-      returned_bytes: Buffer.byteLength(reply4.text, "utf8")
-    });
+    appendEvent(db, ownCallRow(project, ctx, name, reply4));
   }
   function dispatch2(server, tool) {
     return async (input, req) => {
@@ -47672,7 +50610,7 @@ async function startServer(argv, env) {
         get project() {
           return projectOf();
         },
-        sessionId: metaString(meta3, "sessionId") ?? "mcp:" + serverId,
+        sessionId: sessionIdOf(meta3, agent, env, serverId),
         turn: metaNumber(meta3, "turn") ?? 0,
         signal: req.mcpReq.signal,
         clientInfo: server.server.getClientVersion(),
@@ -47787,7 +50725,8 @@ function piExtension(pi) {
   let project;
   let turn = 0;
   let compactPending = false;
-  let instructionsDelivered = false;
+  let payload = "";
+  const journal = ownJournal();
   let toolsRegistered = false;
   function identify(ctx) {
     if (sessionId === "") sessionId = str3(ctx?.sessionManager?.getSessionId());
@@ -47813,11 +50752,14 @@ function piExtension(pi) {
       signal: signal ?? new AbortController().signal,
       protocolVersion: ""
     };
+    let reply4;
     try {
-      return await tool.handler(parsed.data, ctx);
+      reply4 = await tool.handler(parsed.data, ctx);
     } catch (err) {
       return errorReply2(err);
     }
+    if (project !== void 0) await journal(project, ctx, tool.name, reply4);
+    return reply4;
   }
   function piTool(tool) {
     return {
@@ -47840,21 +50782,22 @@ function piExtension(pi) {
     identify(ctx);
     turn += 1;
     registerTools();
+    const base = str3(event.systemPrompt);
+    const withPayload = () => ({ systemPrompt: base === "" ? payload : base + "\n\n" + payload });
     let out;
     try {
       out = await hook({ type: compactPending ? "session_compact" : "session_start" }, turn);
     } catch {
-      return {};
+      return payload === "" ? {} : withPayload();
     }
+    const compactTurn = compactPending;
     compactPending = false;
-    const parts = [];
-    const base = str3(event.systemPrompt);
-    if (base !== "") parts.push(base);
-    if (!instructionsDelivered) parts.push(INSTRUCTIONS);
-    if (out.stdout !== "") parts.push(out.stdout);
-    instructionsDelivered = true;
-    if (parts.length === (base === "" ? 0 : 1)) return {};
-    return { systemPrompt: parts.join("\n\n") };
+    if (payload === "" || compactTurn) {
+      payload = [INSTRUCTIONS, out.stdout].filter((s) => s !== "").join("\n\n");
+    } else if (out.stdout !== "") {
+      payload += "\n\n" + out.stdout;
+    }
+    return withPayload();
   });
   pi.on("input", async (event, ctx) => {
     identify(ctx);

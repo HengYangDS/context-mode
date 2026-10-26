@@ -1,14 +1,37 @@
 {
+  "bin": {
+    "context-mode": "cli.mjs"
+  },
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "files": [
+    ".claude-plugin",
+    "SHA256SUMS",
+    "claude-code",
+    "cli.mjs",
+    "copilot",
+    "fixtures",
+    "gemini-extension.json",
+    "hook.mjs",
+    "hooks",
+    "opencode",
+    "pi",
+    "qwen-extension.json",
+    "run.mjs",
+    "search.mjs",
+    "server.mjs",
+    "skills"
+  ],
   "name": "context-mode",
   "pi": {
     "extensions": [
       "./pi/index.js"
     ],
     "skills": [
-      "./skills"
+      "./pi/skills"
     ]
   },
-  "private": true,
   "type": "module",
-  "version": "2.0.0"
+  "version": "2.0.0-next.1"
 }

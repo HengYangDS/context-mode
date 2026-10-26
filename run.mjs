@@ -4,11 +4,16 @@ import { basename as basename2 } from "node:path";
 // src/core/contracts/constants.ts
 var SERVER_KEY = "context-mode";
 var TOOL_ORDER = Object.freeze(["ctx_execute", "ctx_batch", "ctx_index", "ctx_search", "ctx_resume", "ctx_stats", "ctx_doctor", "ctx_upgrade", "ctx_purge"]);
+function prefixToolNames(text, prefix) {
+  if (prefix === "") return text;
+  let out = text;
+  for (const name of TOOL_ORDER) out = out.split(name).join(prefix + name);
+  return out;
+}
 var OUTPUT_CAP = 16384;
 var REPORT_CAP = 4096;
 var INDEX_WRITE_CHUNK = 1048576;
 var MAX_CHUNK_BYTES = 4096;
-var READ_MAX_LINES = 200;
 var WEIGHT = Object.freeze({ toolerr: 900, decision: 700, prompt: 500, edit: 400, index: 200 });
 var DECAY_X1000 = Object.freeze([
   1e3,
@@ -152,7 +157,7 @@ var SQLITE_NOTADB_CODE = 26;
 var HOOK_TIMEOUT_MS = 5e3;
 var IN_PROCESS_TIMEOUT_MS = 0;
 var PROJECT_KEY_HEX_LEN = 16;
-var SCHEMA_VERSION = 2;
+var SCHEMA_VERSION = 5;
 var PROJECTS_DIR_NAME = "projects";
 var DB_FILE_NAME = "context.db";
 var GIT_DIR_NAME = ".git";
@@ -174,6 +179,7 @@ var RUN_MORE_PREFIX = "more: node ";
 var SEARCH_WRAPPER_FILE = "search.mjs";
 var RUN_WRAPPER_AGENT = "claude-code";
 var RUN_SESSION_PREFIX = "mcp:";
+var HOST_SESSION_ENV = Object.freeze({ "claude-code": "CLAUDE_CODE_SESSION_ID" });
 var NODE_MIN = "24.15.0";
 var DATA_ROOT = "~/.context-mode";
 var REQUIRE_SECURITY_ENV = "CONTEXT_MODE_REQUIRE_SECURITY";
@@ -185,9 +191,6 @@ function readHintEvery(raw) {
 }
 var MCP_HINT_EVERY = readHintEvery(process.env.CTX_MCP_HINT_EVERY);
 var MAX_NEST_DEPTH = 32;
-function READ_DENY_MESSAGE(path3, size) {
-  return `context-mode: this file is ${size} bytes, more than the ${OUTPUT_CAP} byte limit for one read. Pick one: read part of it with Read(file_path, offset, limit), for example limit ${READ_MAX_LINES}; or run code on it with ctx_execute(language, code, file="${path3}"), which gives your code the path in CTX_FILE and returns only stdout, up to ${OUTPUT_CAP} bytes; or search it with a bounded command such as grep -n or tail.`;
-}
 var DENY_PREFIX = "context-mode: ";
 var DENY_WHAT = Object.freeze({
   curl: "This curl/wget call",
@@ -238,7 +241,7 @@ var DOCTOR_LABEL = Object.freeze({
   D1: "version",
   D2: "node",
   D3: "host config",
-  D4: "v1 leftovers",
+  D4: "old entries",
   D5: "hook round trip",
   D5b: "double-fire",
   D6: "MCP",
@@ -294,6 +297,7 @@ var HOOK_HOST_FILE = Object.freeze({
   opencode: null
 });
 var TOOL_HOOK_EVENTS = Object.freeze(["PreToolUse", "PostToolUse"]);
+var KIRO_TOOL_MATCHERS = Object.freeze([["@mcp", "mcp"], ["shell", "shell"]]);
 var CODEX_FEATURES_HOOKS_KEY = Object.freeze(["features", "hooks"]);
 var DB_SIBLING_SUFFIXES = Object.freeze(["", DB_WAL_SUFFIX, DB_SHM_SUFFIX]);
 var UPGRADE_HOST_COMMAND = Object.freeze({
@@ -327,33 +331,39 @@ var V1_DATA_ROOT_ENTRIES = Object.freeze(["content", "platform.json"]);
 var PI_ROLE = "custom";
 var V1_PATH_SEPS = Object.freeze(["/", "\\"]);
 var V1_REASON = Object.freeze({
-  hook: "v1 hook entry: command contains context-mode and a v1 script name or context-mode hook",
-  cacheHealHook: "v1 cache-heal SessionStart hook entry",
-  cacheHealFile: "v1 cache-heal script file",
-  statusLine: "v1 statusLine (context-mode statusline): report only, never removed",
-  mcpEntry: "v1 MCP entry mcpServers.context-mode",
-  codexHook: "v1 Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
-  codexToml: "v1 config.toml [mcp_servers.context-mode*] section",
-  hookFile: "v1 hook file context-mode.json (runs context-mode hook)",
-  vscodeMcp: "v1 MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
-  kiroHook: "v1 Kiro flat hook entry: command contains context-mode and a v1 script name or context-mode hook",
-  kiroAgentFile: "v1 Kiro agent file agents/*.json with name context-mode",
-  kiroSteering: "v1 Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
-  piNpm: "v1 Pi package npm:context-mode",
-  opencodePlugin: "v1 OpenCode plugin spec context-mode",
-  zcodeHook: "v1 ZCode hook entry: command contains context-mode hook",
-  dataDir: "v1 data dir <agent home>/context-mode/",
-  dataDirShared: "v1 data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
-  dataRoot: "v1 content under ~/.context-mode/",
-  tmpFile: "v1 temp file context-mode-* under the OS temp dir"
+  hook: "old context-mode hook entry: command contains context-mode and an old script name or context-mode hook",
+  cacheHealHook: "old context-mode cache-heal SessionStart hook entry",
+  cacheHealFile: "old context-mode cache-heal script file",
+  statusLine: "old context-mode statusLine (context-mode statusline): report only, never removed",
+  mcpEntry: "old context-mode MCP entry mcpServers.context-mode",
+  codexHook: "old context-mode Codex hook entry: context-mode hook codex or hooks/codex/*.mjs",
+  codexToml: "old context-mode config.toml [mcp_servers.context-mode*] section",
+  hookFile: "old context-mode hook file context-mode.json (runs context-mode hook)",
+  vscodeMcp: "old context-mode MCP entry servers.context-mode in .vscode/mcp.json: report only, never removed",
+  kiroHook: "old Kiro hook entry: command contains context-mode and an old script name or context-mode hook",
+  kiroAgentFile: "old context-mode Kiro agent file agents/*.json with name context-mode",
+  kiroSteering: "old context-mode Kiro steering doc .kiro/steering/KIRO.md: manual review, report only, never removed",
+  piNpm: "old context-mode Pi package npm:context-mode",
+  opencodePlugin: "old context-mode OpenCode plugin spec context-mode",
+  zcodeHook: "old context-mode ZCode hook entry: command contains context-mode hook",
+  dataDir: "old context-mode data dir <agent home>/context-mode/",
+  dataDirShared: "old context-mode data dir ~/.gemini/context-mode/: delete only after a prompt (Antigravity shares it)",
+  dataRoot: "old context-mode content under ~/.context-mode/",
+  tmpFile: "old context-mode temp file context-mode-* under the OS temp dir: report only, no action needed"
 });
 var UPGRADE_REPORT_ONLY_REASONS = Object.freeze([V1_REASON.statusLine, V1_REASON.vscodeMcp, V1_REASON.dataDirShared, V1_REASON.tmpFile, V1_REASON.kiroSteering]);
 var OPENCODE_TOOL_PREFIX = SERVER_KEY + "_";
+var ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"]);
 var OWN_MCP_ENTRY = Object.freeze({
   codex: { file: [".codex", "config.toml"], key: ["mcp_servers", SERVER_KEY] },
   vscode: { file: [".vscode", "mcp.json"], key: ["servers", SERVER_KEY] },
   kiro: { file: [".kiro", "settings", "mcp.json"], key: ["mcpServers", SERVER_KEY] },
-  zcode: { file: [".zcode", "cli", "config.json"], key: ["mcpServers", SERVER_KEY] }
+  zcode: {
+    file: [".zcode", "cli", "config.json"],
+    key: ["mcp", "servers", SERVER_KEY],
+    fields: { type: "stdio", enabled: true, timeoutMs: EXEC_TIMEOUT_MS },
+    also: [[ZCODE_MCP_FEATURE_KEY, true]]
+  }
 });
 var REPORT_ENV_ENUMS = Object.freeze({
   NODE_ENV: Object.freeze(["development", "production", "test"])
@@ -380,6 +390,7 @@ function canonicalName(name, ownPrefix) {
 function outputOf(resp) {
   if (resp === void 0) return "";
   if (typeof resp === "string") return resp;
+  if (Array.isArray(resp)) return blocksOf(resp).text;
   if (typeof resp === "object" && resp !== null) {
     const r = resp;
     if (typeof r.stdout === "string" || typeof r.stderr === "string") {
@@ -388,12 +399,39 @@ function outputOf(resp) {
       return err === "" ? out : out === "" ? err : out + "\n" + err;
     }
   }
+  if (typeof resp === "object" && resp !== null && isGrepContent(resp)) return resp.content;
   return JSON.stringify(resp);
+}
+function isGrepContent(resp) {
+  const r = resp;
+  return r.mode === "content" && typeof r.content === "string";
+}
+function blocksOf(resp) {
+  const parts = [];
+  let keep = false;
+  for (const b of resp) {
+    const blk = typeof b === "object" && b !== null ? b : {};
+    if (blk.type === "text" && typeof blk.text === "string") parts.push(blk.text);
+    else keep = true;
+  }
+  return { text: parts.join("\n"), keep };
 }
 function readResult(resp) {
   const text = outputOf(resp);
   const isError = typeof resp === "object" && resp !== null && resp.is_error === true;
-  return { isError, bytes: Buffer.byteLength(text), text };
+  const info = { isError, bytes: Buffer.byteLength(text), text };
+  if (typeof resp === "object" && resp !== null && !Array.isArray(resp) && isGrepContent(resp)) info.shape = resp;
+  if (Array.isArray(resp)) {
+    info.blocks = true;
+    if (blocksOf(resp).keep) info.keep = true;
+  }
+  if (typeof resp === "object" && resp !== null) {
+    const r = resp;
+    if (typeof r.persistedOutputPath === "string" && r.persistedOutputPath !== "" && typeof r.persistedOutputSize === "number" && r.persistedOutputSize > info.bytes) {
+      info.persistedPath = r.persistedOutputPath;
+    }
+  }
+  return info;
 }
 function decodeClaudeShape(raw, agent, ownPrefix, sources) {
   if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new Error(agent + ": hook payload is not a JSON object");
@@ -418,7 +456,10 @@ function decodeClaudeShape(raw, agent, ownPrefix, sources) {
   return ev;
 }
 function replaceShape(ev, output) {
-  return ev.tool?.canonicalName === "Bash" ? { stdout: output, stderr: "", interrupted: false } : output;
+  if (ev.tool?.canonicalName === "Bash") return { stdout: output, stderr: "", interrupted: false };
+  if (ev.result?.shape !== void 0) return { ...ev.result.shape, content: output };
+  if (ev.result?.blocks === true) return [{ type: "text", text: output }];
+  return output;
 }
 function encodeClaudeShape(ev, d, hasReplace2) {
   const out = (fields) => ({
@@ -496,8 +537,15 @@ var EMPTY = { stdout: "", exitCode: 0 };
 function own(p, key) {
   return Object.hasOwn(p, key) ? p[key] : void 0;
 }
+var NATIVE_TO_CANONICAL = {
+  run_shell_command: "Bash",
+  read_file: "Read",
+  grep_search: "Grep",
+  web_fetch: "WebFetch"
+};
 function canonicalName2(name, mcp) {
   if (name.startsWith(TOOL_NAME_PREFIX3)) return name.slice(TOOL_NAME_PREFIX3.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
   if (typeof mcp !== "object" || mcp === null) return name;
   const m = mcp;
   const server = own(m, "server_name");
@@ -506,8 +554,10 @@ function canonicalName2(name, mcp) {
   return "mcp:" + server + ":" + tool;
 }
 function readResult2(resp) {
-  const text = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
-  const err = typeof resp === "object" && resp !== null ? own(resp, "error") : void 0;
+  const obj = typeof resp === "object" && resp !== null ? resp : void 0;
+  const llm = obj === void 0 ? void 0 : own(obj, "llmContent");
+  const text = resp === void 0 ? "" : typeof resp === "string" ? resp : typeof llm === "string" ? llm : JSON.stringify(resp);
+  const err = obj === void 0 ? void 0 : own(obj, "error");
   return { isError: err !== void 0 && err !== null, bytes: Buffer.byteLength(text), text };
 }
 function decode3(raw) {
@@ -544,14 +594,15 @@ function encode3(ev, d, _extra) {
       if (!DENY_EVENTS.includes(ev.event)) return EMPTY;
       return { stdout: JSON.stringify({ decision: "deny", reason: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason }), exitCode: 0 };
     case "replace":
-      return EMPTY;
+      if (ev.event !== "PostToolUse") return EMPTY;
+      return { stdout: JSON.stringify({ decision: "deny", reason: d.output }), exitCode: 0 };
   }
 }
 
 // src/adapters/qwen.ts
 var TOOL_NAME_PREFIX4 = "mcp__context-mode__";
 var QWEN_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
-var NATIVE_TO_CANONICAL = {
+var NATIVE_TO_CANONICAL2 = {
   run_shell_command: "Bash",
   Shell: "Bash",
   read_file: "Read",
@@ -563,7 +614,7 @@ function decode4(raw) {
   const failure = typeof raw === "object" && raw !== null && !Array.isArray(raw) && raw.hook_event_name === FAILURE_EVENT;
   const payload = failure ? { ...raw, hook_event_name: "PostToolUse" } : raw;
   const ev = decodeClaudeShape(payload, "qwen", TOOL_NAME_PREFIX4, QWEN_SOURCES);
-  if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL[ev.tool.name];
+  if (ev.tool !== void 0 && Object.hasOwn(NATIVE_TO_CANONICAL2, ev.tool.name)) ev.tool.canonicalName = NATIVE_TO_CANONICAL2[ev.tool.name];
   if (failure) {
     const error = raw.error;
     const text = typeof error === "string" ? error : error === void 0 ? "" : JSON.stringify(error);
@@ -576,7 +627,7 @@ function encode4(ev, d, _extra) {
 }
 
 // src/adapters/copilot-cli.ts
-var TOOL_NAME_PREFIX5 = "mcp_context-mode_";
+var TOOL_NAME_PREFIX5 = "context-mode-";
 var NATIVE_EVENTS = {
   sessionStart: { event: "SessionStart", casing: "camel", failure: false },
   userPromptSubmitted: { event: "UserPromptSubmit", casing: "camel", failure: false },
@@ -592,21 +643,17 @@ var NATIVE_EVENTS = {
 var COPILOT_SOURCES = { startup: "startup", resume: "resume", new: "startup" };
 var KEYS = {
   camel: { event: "hookEventName", session: "sessionId", tool: "toolName", args: "toolArgs", result: "toolResult" },
-  snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_response" }
+  snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_result" }
 };
-var MCP_PREFIX2 = "mcp_";
-var MCP_SEP2 = "_";
 var RESULT_SUCCESS = "success";
 function isRecord(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
+var NATIVE_TO_CANONICAL3 = { bash: "Bash" };
 function canonicalName3(name) {
   if (name.startsWith(TOOL_NAME_PREFIX5)) return name.slice(TOOL_NAME_PREFIX5.length);
-  if (!name.startsWith(MCP_PREFIX2)) return name;
-  const rest = name.slice(MCP_PREFIX2.length);
-  const sep3 = rest.indexOf(MCP_SEP2);
-  if (sep3 < 0) return name;
-  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP2.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL3, name)) return NATIVE_TO_CANONICAL3[name];
+  return name;
 }
 function readArgs(v) {
   if (isRecord(v)) return v;
@@ -618,20 +665,31 @@ function readArgs(v) {
     return {};
   }
 }
+var RESULT_KEYS = {
+  camel: { type: "resultType", text: "textResultForLlm" },
+  snake: { type: "result_type", text: "text_result_for_llm" }
+};
 function readResult3(v, casing, failure) {
-  if (casing === "camel") {
-    const r = isRecord(v) ? v : {};
-    const text2 = typeof r.textResultForLlm === "string" ? r.textResultForLlm : "";
-    const isError2 = failure || typeof r.resultType === "string" && r.resultType !== RESULT_SUCCESS;
-    return { isError: isError2, bytes: Buffer.byteLength(text2), text: text2 };
-  }
-  const text = v === void 0 ? "" : typeof v === "string" ? v : JSON.stringify(v);
-  const isError = failure || isRecord(v) && v.is_error === true;
+  const k = RESULT_KEYS[casing];
+  const r = isRecord(v) ? v : {};
+  const text = typeof r[k.text] === "string" ? r[k.text] : "";
+  const isError = failure || typeof r[k.type] === "string" && r[k.type] !== RESULT_SUCCESS;
   return { isError, bytes: Buffer.byteLength(text), text };
+}
+var EVENT_BY_KEY = [
+  ["toolResult", "postToolUse"],
+  ["toolName", "preToolUse"],
+  ["prompt", "userPromptSubmitted"],
+  ["source", "sessionStart"]
+];
+function eventName(raw) {
+  if (typeof raw.hookEventName === "string") return raw.hookEventName;
+  if (raw.hook_event_name !== void 0) return raw.hook_event_name;
+  return EVENT_BY_KEY.find(([key]) => Object.hasOwn(raw, key))?.[1];
 }
 function decode5(raw) {
   if (!isRecord(raw)) throw new Error("copilot-cli: hook payload is not a JSON object");
-  const name = typeof raw.hookEventName === "string" ? raw.hookEventName : raw.hook_event_name;
+  const name = eventName(raw);
   const native = typeof name === "string" ? NATIVE_EVENTS[name] : void 0;
   if (native === void 0) throw new Error("copilot-cli: unknown hook event " + String(name));
   const k = KEYS[native.casing];
@@ -661,23 +719,27 @@ function encode5(ev, d, _extra) {
         exitCode: 0
       };
     case "replace":
-      return EMPTY2;
+      if (ev.event !== "PostToolUse") return EMPTY2;
+      return { stdout: JSON.stringify({ modifiedResult: { resultType: RESULT_SUCCESS, textResultForLlm: d.output } }), exitCode: 0 };
   }
 }
 
 // src/adapters/vscode.ts
 var TOOL_NAME_PREFIX6 = "mcp_context-mode_";
 var VSCODE_EVENTS = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "PreCompact"];
-var MCP_PREFIX3 = "mcp_";
-var MCP_SEP3 = "_";
+var MCP_PREFIX2 = "mcp_";
+var MCP_SEP2 = "_";
 var SESSION_START_NEW = "new";
+var SHELL_TOOL_NAME = "run_in_terminal";
+var NATIVE_TO_CANONICAL4 = { [SHELL_TOOL_NAME]: "Bash" };
 function canonicalName4(name) {
   if (name.startsWith(TOOL_NAME_PREFIX6)) return name.slice(TOOL_NAME_PREFIX6.length);
-  if (!name.startsWith(MCP_PREFIX3)) return name;
-  const rest = name.slice(MCP_PREFIX3.length);
-  const sep3 = rest.indexOf(MCP_SEP3);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL4, name)) return NATIVE_TO_CANONICAL4[name];
+  if (!name.startsWith(MCP_PREFIX2)) return name;
+  const rest = name.slice(MCP_PREFIX2.length);
+  const sep3 = rest.indexOf(MCP_SEP2);
   if (sep3 <= 0 || sep3 === rest.length - 1) return name;
-  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP3.length);
+  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP2.length);
 }
 function readResult4(resp) {
   const text = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
@@ -716,16 +778,19 @@ var KIRO_EVENTS = {
   PostToolUse: "PostToolUse"
 };
 var PROMPT_ENV = "USER_PROMPT";
-var MCP_PREFIX4 = "mcp_";
-var MCP_SEP4 = "_";
+var MCP_PREFIX3 = "mcp_";
+var SHELL_TOOL_NAME2 = "execute_bash";
+var NATIVE_TO_CANONICAL5 = { [SHELL_TOOL_NAME2]: "Bash" };
+var MCP_SEP3 = "_";
 var KIRO_SOURCES = { startup: "startup", resume: "resume", clear: "clear", compact: "compact" };
 function canonicalName5(name) {
   if (name.startsWith(TOOL_NAME_PREFIX7)) return name.slice(TOOL_NAME_PREFIX7.length);
-  if (!name.startsWith(MCP_PREFIX4)) return name;
-  const rest = name.slice(MCP_PREFIX4.length);
-  const sep3 = rest.indexOf(MCP_SEP4);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL5, name)) return NATIVE_TO_CANONICAL5[name];
+  if (!name.startsWith(MCP_PREFIX3)) return name;
+  const rest = name.slice(MCP_PREFIX3.length);
+  const sep3 = rest.indexOf(MCP_SEP3);
   if (sep3 <= 0 || sep3 === rest.length - 1) return name;
-  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP4.length);
+  return "mcp:" + rest.slice(0, sep3) + ":" + rest.slice(sep3 + MCP_SEP3.length);
 }
 function readResult5(resp) {
   const text = resp === void 0 ? "" : typeof resp === "string" ? resp : JSON.stringify(resp);
@@ -759,7 +824,7 @@ function encode7(ev, d, _extra) {
     case "hint":
       return { stdout: d.text, exitCode: 0 };
     case "deny":
-      return { stdout: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
+      return { stdout: "", stderr: d.rewritten === void 0 ? d.reason : d.rewritten + "\n" + d.reason, exitCode: 2 };
     case "replace":
       return { stdout: "", exitCode: 0 };
   }
@@ -796,6 +861,7 @@ var PI_EVENTS = {
   tool_call: { event: "PreToolUse" },
   tool_result: { event: "PostToolUse" }
 };
+var NATIVE_TO_CANONICAL6 = { bash: "Bash", read: "Read" };
 function record(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
 }
@@ -816,7 +882,7 @@ function decode9(raw) {
   if (row.event === "UserPromptSubmit" && typeof p.message === "string") ev.prompt = p.message;
   if (row.event === "PreToolUse" || row.event === "PostToolUse") {
     const name = String(p.toolName ?? "");
-    ev.tool = { name, canonicalName: name, input: record(p.input) };
+    ev.tool = { name, canonicalName: Object.hasOwn(NATIVE_TO_CANONICAL6, name) ? NATIVE_TO_CANONICAL6[name] : name, input: record(p.input) };
     if (typeof p.toolCallId === "string") ev.tool.callId = p.toolCallId;
   }
   if (row.event === "PostToolUse") ev.result = readResult6(p);
@@ -855,10 +921,11 @@ var OPENCODE_EVENTS = {
   compaction: "PreCompact",
   "step-finish": "Usage"
 };
-var NATIVE_TO_CANONICAL2 = { webfetch: "WebFetch" };
+var SHELL_TOOL_NAME3 = "bash";
+var NATIVE_TO_CANONICAL7 = { webfetch: "WebFetch", [SHELL_TOOL_NAME3]: "Bash" };
 function toCanonicalTool(name) {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
-  return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL2, name) ? NATIVE_TO_CANONICAL2[name] : name;
+  return Object.prototype.hasOwnProperty.call(NATIVE_TO_CANONICAL7, name) ? NATIVE_TO_CANONICAL7[name] : name;
 }
 function record2(v) {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? v : {};
@@ -916,6 +983,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/claude-code.json" },
+    skillChannel: { kind: "package", path: "claude-code/skills" },
+    // ADR-0020, D-HQ-SKILLS-2
     decode,
     encode
   },
@@ -931,6 +1001,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".codex/hooks.json" },
+    skillChannel: { kind: "home-dir", path: ".codex/skills" },
+    // ADR-0020
     decode: decode2,
     encode: encode2
   },
@@ -939,7 +1012,8 @@ var ADAPTERS = Object.freeze([
     installMode: "extension",
     projectSource: "spawn-cwd",
     toolNamePrefix: TOOL_NAME_PREFIX3,
-    nativeTools: { shell: [] },
+    // D-HA-GEMINI-NAMES-1: gemini-cli 0.65.0 *_TOOL_NAME constants.
+    nativeTools: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
     execReadOnlyHint: false,
     // D-FU-GCH-1: no SessionStart. Claude Code also loads hooks/hooks.json (Gemini's file) and would run a SessionStart
     // entry through /bin/sh, which fails on ${extensionPath}. Gemini's SessionStart only sent the resume hint (compact never
@@ -949,6 +1023,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/hooks.json" },
+    skillChannel: { kind: "package", path: "skills" },
+    // ADR-0020
     decode: decode3,
     encode: encode3
   },
@@ -964,6 +1041,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/qwen.json" },
+    skillChannel: { kind: "home-dir", path: ".qwen/skills" },
+    // ADR-0020
     decode: decode4,
     encode: encode4
   },
@@ -972,13 +1052,16 @@ var ADAPTERS = Object.freeze([
     installMode: "plugin",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX5,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: ["bash"] },
     execReadOnlyHint: false,
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode.json" },
+    skillChannel: { kind: "home-dir", path: ".copilot/skills" },
+    // ADR-0020
     decode: decode5,
     encode: encode5
   },
@@ -988,13 +1071,16 @@ var ADAPTERS = Object.freeze([
     projectSource: "arg:workspaceFolder",
     toolNamePrefix: TOOL_NAME_PREFIX6,
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
-    nativeTools: { shell: [] },
+    nativeTools: { shell: [SHELL_TOOL_NAME] },
     execReadOnlyHint: false,
     eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
     compactDelivery: "pending-flag",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode-vscode.json" },
+    skillChannel: { kind: "home-dir", path: ".copilot/skills" },
+    // ADR-0020
     decode: decode6,
     encode: encode6
   },
@@ -1003,13 +1089,17 @@ var ADAPTERS = Object.freeze([
     installMode: "mcp-entry",
     projectSource: "arg:--agent+cwd",
     toolNamePrefix: TOOL_NAME_PREFIX7,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: [SHELL_TOOL_NAME2] },
     execReadOnlyHint: false,
+    // D-HF-KIRO-SHELL-1
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none",
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "hint-only",
+    hookChannel: { kind: "home-file", path: ".kiro/hooks/context-mode.json" },
+    skillChannel: { kind: "home-dir", path: ".kiro/skills" },
+    // ADR-0020
     decode: decode7,
     encode: encode7
   },
@@ -1026,6 +1116,9 @@ var ADAPTERS = Object.freeze([
     compactSummary: "none",
     hookTimeoutMs: HOOK_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".zcode/cli/config.json" },
+    skillChannel: { kind: "home-dir", path: ".zcode/skills" },
+    // ADR-0020
     decode: decode8,
     encode: encode8
   },
@@ -1034,13 +1127,16 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "pi:ctx.cwd",
     toolNamePrefix: TOOL_NAME_PREFIX9,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: ["bash"], read: ["read"] },
     execReadOnlyHint: false,
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag",
     compactSummary: "none",
     hookTimeoutMs: IN_PROCESS_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "pi/index.js" },
+    skillChannel: { kind: "package", path: "pi/skills" },
+    // ADR-0020
     decode: decode9,
     encode: encode9,
     checkPermission
@@ -1050,21 +1146,25 @@ var ADAPTERS = Object.freeze([
     installMode: "in-process",
     projectSource: "spawn-cwd",
     toolNamePrefix: TOOL_NAME_PREFIX10,
-    nativeTools: { shell: [] },
+    nativeTools: { shell: [SHELL_TOOL_NAME3] },
     execReadOnlyHint: false,
+    // D-HF-OPENCODE-SHELL-1
     // Usage: step-finish cost row (DEVIATIONS D-M5-arch-2).
     eventMap: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     compactDelivery: "opencode-cache",
     compactSummary: "none",
     hookTimeoutMs: IN_PROCESS_TIMEOUT_MS,
     denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "opencode/plugin.js" },
+    skillChannel: { kind: "home-dir", path: ".config/opencode/skills" },
+    // ADR-0020
     decode: decode10,
     encode: encode10,
     toCanonicalTool
   }
 ]);
 var BY_ID = new Map(ADAPTERS.map((r) => [r.id, r]));
-var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "pi"]);
+var REPLACE_ROWS = /* @__PURE__ */ new Set(["claude-code", "gemini", "copilot-cli", "pi"]);
 function hasReplace(row) {
   return REPLACE_ROWS.has(row.id);
 }
@@ -1140,16 +1240,14 @@ var CtxError = class extends Error {
   }
 };
 
-// src/core/store/db.ts
-import { existsSync, linkSync, mkdirSync, rmSync } from "node:fs";
-
 // src/core/store/schema.ts
 var SCHEMA_VERSION2 = SCHEMA_VERSION;
 var PRAGMAS = `
 PRAGMA busy_timeout = ${DB_TIMEOUT_MS};
 PRAGMA journal_mode = WAL;
 `;
-var FTS_TOKENIZE = "tokenize = 'unicode61 remove_diacritics 2'";
+var FTS_TOKENIZE = "tokenize = 'porter unicode61 remove_diacritics 2'";
+var FTS_TOKENIZE_V1 = "tokenize = 'unicode61 remove_diacritics 2'";
 var DDL = `
 CREATE TABLE IF NOT EXISTS events (
   seq            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1195,7 +1293,7 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks USING fts5(
   agent UNINDEXED,
   ord UNINDEXED,
   body,
-  ${FTS_TOKENIZE}
+  ${FTS_TOKENIZE_V1}
 );
 
 CREATE TABLE IF NOT EXISTS meta (
@@ -1206,9 +1304,47 @@ CREATE TABLE IF NOT EXISTS meta (
 var DDL_V2 = `
 CREATE UNIQUE INDEX IF NOT EXISTS idx_events_cost_session_turn ON events(session_id, turn) WHERE kind = 'cost';
 `;
+var DDL_V3 = `
+CREATE VIRTUAL TABLE chunks_v3 USING fts5(
+  source_id UNINDEXED,
+  session_id UNINDEXED,
+  worktree UNINDEXED,
+  agent UNINDEXED,
+  ord UNINDEXED,
+  body,
+  title,
+  ${FTS_TOKENIZE}
+);
+INSERT INTO chunks_v3(rowid, source_id, session_id, worktree, agent, ord, body, title)
+  SELECT rowid, source_id, session_id, worktree, agent, ord, body, '' FROM chunks;
+DROP TABLE chunks;
+ALTER TABLE chunks_v3 RENAME TO chunks;
+`;
+var DDL_V4 = `
+CREATE VIRTUAL TABLE chunks_tri USING fts5(
+  body,
+  title,
+  tokenize = 'trigram',
+  content = ''
+);
+INSERT INTO chunks_tri(rowid, body, title) SELECT rowid, body, title FROM chunks;
+CREATE VIRTUAL TABLE chunks_vocab USING fts5vocab(chunks, 'row');
+`;
+var DDL_V5 = `
+CREATE VIRTUAL TABLE line_units USING fts5(
+  body,
+  source_id UNINDEXED,
+  session_id UNINDEXED,
+  ord UNINDEXED,
+  ${FTS_TOKENIZE}
+);
+`;
 var MIGRATIONS = [
   { version: 1, sql: DDL },
-  { version: 2, sql: DDL_V2 }
+  { version: 2, sql: DDL_V2 },
+  { version: 3, sql: DDL_V3 },
+  { version: 4, sql: DDL_V4 },
+  { version: 5, sql: DDL_V5 }
 ];
 function applyMigrations(db, fromVersion) {
   if (fromVersion === SCHEMA_VERSION2) return;
@@ -1230,6 +1366,7 @@ function applyMigrations(db, fromVersion) {
 }
 
 // src/core/store/db.ts
+var { existsSync, linkSync, mkdirSync, rmSync } = process.getBuiltinModule("node:fs");
 function versionParts(v) {
   const bare = v.startsWith("v") ? v.slice(1) : v;
   return bare.split(".").map((p) => Number.parseInt(p, 10));
@@ -1348,17 +1485,1628 @@ function closeDb(db) {
   }
 }
 
+// src/core/store/words.ts
+var WORD_RANGES = Object.freeze([
+  170,
+  170,
+  178,
+  179,
+  181,
+  181,
+  185,
+  186,
+  188,
+  190,
+  192,
+  214,
+  216,
+  246,
+  248,
+  705,
+  710,
+  721,
+  736,
+  740,
+  748,
+  748,
+  750,
+  750,
+  880,
+  884,
+  886,
+  887,
+  890,
+  893,
+  895,
+  895,
+  902,
+  902,
+  904,
+  906,
+  908,
+  908,
+  910,
+  929,
+  931,
+  1013,
+  1015,
+  1153,
+  1162,
+  1327,
+  1329,
+  1366,
+  1369,
+  1369,
+  1376,
+  1416,
+  1488,
+  1514,
+  1519,
+  1522,
+  1568,
+  1610,
+  1632,
+  1641,
+  1646,
+  1647,
+  1649,
+  1747,
+  1749,
+  1749,
+  1765,
+  1766,
+  1774,
+  1788,
+  1791,
+  1791,
+  1808,
+  1808,
+  1810,
+  1839,
+  1869,
+  1957,
+  1969,
+  1969,
+  1984,
+  2026,
+  2036,
+  2037,
+  2042,
+  2042,
+  2048,
+  2069,
+  2074,
+  2074,
+  2084,
+  2084,
+  2088,
+  2088,
+  2112,
+  2136,
+  2144,
+  2154,
+  2160,
+  2183,
+  2185,
+  2191,
+  2208,
+  2249,
+  2308,
+  2361,
+  2365,
+  2365,
+  2384,
+  2384,
+  2392,
+  2401,
+  2406,
+  2415,
+  2417,
+  2432,
+  2437,
+  2444,
+  2447,
+  2448,
+  2451,
+  2472,
+  2474,
+  2480,
+  2482,
+  2482,
+  2486,
+  2489,
+  2493,
+  2493,
+  2510,
+  2510,
+  2524,
+  2525,
+  2527,
+  2529,
+  2534,
+  2545,
+  2548,
+  2553,
+  2556,
+  2556,
+  2565,
+  2570,
+  2575,
+  2576,
+  2579,
+  2600,
+  2602,
+  2608,
+  2610,
+  2611,
+  2613,
+  2614,
+  2616,
+  2617,
+  2649,
+  2652,
+  2654,
+  2654,
+  2662,
+  2671,
+  2674,
+  2676,
+  2693,
+  2701,
+  2703,
+  2705,
+  2707,
+  2728,
+  2730,
+  2736,
+  2738,
+  2739,
+  2741,
+  2745,
+  2749,
+  2749,
+  2768,
+  2768,
+  2784,
+  2785,
+  2790,
+  2799,
+  2809,
+  2809,
+  2821,
+  2828,
+  2831,
+  2832,
+  2835,
+  2856,
+  2858,
+  2864,
+  2866,
+  2867,
+  2869,
+  2873,
+  2877,
+  2877,
+  2908,
+  2909,
+  2911,
+  2913,
+  2918,
+  2927,
+  2929,
+  2935,
+  2947,
+  2947,
+  2949,
+  2954,
+  2958,
+  2960,
+  2962,
+  2965,
+  2969,
+  2970,
+  2972,
+  2972,
+  2974,
+  2975,
+  2979,
+  2980,
+  2984,
+  2986,
+  2990,
+  3001,
+  3024,
+  3024,
+  3046,
+  3058,
+  3077,
+  3084,
+  3086,
+  3088,
+  3090,
+  3112,
+  3114,
+  3129,
+  3133,
+  3133,
+  3160,
+  3162,
+  3164,
+  3165,
+  3168,
+  3169,
+  3174,
+  3183,
+  3192,
+  3198,
+  3200,
+  3200,
+  3205,
+  3212,
+  3214,
+  3216,
+  3218,
+  3240,
+  3242,
+  3251,
+  3253,
+  3257,
+  3261,
+  3261,
+  3292,
+  3294,
+  3296,
+  3297,
+  3302,
+  3311,
+  3313,
+  3314,
+  3332,
+  3340,
+  3342,
+  3344,
+  3346,
+  3386,
+  3389,
+  3389,
+  3406,
+  3406,
+  3412,
+  3414,
+  3416,
+  3425,
+  3430,
+  3448,
+  3450,
+  3455,
+  3461,
+  3478,
+  3482,
+  3505,
+  3507,
+  3515,
+  3517,
+  3517,
+  3520,
+  3526,
+  3558,
+  3567,
+  3585,
+  3632,
+  3634,
+  3635,
+  3648,
+  3654,
+  3664,
+  3673,
+  3713,
+  3714,
+  3716,
+  3716,
+  3718,
+  3722,
+  3724,
+  3747,
+  3749,
+  3749,
+  3751,
+  3760,
+  3762,
+  3763,
+  3773,
+  3773,
+  3776,
+  3780,
+  3782,
+  3782,
+  3792,
+  3801,
+  3804,
+  3807,
+  3840,
+  3840,
+  3872,
+  3891,
+  3904,
+  3911,
+  3913,
+  3948,
+  3976,
+  3980,
+  4096,
+  4138,
+  4159,
+  4169,
+  4176,
+  4181,
+  4186,
+  4189,
+  4193,
+  4193,
+  4197,
+  4198,
+  4206,
+  4208,
+  4213,
+  4225,
+  4238,
+  4238,
+  4240,
+  4249,
+  4256,
+  4293,
+  4295,
+  4295,
+  4301,
+  4301,
+  4304,
+  4346,
+  4348,
+  4680,
+  4682,
+  4685,
+  4688,
+  4694,
+  4696,
+  4696,
+  4698,
+  4701,
+  4704,
+  4744,
+  4746,
+  4749,
+  4752,
+  4784,
+  4786,
+  4789,
+  4792,
+  4798,
+  4800,
+  4800,
+  4802,
+  4805,
+  4808,
+  4822,
+  4824,
+  4880,
+  4882,
+  4885,
+  4888,
+  4954,
+  4969,
+  4988,
+  4992,
+  5007,
+  5024,
+  5109,
+  5112,
+  5117,
+  5121,
+  5740,
+  5743,
+  5759,
+  5761,
+  5786,
+  5792,
+  5866,
+  5870,
+  5880,
+  5888,
+  5905,
+  5919,
+  5937,
+  5952,
+  5969,
+  5984,
+  5996,
+  5998,
+  6e3,
+  6016,
+  6067,
+  6103,
+  6103,
+  6108,
+  6108,
+  6112,
+  6121,
+  6128,
+  6137,
+  6160,
+  6169,
+  6176,
+  6264,
+  6272,
+  6276,
+  6279,
+  6312,
+  6314,
+  6314,
+  6320,
+  6389,
+  6400,
+  6430,
+  6470,
+  6509,
+  6512,
+  6516,
+  6528,
+  6571,
+  6576,
+  6601,
+  6608,
+  6618,
+  6656,
+  6678,
+  6688,
+  6740,
+  6784,
+  6793,
+  6800,
+  6809,
+  6823,
+  6823,
+  6917,
+  6963,
+  6981,
+  6988,
+  6992,
+  7001,
+  7043,
+  7072,
+  7086,
+  7141,
+  7168,
+  7203,
+  7232,
+  7241,
+  7245,
+  7293,
+  7296,
+  7306,
+  7312,
+  7354,
+  7357,
+  7359,
+  7401,
+  7404,
+  7406,
+  7411,
+  7413,
+  7414,
+  7418,
+  7418,
+  7424,
+  7615,
+  7680,
+  7957,
+  7960,
+  7965,
+  7968,
+  8005,
+  8008,
+  8013,
+  8016,
+  8023,
+  8025,
+  8025,
+  8027,
+  8027,
+  8029,
+  8029,
+  8031,
+  8061,
+  8064,
+  8116,
+  8118,
+  8124,
+  8126,
+  8126,
+  8130,
+  8132,
+  8134,
+  8140,
+  8144,
+  8147,
+  8150,
+  8155,
+  8160,
+  8172,
+  8178,
+  8180,
+  8182,
+  8188,
+  8304,
+  8305,
+  8308,
+  8313,
+  8319,
+  8329,
+  8336,
+  8348,
+  8450,
+  8450,
+  8455,
+  8455,
+  8458,
+  8467,
+  8469,
+  8469,
+  8473,
+  8477,
+  8484,
+  8484,
+  8486,
+  8486,
+  8488,
+  8488,
+  8490,
+  8493,
+  8495,
+  8505,
+  8508,
+  8511,
+  8517,
+  8521,
+  8526,
+  8526,
+  8528,
+  8585,
+  9312,
+  9371,
+  9450,
+  9471,
+  10102,
+  10131,
+  11264,
+  11492,
+  11499,
+  11502,
+  11506,
+  11507,
+  11517,
+  11517,
+  11520,
+  11557,
+  11559,
+  11559,
+  11565,
+  11565,
+  11568,
+  11623,
+  11631,
+  11631,
+  11648,
+  11670,
+  11680,
+  11686,
+  11688,
+  11694,
+  11696,
+  11702,
+  11704,
+  11710,
+  11712,
+  11718,
+  11720,
+  11726,
+  11728,
+  11734,
+  11736,
+  11742,
+  11823,
+  11823,
+  12293,
+  12295,
+  12321,
+  12329,
+  12337,
+  12341,
+  12344,
+  12348,
+  12353,
+  12438,
+  12445,
+  12447,
+  12449,
+  12538,
+  12540,
+  12543,
+  12549,
+  12591,
+  12593,
+  12686,
+  12690,
+  12693,
+  12704,
+  12735,
+  12784,
+  12799,
+  12832,
+  12841,
+  12872,
+  12879,
+  12881,
+  12895,
+  12928,
+  12937,
+  12977,
+  12991,
+  13312,
+  19903,
+  19968,
+  42124,
+  42192,
+  42237,
+  42240,
+  42508,
+  42512,
+  42539,
+  42560,
+  42606,
+  42623,
+  42653,
+  42656,
+  42735,
+  42775,
+  42783,
+  42786,
+  42888,
+  42891,
+  42972,
+  42993,
+  43009,
+  43011,
+  43013,
+  43015,
+  43018,
+  43020,
+  43042,
+  43056,
+  43061,
+  43072,
+  43123,
+  43138,
+  43187,
+  43216,
+  43225,
+  43250,
+  43255,
+  43259,
+  43259,
+  43261,
+  43262,
+  43264,
+  43301,
+  43312,
+  43334,
+  43360,
+  43388,
+  43396,
+  43442,
+  43471,
+  43481,
+  43488,
+  43492,
+  43494,
+  43518,
+  43520,
+  43560,
+  43584,
+  43586,
+  43588,
+  43595,
+  43600,
+  43609,
+  43616,
+  43638,
+  43642,
+  43642,
+  43646,
+  43695,
+  43697,
+  43697,
+  43701,
+  43702,
+  43705,
+  43709,
+  43712,
+  43712,
+  43714,
+  43714,
+  43739,
+  43741,
+  43744,
+  43754,
+  43762,
+  43764,
+  43777,
+  43782,
+  43785,
+  43790,
+  43793,
+  43798,
+  43808,
+  43814,
+  43816,
+  43822,
+  43824,
+  43866,
+  43868,
+  43881,
+  43888,
+  44002,
+  44016,
+  44025,
+  44032,
+  55203,
+  55216,
+  55238,
+  55243,
+  55291,
+  63744,
+  64109,
+  64112,
+  64217,
+  64256,
+  64262,
+  64275,
+  64279,
+  64285,
+  64285,
+  64287,
+  64296,
+  64298,
+  64310,
+  64312,
+  64316,
+  64318,
+  64318,
+  64320,
+  64321,
+  64323,
+  64324,
+  64326,
+  64433,
+  64467,
+  64829,
+  64848,
+  64911,
+  64914,
+  64967,
+  65008,
+  65019,
+  65136,
+  65140,
+  65142,
+  65276,
+  65296,
+  65305,
+  65313,
+  65338,
+  65345,
+  65370,
+  65382,
+  65470,
+  65474,
+  65479,
+  65482,
+  65487,
+  65490,
+  65495,
+  65498,
+  65500,
+  65536,
+  65547,
+  65549,
+  65574,
+  65576,
+  65594,
+  65596,
+  65597,
+  65599,
+  65613,
+  65616,
+  65629,
+  65664,
+  65786,
+  65799,
+  65843,
+  65856,
+  65912,
+  65930,
+  65931,
+  66176,
+  66204,
+  66208,
+  66256,
+  66273,
+  66299,
+  66304,
+  66339,
+  66349,
+  66378,
+  66384,
+  66421,
+  66432,
+  66461,
+  66464,
+  66499,
+  66504,
+  66511,
+  66513,
+  66517,
+  66560,
+  66717,
+  66720,
+  66729,
+  66736,
+  66771,
+  66776,
+  66811,
+  66816,
+  66855,
+  66864,
+  66915,
+  66928,
+  66938,
+  66940,
+  66954,
+  66956,
+  66962,
+  66964,
+  66965,
+  66967,
+  66977,
+  66979,
+  66993,
+  66995,
+  67001,
+  67003,
+  67004,
+  67008,
+  67059,
+  67072,
+  67382,
+  67392,
+  67413,
+  67424,
+  67431,
+  67456,
+  67461,
+  67463,
+  67504,
+  67506,
+  67514,
+  67584,
+  67589,
+  67592,
+  67592,
+  67594,
+  67637,
+  67639,
+  67640,
+  67644,
+  67644,
+  67647,
+  67669,
+  67672,
+  67702,
+  67705,
+  67742,
+  67751,
+  67759,
+  67808,
+  67826,
+  67828,
+  67829,
+  67835,
+  67867,
+  67872,
+  67897,
+  67904,
+  67929,
+  67968,
+  68023,
+  68028,
+  68047,
+  68050,
+  68096,
+  68112,
+  68115,
+  68117,
+  68119,
+  68121,
+  68149,
+  68160,
+  68168,
+  68192,
+  68222,
+  68224,
+  68255,
+  68288,
+  68295,
+  68297,
+  68324,
+  68331,
+  68335,
+  68352,
+  68405,
+  68416,
+  68437,
+  68440,
+  68466,
+  68472,
+  68497,
+  68521,
+  68527,
+  68608,
+  68680,
+  68736,
+  68786,
+  68800,
+  68850,
+  68858,
+  68899,
+  68912,
+  68921,
+  68928,
+  68965,
+  68975,
+  68997,
+  69216,
+  69246,
+  69248,
+  69289,
+  69296,
+  69297,
+  69314,
+  69319,
+  69376,
+  69415,
+  69424,
+  69445,
+  69457,
+  69460,
+  69488,
+  69505,
+  69552,
+  69579,
+  69600,
+  69622,
+  69635,
+  69687,
+  69714,
+  69743,
+  69745,
+  69746,
+  69749,
+  69749,
+  69763,
+  69807,
+  69840,
+  69864,
+  69872,
+  69881,
+  69891,
+  69926,
+  69942,
+  69951,
+  69956,
+  69956,
+  69959,
+  69959,
+  69968,
+  70002,
+  70006,
+  70006,
+  70019,
+  70066,
+  70081,
+  70084,
+  70096,
+  70106,
+  70108,
+  70108,
+  70113,
+  70132,
+  70144,
+  70161,
+  70163,
+  70187,
+  70207,
+  70208,
+  70272,
+  70278,
+  70280,
+  70280,
+  70282,
+  70285,
+  70287,
+  70301,
+  70303,
+  70312,
+  70320,
+  70366,
+  70384,
+  70393,
+  70405,
+  70412,
+  70415,
+  70416,
+  70419,
+  70440,
+  70442,
+  70448,
+  70450,
+  70451,
+  70453,
+  70457,
+  70461,
+  70461,
+  70480,
+  70480,
+  70493,
+  70497,
+  70528,
+  70537,
+  70539,
+  70539,
+  70542,
+  70542,
+  70544,
+  70581,
+  70583,
+  70583,
+  70609,
+  70609,
+  70611,
+  70611,
+  70656,
+  70708,
+  70727,
+  70730,
+  70736,
+  70745,
+  70751,
+  70753,
+  70784,
+  70831,
+  70852,
+  70853,
+  70855,
+  70855,
+  70864,
+  70873,
+  71040,
+  71086,
+  71128,
+  71131,
+  71168,
+  71215,
+  71236,
+  71236,
+  71248,
+  71257,
+  71296,
+  71338,
+  71352,
+  71352,
+  71360,
+  71369,
+  71376,
+  71395,
+  71424,
+  71450,
+  71472,
+  71483,
+  71488,
+  71494,
+  71680,
+  71723,
+  71840,
+  71922,
+  71935,
+  71942,
+  71945,
+  71945,
+  71948,
+  71955,
+  71957,
+  71958,
+  71960,
+  71983,
+  71999,
+  71999,
+  72001,
+  72001,
+  72016,
+  72025,
+  72096,
+  72103,
+  72106,
+  72144,
+  72161,
+  72161,
+  72163,
+  72163,
+  72192,
+  72192,
+  72203,
+  72242,
+  72250,
+  72250,
+  72272,
+  72272,
+  72284,
+  72329,
+  72349,
+  72349,
+  72368,
+  72440,
+  72640,
+  72672,
+  72688,
+  72697,
+  72704,
+  72712,
+  72714,
+  72750,
+  72768,
+  72768,
+  72784,
+  72812,
+  72818,
+  72847,
+  72960,
+  72966,
+  72968,
+  72969,
+  72971,
+  73008,
+  73030,
+  73030,
+  73040,
+  73049,
+  73056,
+  73061,
+  73063,
+  73064,
+  73066,
+  73097,
+  73112,
+  73112,
+  73120,
+  73129,
+  73136,
+  73179,
+  73184,
+  73193,
+  73440,
+  73458,
+  73474,
+  73474,
+  73476,
+  73488,
+  73490,
+  73523,
+  73552,
+  73561,
+  73648,
+  73648,
+  73664,
+  73684,
+  73728,
+  74649,
+  74752,
+  74862,
+  74880,
+  75075,
+  77712,
+  77808,
+  77824,
+  78895,
+  78913,
+  78918,
+  78944,
+  82938,
+  82944,
+  83526,
+  90368,
+  90397,
+  90416,
+  90425,
+  92160,
+  92728,
+  92736,
+  92766,
+  92768,
+  92777,
+  92784,
+  92862,
+  92864,
+  92873,
+  92880,
+  92909,
+  92928,
+  92975,
+  92992,
+  92995,
+  93008,
+  93017,
+  93019,
+  93025,
+  93027,
+  93047,
+  93053,
+  93071,
+  93504,
+  93548,
+  93552,
+  93561,
+  93760,
+  93846,
+  93856,
+  93880,
+  93883,
+  93907,
+  93952,
+  94026,
+  94032,
+  94032,
+  94099,
+  94111,
+  94176,
+  94177,
+  94179,
+  94179,
+  94194,
+  94198,
+  94208,
+  101589,
+  101631,
+  101662,
+  101760,
+  101874,
+  110576,
+  110579,
+  110581,
+  110587,
+  110589,
+  110590,
+  110592,
+  110882,
+  110898,
+  110898,
+  110928,
+  110930,
+  110933,
+  110933,
+  110948,
+  110951,
+  110960,
+  111355,
+  113664,
+  113770,
+  113776,
+  113788,
+  113792,
+  113800,
+  113808,
+  113817,
+  118e3,
+  118009,
+  119488,
+  119507,
+  119520,
+  119539,
+  119648,
+  119672,
+  119808,
+  119892,
+  119894,
+  119964,
+  119966,
+  119967,
+  119970,
+  119970,
+  119973,
+  119974,
+  119977,
+  119980,
+  119982,
+  119993,
+  119995,
+  119995,
+  119997,
+  120003,
+  120005,
+  120069,
+  120071,
+  120074,
+  120077,
+  120084,
+  120086,
+  120092,
+  120094,
+  120121,
+  120123,
+  120126,
+  120128,
+  120132,
+  120134,
+  120134,
+  120138,
+  120144,
+  120146,
+  120485,
+  120488,
+  120512,
+  120514,
+  120538,
+  120540,
+  120570,
+  120572,
+  120596,
+  120598,
+  120628,
+  120630,
+  120654,
+  120656,
+  120686,
+  120688,
+  120712,
+  120714,
+  120744,
+  120746,
+  120770,
+  120772,
+  120779,
+  120782,
+  120831,
+  122624,
+  122654,
+  122661,
+  122666,
+  122928,
+  122989,
+  123136,
+  123180,
+  123191,
+  123197,
+  123200,
+  123209,
+  123214,
+  123214,
+  123536,
+  123565,
+  123584,
+  123627,
+  123632,
+  123641,
+  124112,
+  124139,
+  124144,
+  124153,
+  124368,
+  124397,
+  124400,
+  124410,
+  124608,
+  124638,
+  124640,
+  124642,
+  124644,
+  124645,
+  124647,
+  124653,
+  124656,
+  124660,
+  124670,
+  124671,
+  124896,
+  124902,
+  124904,
+  124907,
+  124909,
+  124910,
+  124912,
+  124926,
+  124928,
+  125124,
+  125127,
+  125135,
+  125184,
+  125251,
+  125259,
+  125259,
+  125264,
+  125273,
+  126065,
+  126123,
+  126125,
+  126127,
+  126129,
+  126132,
+  126209,
+  126253,
+  126255,
+  126269,
+  126464,
+  126467,
+  126469,
+  126495,
+  126497,
+  126498,
+  126500,
+  126500,
+  126503,
+  126503,
+  126505,
+  126514,
+  126516,
+  126519,
+  126521,
+  126521,
+  126523,
+  126523,
+  126530,
+  126530,
+  126535,
+  126535,
+  126537,
+  126537,
+  126539,
+  126539,
+  126541,
+  126543,
+  126545,
+  126546,
+  126548,
+  126548,
+  126551,
+  126551,
+  126553,
+  126553,
+  126555,
+  126555,
+  126557,
+  126557,
+  126559,
+  126559,
+  126561,
+  126562,
+  126564,
+  126564,
+  126567,
+  126570,
+  126572,
+  126578,
+  126580,
+  126583,
+  126585,
+  126588,
+  126590,
+  126590,
+  126592,
+  126601,
+  126603,
+  126619,
+  126625,
+  126627,
+  126629,
+  126633,
+  126635,
+  126651,
+  127232,
+  127244,
+  130032,
+  130041,
+  131072,
+  173791,
+  173824,
+  178205,
+  178208,
+  183981,
+  183984,
+  191456,
+  191472,
+  192093,
+  194560,
+  195101,
+  196608,
+  201546,
+  201552,
+  210041
+]);
+
 // src/core/store/fts.ts
 var INSERT_SOURCE = `
 INSERT INTO sources(session_id, worktree, agent, kind, label, bytes_total, chunk_count, created_ts, created_at, accessed_ts)
 VALUES (:session_id, :worktree, :agent, :kind, :label, :bytes_total, :chunk_count, :created_ts, :created_at, :created_ts)
 RETURNING id`;
 var INSERT_CHUNK = `
-INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body) VALUES (?, ?, ?, ?, ?, ?)`;
-var ESCAPES = Object.freeze({ "&": "&amp;", "<": "&lt;", ">": "&gt;" });
+INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+var TITLE_WEIGHT = 1;
+var PORTER_MATCH = `
+  SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
+         chunks.worktree AS worktree, chunks.ord AS ord, s.created_ts AS created_ts,
+         bm25(chunks, 0, 0, 0, 0, 0, 1.0, ${TITLE_WEIGHT}) AS bm,
+         (chunks.rowid IN (SELECT rowid FROM chunks WHERE chunks MATCH :all)) AS full
+  FROM chunks JOIN sources s ON s.id = chunks.source_id
+  WHERE chunks MATCH :match
+    AND (:scope <> 'session' OR chunks.session_id = :session_id)
+    AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
+    AND (:source IS NULL OR s.label = :source)`;
+var PORTER_ORDER = `
+ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
+var PORTER_RANK_PROJECT = `
+WITH m AS (${PORTER_MATCH}
+), r AS (
+  SELECT *,
+         ROW_NUMBER() OVER (ORDER BY full DESC, bm ASC, source_id DESC, ord ASC) AS rank_a,
+         ROW_NUMBER() OVER (ORDER BY created_ts DESC, source_id DESC, ord ASC) AS rank_b
+  FROM m
+)
+SELECT rid, source_id, session_id, worktree, ord, full, 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) AS score
+FROM r${PORTER_ORDER}`;
+var PORTER_RANK_BM25 = `
+WITH m AS (${PORTER_MATCH}
+)
+SELECT rid, source_id, session_id, worktree, ord, full, -bm AS score
+FROM m${PORTER_ORDER}`;
+var TRI_RANK = `
+SELECT t.rowid AS rid, c.source_id AS source_id, c.session_id AS session_id, c.worktree AS worktree, c.ord AS ord
+FROM chunks_tri t JOIN chunks c ON c.rowid = t.rowid JOIN sources s ON s.id = c.source_id
+WHERE chunks_tri MATCH :match
+  AND (:scope <> 'session' OR c.session_id = :session_id)
+  AND (:scope <> 'worktree' OR c.worktree = :worktree)
+  AND (:source IS NULL OR s.label = :source)
+ORDER BY bm25(chunks_tri, 1.0, ${TITLE_WEIGHT}) ASC, c.source_id DESC, c.ord ASC`;
+var INSERT_TRI = "INSERT INTO chunks_tri(rowid, body, title) VALUES (?, ?, ?)";
 function ftsInsert(db, src, chunks) {
+  const id = reserveSource(db, src, chunks);
+  insertChunks(db, id, src, chunks);
+  return id;
+}
+function reserveSource(db, src, chunks) {
   let total = 0;
   for (const c of chunks) total += c.bytes;
+  return withWrite(db, (h) => {
+    const row = h.raw.prepare(INSERT_SOURCE).get({
+      session_id: src.sessionId,
+      worktree: src.worktree,
+      agent: src.agent,
+      kind: src.kind,
+      label: src.label,
+      bytes_total: total,
+      chunk_count: chunks.length,
+      created_ts: src.createdAt,
+      created_at: new Date(src.createdAt).toISOString()
+    });
+    return Number(row.id);
+  });
+}
+function insertChunks(db, id, src, chunks) {
   const batches = [];
   let batch = [];
   let batchBytes = 0;
@@ -1371,35 +3119,24 @@ function ftsInsert(db, src, chunks) {
     batch.push(c);
     batchBytes += c.bytes;
   }
-  batches.push(batch);
-  let id = 0;
-  batches.forEach((rows, i) => {
+  if (batch.length > 0) batches.push(batch);
+  for (const rows of batches) {
     withWrite(db, (h) => {
-      if (i === 0) {
-        const row = h.raw.prepare(INSERT_SOURCE).get({
-          session_id: src.sessionId,
-          worktree: src.worktree,
-          agent: src.agent,
-          kind: src.kind,
-          label: src.label,
-          bytes_total: total,
-          chunk_count: chunks.length,
-          created_ts: src.createdAt,
-          created_at: new Date(src.createdAt).toISOString()
-        });
-        id = Number(row.id);
-      }
       const ins = h.raw.prepare(INSERT_CHUNK);
-      for (const c of rows) ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text);
+      const tri = h.raw.prepare(INSERT_TRI);
+      for (const c of rows) {
+        const title = c.title ?? "";
+        const rid = ins.run(id, src.sessionId, src.worktree, src.agent, c.ord, c.text, title).lastInsertRowid;
+        tri.run(rid, c.text, title);
+      }
     });
-  });
-  return id;
+  }
 }
 function toMatch(q) {
   const words = [];
   let cur = "";
   for (const ch of q) {
-    if (ch.trim() === "") {
+    if (ch.trim() === "" || ch === "\0") {
       if (cur !== "") words.push(cur);
       cur = "";
     } else {
@@ -1503,7 +3240,6 @@ function moreLine(intent, label) {
 }
 
 // src/core/policy/decide.ts
-import { statSync } from "node:fs";
 import { resolve } from "node:path";
 
 // src/core/policy/lexer.ts
@@ -2445,12 +4181,11 @@ function parseShell(cmd) {
 }
 
 // src/core/policy/subagent.ts
-import { readFileSync } from "node:fs";
 import { join as join2 } from "node:path";
 
 // src/core/project/config-dir.ts
-import { mkdirSync as mkdirSync2, realpathSync } from "node:fs";
 import { join } from "node:path";
+var { mkdirSync: mkdirSync2, realpathSync } = process.getBuiltinModule("node:fs");
 function homeDirOf(env) {
   const home = env.HOME;
   if (home !== void 0 && home !== "") return home;
@@ -2470,6 +4205,7 @@ function resolveConfigDir(env) {
 }
 
 // src/core/policy/subagent.ts
+var { readFileSync } = process.getBuiltinModule("node:fs");
 function isSubagentCall(ev) {
   return ev.agentId !== void 0 && ev.agentId !== "";
 }
@@ -2600,8 +4336,8 @@ function unwrap(commands) {
 }
 
 // src/core/policy/user-deny.ts
-import { readFileSync as readFileSync2 } from "node:fs";
 import { isAbsolute, join as join3, relative, sep } from "node:path";
+var { readFileSync: readFileSync2 } = process.getBuiltinModule("node:fs");
 var BASH_TOOL = "Bash";
 var READ_TOOL = "Read";
 var PREFIX_RULE = ":*";
@@ -2712,7 +4448,29 @@ function matchesAnyDenyPattern(text, patterns, subject = BASH_SUBJECT) {
   return null;
 }
 
+// src/prompt/_generated.ts
+var TOOL_DESCRIPTIONS = Object.freeze({
+  ctx_execute: "Runs code in a sandboxed subprocess in the project directory (shell, powershell, javascript, typescript, python, or another runtime on PATH); only what the code prints comes back. For a large file, set `file` to its local path: the code gets it in the CTX_FILE environment variable. Set `intent` when output may be large: the matching sections come back and the full output is indexed for ctx_search. `timeoutMs` defaults to and caps at 600000; then the whole process tree is killed.\n",
+  ctx_batch: "Runs several shell commands, then answers several search queries over their combined output, in one call. Use it to collect facts from more than one command at once, for example test results plus recent commits, when you need specific answers rather than the full text. Returns the matching sections and a one-line footer.",
+  ctx_index: "Stores content so it can be searched later: a local file or folder (nested .gitignore files are respected), raw text, or a URL, which is fetched and converted to Markdown. Use it for documentation or large files you will query more than once, then use ctx_search instead of reading the content again. Returns the source label and how many chunks were stored.",
+  ctx_search: "Searches content stored with ctx_index and earlier sandbox output in this project. Pass several queries in one call. By default it searches the current worktree; set `scope` to `project` for all worktrees or `session` for this session only. Results from the current session rank first, then by relevance, ranked with measurably better recall than plain keyword search. Set `sort` to `timeline` for oldest-first order across this session, prior sessions and memory, paged with `after`; `offset` is for relevance order only. Set `source` to `decision` to search only rows where the user answered a question. Every hit names its source. When nothing matches, the reply states the scope and how many sources are indexed.",
+  ctx_resume: "Returns a summary of up to 2 KB for this session: the last task and user request, files changed, open errors, and search terms for ctx_search. A large row is shown as a pointer line instead of its full text; call `ctx_resume(seq: N)` with that line's number to read the full row. Call it with no `seq` to get the state block on demand. Use it after the conversation was compacted or resumed, before you repeat earlier work.",
+  ctx_stats: "Reports how many bytes context-mode kept out of the conversation in this session and in this project, per agent, as a Markdown table. Show the table to the user as it is. Use it when the user asks what context-mode saved.",
+  ctx_doctor: "Checks this context-mode install and reports a table with one row per check: version, Node and node:sqlite, host config and hooks for this agent, MCP connection, project and worktree, database health, index contents, and hook timing. Each failed row names its cause and the fix in one line. It changes nothing. Use it when the user asks whether context-mode works, or after a context-mode error.",
+  ctx_upgrade: "Updates context-mode to the latest release for this agent and rewrites only context-mode's own entries in the host config. User entries and user settings such as hook timeouts are kept, and old entries are erased. Returns a table of what changed and whether a restart is needed. Use it only when the user asks to update context-mode.",
+  ctx_purge: "Deletes stored data: one session, one indexed source, or everything stored for this project. This cannot be undone. Use it only when the user asks to forget or reset data."
+});
+var READ_DENY_TEMPLATE = 'context-mode: {size}-byte file, over the one-read limit. Run ctx_execute(language, code, file="{path}") and print only the answer.';
+
+// src/core/policy/read-deny.ts
+var SIZE = "{size}";
+var PATH = "{path}";
+function READ_DENY_MESSAGE(path3, size, prefix = "") {
+  return prefixToolNames(READ_DENY_TEMPLATE, prefix).split(SIZE).join(String(size)).split(PATH).join(path3);
+}
+
 // src/core/policy/decide.ts
+var { statSync } = process.getBuiltinModule("node:fs");
 var BASH = "Bash";
 var READ = "Read";
 var WEBFETCH = "WebFetch";
@@ -2740,7 +4498,7 @@ function decide(ev, row, userDeny) {
   const input = tool.input;
   let rules;
   if (userDeny === null) {
-    if (process.env[REQUIRE_SECURITY_ENV] === FLAG_ON) return deny(POLICY_UNREADABLE_LINE);
+    if (process.env[REQUIRE_SECURITY_ENV] === FLAG_ON) return deny(prefixToolNames(POLICY_UNREADABLE_LINE, row.toolNamePrefix));
     process.stderr.write(POLICY_UNREADABLE_WARNING + "\n");
     rules = [];
   } else rules = userDeny;
@@ -2748,7 +4506,7 @@ function decide(ev, row, userDeny) {
   if (hit !== null) return deny(USER_DENY_REASON_PREFIX + hit);
   if (canonical === WEBFETCH) return webFetch(input, row);
   if (canonical === BASH) return bash(ev, row, input, rules);
-  if (canonical === READ) return read(ev, input);
+  if (canonical === READ) return read(ev, row, input);
   return ALLOW;
 }
 function denyMessage(kind, match, row, intent) {
@@ -2818,7 +4576,7 @@ function webFetch(input, row) {
 function bash(ev, row, input, rules) {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(PARSE_ERROR_DENY_LINE) : ALLOW;
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : ALLOW;
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -2872,19 +4630,19 @@ function fileSize(abs) {
     return -1;
   }
 }
-function read(ev, input) {
+function read(ev, row, input) {
   if (!present(input.offset) && !present(input.limit)) {
     const p = readPath(input);
     if (p !== void 0) {
       const abs = resolve(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size));
+      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
     }
   }
   return ALLOW;
 }
 function shellDump(cmds, cwd, row) {
-  if (row.nativeTools.read !== void 0 && row.nativeTools.read.length > 0) return null;
+  if (row.nativeTools.read !== void 0 && row.nativeTools.read.length > 0 && hasReplace(row)) return null;
   if (cmds.length !== 1) return null;
   const c = cmds[0];
   if (c.redirectsToFile || c.endsInBoundedSink) return null;
@@ -2895,7 +4653,7 @@ function shellDump(cmds, cwd, row) {
   if (d.bounded) return ALLOW;
   const abs = resolve(cwd, d.file);
   const size = fileSize(abs);
-  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size)) : null;
+  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix)) : null;
 }
 var allDigits2 = (s) => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");
 function countFlag(a) {
@@ -2954,12 +4712,11 @@ function dumpTarget(name, args) {
 }
 
 // src/core/project/resolve.ts
-import { existsSync as existsSync2, readFileSync as readFileSync3, realpathSync as realpathSync3, statSync as statSync2 } from "node:fs";
 import { basename, dirname as dirname2, join as join4, resolve as resolve2 } from "node:path";
 
 // src/core/project/contain.ts
-import { realpathSync as realpathSync2 } from "node:fs";
 import { dirname, sep as sep2 } from "node:path";
+var { realpathSync: realpathSync2 } = process.getBuiltinModule("node:fs");
 function real(p) {
   try {
     return realpathSync2.native(p);
@@ -3100,6 +4857,7 @@ function sha256Hex(text) {
 }
 
 // src/core/project/resolve.ts
+var { existsSync: existsSync2, readFileSync: readFileSync3, realpathSync: realpathSync3, statSync: statSync2 } = process.getBuiltinModule("node:fs");
 function sourceOf(agent) {
   switch (agent) {
     case "claude-code":
@@ -3431,9 +5189,52 @@ var encoder = new TextEncoder();
 function chunkText(text, kind, maxBytes = MAX_CHUNK_BYTES) {
   const src = normalize(text);
   if (src.length === 0) return [];
-  const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, kind === "md");
   const cap = Math.max(4, Math.min(MAX_CHUNK_BYTES, Math.floor(maxBytes)));
+  if (kind === "md") return mdChunks(src, cap, cap < MAX_CHUNK_BYTES);
+  const blocks = kind === "html" ? htmlBlocks(src) : lineBlocks(src, false);
   return merge(src, blocks, kind !== "text", cap, cap < MAX_CHUNK_BYTES);
+}
+function mdChunks(src, cap, lineCut) {
+  const out = [];
+  const stack = [];
+  let title = "";
+  let run = [];
+  const push2 = (text, bytes2) => {
+    out.push({ ord: out.length, text, bytes: bytes2, title });
+  };
+  const flush = () => {
+    if (run.length === 0) return;
+    for (const c of merge(src, run, true, cap, lineCut)) push2(c.text, c.bytes);
+    run = [];
+  };
+  for (const b of lineBlocks(src, true)) {
+    if (b.heading !== void 0) {
+      flush();
+      while (stack.length > 0 && stack[stack.length - 1].level >= b.heading.level) stack.pop();
+      stack.push(b.heading);
+      title = stack.map((h) => h.text).join(" > ");
+    }
+    if (b.fence !== void 0 && utf8Bytes(src.slice(b.start, b.end)) > cap) {
+      const pieces = fencePieces(src, b, b.fence, cap);
+      if (pieces !== void 0) {
+        flush();
+        for (const p of pieces) push2(p, utf8Bytes(p));
+        continue;
+      }
+    }
+    run.push(b);
+  }
+  flush();
+  return out;
+}
+function fencePieces(src, b, f, cap) {
+  const opener = src.slice(b.start, f.openEnd);
+  const closer = f.closeStart >= 0 ? src.slice(f.closeStart, b.end) : f.fence;
+  const innerEnd = f.closeStart >= 0 ? Math.max(f.openEnd + 1, f.closeStart - 1) : b.end;
+  const inner = src.slice(Math.min(f.openEnd + 1, innerEnd), innerEnd);
+  const room = cap - utf8Bytes(opener) - utf8Bytes(closer) - 2;
+  if (room < 16 || inner.length === 0) return void 0;
+  return merge(inner, lineBlocks(inner, false), true, room, true).map((c) => opener + "\n" + c.text + "\n" + closer);
 }
 function normalize(text) {
   const lf = text.split("\r\n").join("\n");
@@ -3445,9 +5246,18 @@ function lineBlocks(src, md) {
   let end = -1;
   let inTable = false;
   let fence = "";
+  let heading;
+  let fenceInfo;
   const close = () => {
-    if (start >= 0) out.push({ start, end });
+    if (start >= 0) {
+      const span = { start, end };
+      if (heading !== void 0) span.heading = heading;
+      if (fenceInfo !== void 0) span.fence = fenceInfo;
+      out.push(span);
+    }
     start = -1;
+    heading = void 0;
+    fenceInfo = void 0;
   };
   const add = (from, to, table) => {
     if (start < 0) start = from;
@@ -3461,20 +5271,48 @@ function lineBlocks(src, md) {
     const line = src.slice(pos, eol);
     if (fence !== "") {
       add(pos, eol, false);
-      if (closesFence(line, fence)) fence = "";
+      if (closesFence(line, fence)) {
+        fence = "";
+        if (md && fenceInfo !== void 0) {
+          fenceInfo.closeStart = pos;
+          close();
+        }
+      }
     } else if (line.length === 0) {
       close();
     } else {
       const opener = md ? fenceOf(line) : "";
-      const table = md && opener === "" && line.includes("|");
-      if (md && start >= 0 && table !== inTable) close();
+      const head = md && opener === "" ? headingOf(line) : void 0;
+      const table = md && opener === "" && head === void 0 && line.includes("|");
+      if (md && start >= 0 && (table !== inTable || opener !== "" || head !== void 0)) close();
       add(pos, eol, table);
       fence = opener;
+      if (opener !== "") fenceInfo = { fence: opener, openEnd: eol, closeStart: -1 };
+      if (head !== void 0) {
+        heading = head;
+        close();
+      }
     }
     pos = eol + 1;
   }
   close();
   return out;
+}
+function headingOf(line) {
+  let i = 0;
+  while (i < line.length && i < 4 && line[i] === " ") i += 1;
+  if (i > 3) return void 0;
+  let level = 0;
+  while (i + level < line.length && line[i + level] === "#") level += 1;
+  if (level < 1 || level > 6) return void 0;
+  const after = line[i + level];
+  if (after !== void 0 && after !== " " && after !== "	") return void 0;
+  let text = line.slice(i + level).trim();
+  let k = text.length;
+  while (k > 0 && text[k - 1] === "#") k -= 1;
+  if (k === 0) text = "";
+  else if (k < text.length && (text[k - 1] === " " || text[k - 1] === "	")) text = text.slice(0, k).trim();
+  return { level, text };
 }
 function fenceOf(line) {
   const t = line.trimStart();
@@ -3599,6 +5437,7 @@ function cutPoint(src, start, end, scratch) {
 function merge(src, blocks, join6, cap, lineCut) {
   const out = [];
   const scratch = new Uint8Array(cap);
+  let wide;
   let cur;
   let curBytes = 0;
   const emit = (start, end, bytes2) => {
@@ -3631,10 +5470,28 @@ function merge(src, blocks, join6, cap, lineCut) {
         bytes2 -= w;
         continue;
       }
+      if (lineCut) {
+        const eol = src.indexOf("\n", start);
+        const lineEnd = eol < 0 || eol >= b.end ? b.end : eol + 1;
+        const w = utf8Bytes(src.slice(start, lineEnd));
+        if (w <= MAX_CHUNK_BYTES) {
+          emit(start, lineEnd, w);
+          start = lineEnd;
+          bytes2 -= w;
+          continue;
+        }
+        wide ??= new Uint8Array(MAX_CHUNK_BYTES);
+        const big = cutPoint(src, start, lineEnd, wide);
+        emit(start, big.end, big.written);
+        start = big.end;
+        bytes2 -= big.written;
+        continue;
+      }
       emit(start, cut.end, cut.written);
       start = cut.end;
       bytes2 -= cut.written;
     }
+    if (start >= b.end) continue;
     cur = { start, end: b.end };
     curBytes = bytes2;
   }
@@ -3683,7 +5540,8 @@ function denyRules(b64) {
   return parsed;
 }
 function userPolicyDeny(reason) {
-  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === POLICY_UNREADABLE_LINE || reason === PARSE_ERROR_DENY_LINE;
+  const prefix = getAdapter(RUN_WRAPPER_AGENT).toolNamePrefix;
+  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === prefixToolNames(POLICY_UNREADABLE_LINE, prefix) || reason === prefixToolNames(PARSE_ERROR_DENY_LINE, prefix);
 }
 function projectOf(argv, cwd) {
   return resolveProject(RUN_WRAPPER_AGENT, { env: { CLAUDE_PROJECT_DIR: cwd }, argv, cwd });

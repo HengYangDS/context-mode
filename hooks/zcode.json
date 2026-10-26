@@ -4,32 +4,48 @@
     "events": {
       "PostToolUse": [
         {
-          "command": "node hook.mjs --agent zcode",
-          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$",
-          "timeoutMs": 5000,
-          "type": "command"
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ],
+          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
         }
       ],
       "PreToolUse": [
         {
-          "command": "node hook.mjs --agent zcode",
-          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$",
-          "timeoutMs": 5000,
-          "type": "command"
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ],
+          "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__context-mode__ctx_.*)$"
         }
       ],
       "SessionStart": [
         {
-          "command": "node hook.mjs --agent zcode",
-          "timeoutMs": 5000,
-          "type": "command"
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ]
         }
       ],
       "UserPromptSubmit": [
         {
-          "command": "node hook.mjs --agent zcode",
-          "timeoutMs": 5000,
-          "type": "command"
+          "hooks": [
+            {
+              "command": "node hook.mjs --agent zcode",
+              "timeoutMs": 5000,
+              "type": "command"
+            }
+          ]
         }
       ]
     }

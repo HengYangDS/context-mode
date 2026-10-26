@@ -9,7 +9,7 @@
             "type": "command"
           }
         ],
-        "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__plugin_context-mode_context-mode__ctx_.*)$"
+        "matcher": "^(Bash|Read|Grep|WebFetch|Write|Edit|NotebookEdit|mcp__plugin_context-mode_context-mode__ctx_.*|mcp__.*)$"
       }
     ],
     "PreToolUse": [

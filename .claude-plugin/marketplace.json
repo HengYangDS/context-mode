@@ -1,0 +1,15 @@
+{
+  "name": "context-mode",
+  "owner": {
+    "name": "context-mode"
+  },
+  "plugins": [
+    {
+      "description": "Context Mode for Claude Code",
+      "name": "context-mode",
+      "skills": "./claude-code/skills",
+      "source": "./",
+      "version": "2.0.0-next.1"
+    }
+  ]
+}

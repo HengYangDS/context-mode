@@ -27,7 +27,18 @@
       },
       "enabled": true,
       "matcher": "@mcp",
-      "name": "context-mode-PreToolUse",
+      "name": "context-mode-PreToolUse-mcp",
+      "timeout": 5,
+      "trigger": "PreToolUse"
+    },
+    {
+      "action": {
+        "command": "node hook.mjs --agent kiro",
+        "type": "command"
+      },
+      "enabled": true,
+      "matcher": "shell",
+      "name": "context-mode-PreToolUse-shell",
       "timeout": 5,
       "trigger": "PreToolUse"
     },
@@ -38,7 +49,18 @@
       },
       "enabled": true,
       "matcher": "@mcp",
-      "name": "context-mode-PostToolUse",
+      "name": "context-mode-PostToolUse-mcp",
+      "timeout": 5,
+      "trigger": "PostToolUse"
+    },
+    {
+      "action": {
+        "command": "node hook.mjs --agent kiro",
+        "type": "command"
+      },
+      "enabled": true,
+      "matcher": "shell",
+      "name": "context-mode-PostToolUse-shell",
       "timeout": 5,
       "trigger": "PostToolUse"
     }
