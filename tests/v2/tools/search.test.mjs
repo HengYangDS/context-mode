@@ -345,3 +345,27 @@ test("D-M2-JSON-3: a source that is not a JSON array of objects keeps the snippe
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// H9 (OPEN-ITEMS): the replace handle line names the source and the command as the query. When no query word
+// is in the output, a source query lists that source's chunks by position instead of "No hits".
+test("H9: a source query whose words match nothing lists that source's chunks, first by position", async () => {
+  const root = mkdtempSync(join(tmpdir(), "cm-h9-"));
+  try {
+    const content = Array.from({ length: 30 }, (_, i) => "## part " + i + "\n\nalpha beta gamma " + i).join("\n\n");
+    await ctxIndex.handler({ content, source: "big-out" }, ctxFor(root));
+    await ctxIndex.handler({ content: "cat big log other words", source: "other" }, ctxFor(root));
+    const r = await ctxSearch.handler({ queries: ["cat big.log"], source: "big-out" }, ctxFor(root));
+    assert.equal(r.isError, false, r.text);
+    assert.ok(r.text.startsWith("big-out #0: "), r.text.slice(0, 300));
+    assert.ok(r.text.includes("big-out #1: "), r.text.slice(0, 300));
+    assert.ok(!r.text.includes("other #"), r.text);
+    // Words that do match keep the BM25 path.
+    const hit = await ctxSearch.handler({ queries: ["gamma 17"], source: "big-out" }, ctxFor(root));
+    assert.ok(hit.text.includes("alpha beta gamma 17"), hit.text.slice(0, 300));
+    // No source: a query with no match is still zero hits.
+    const none = await ctxSearch.handler({ queries: ["zzqq nothing"] }, ctxFor(root));
+    assert.ok(none.text.startsWith("No hits"), none.text);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
