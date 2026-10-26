@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // scripts/release/plan.mjs — next version and release notes (docs/v2/impl/13-build-release.md §10,
 // A11, DEVIATIONS D-M6-arch-4). No dependency: plain string ops over `git log` subjects.
-// Usage: node scripts/release/plan.mjs [--dry-run] [--skip-live]
+// Usage: node scripts/release/plan.mjs [--dry-run] [--skip-live] [--tag <v-tag>]
 //   default:    prints "version=<v>\nnotes<<EOF\n<notes>\nEOF\n" for $GITHUB_OUTPUT
 //   --dry-run:  prints "version: <v>\n\n<notes>\n" as text (the /release skill preview)
 //   --skip-live: adds the line "Live E2E skipped for this release." to the notes
@@ -10,16 +10,22 @@
 // the manifest at that commit. No such tag (no `release` branch, or a `release` branch that holds only
 // untagged rehearsal commits): first release, version 2.0.0 over all history (A11).
 // A tagged release that `release` does not contain: refuse.
+// --tag v<x.y.z>[-<pre>] (release.yml on a pushed v2.* tag, D-RN-TAG-1): the version is the tag without "v",
+// never a bump. The tag must be on origin at HEAD. Notes: commits since the newest older v2+ tag on origin
+// (prereleases count): a tag on a HEAD ancestor starts the range at its commit, a tag in `release` at its
+// Source-Commit trailer; none -> all history.
 // Failure: one stderr line `release failed: <reason>` and exit 1 (impl/13 §1).
 import { spawnSync } from "node:child_process";
 import { GIT_REMOTE_NAME, RELEASE_BRANCH } from "../../src/core/contracts/constants.ts";
-import { parseTaggedReleases } from "./release-tags.mjs";
+import { compareReleaseVersions, parseReleaseTag, parseTaggedReleases, tagCommit } from "./release-tags.mjs";
 
 const FIRST_VERSION = "2.0.0";
 const TRAILER = "Source-Commit: ";
 const MANIFEST = ".claude-plugin/plugin.json";
 const SKIP_LIVE_LINE = "Live E2E skipped for this release.";
 const FLAGS = Object.freeze(["--dry-run", "--skip-live"]);
+const TAG_FLAG = "--tag";
+const TAG_PREFIX = "v";
 // Bump rank: 0 none, 1 patch, 2 minor, 3 major.
 const RANK_BY_TYPE = Object.freeze({ feat: 2, fix: 1, perf: 1 });
 const MAJOR = 3;
@@ -81,14 +87,42 @@ function sourceCommit(commit) {
 
 // The newest tagged release (origin tags) that the local `release` branch contains; null when origin has none.
 function lastRelease() {
-  const ls = git("ls-remote", "--tags", GIT_REMOTE_NAME);
-  if (!ls.ok) fail(`git ls-remote ${GIT_REMOTE_NAME}: ${ls.err.split("\n")[0]}`);
-  const tagged = parseTaggedReleases(ls.out);
+  const tagged = parseTaggedReleases(lsRemoteTags());
   if (tagged.length === 0) return null;
   const hasRelease = git("rev-parse", "--verify", "--quiet", `refs/heads/${RELEASE_BRANCH}`).ok;
   const found = hasRelease && tagged.find((t) => git("merge-base", "--is-ancestor", t.commit, `refs/heads/${RELEASE_BRANCH}`).ok);
   if (!found) fail(`tagged release ${tagged[0].tag} (${tagged[0].commit}) is not in ${RELEASE_BRANCH}; refusing`);
   return found;
+}
+
+function lsRemoteTags() {
+  const ls = git("ls-remote", "--tags", GIT_REMOTE_NAME);
+  if (!ls.ok) fail(`git ls-remote ${GIT_REMOTE_NAME}: ${ls.err.split("\n")[0]}`);
+  return ls.out;
+}
+
+// --tag mode: the commit the notes range starts after, or null (all history).
+function previousTagStart(ls, tag, version) {
+  const hasRelease = git("rev-parse", "--verify", "--quiet", `refs/heads/${RELEASE_BRANCH}`).ok;
+  for (const t of parseTaggedReleases(ls, { prerelease: true })) {
+    if (t.tag === tag || compareReleaseVersions(parseReleaseTag(t.tag, { prerelease: true }), version) >= 0) continue;
+    if (git("merge-base", "--is-ancestor", t.commit, "HEAD").ok) return t.commit;
+    if (hasRelease && git("merge-base", "--is-ancestor", t.commit, `refs/heads/${RELEASE_BRANCH}`).ok) return sourceCommit(t.commit);
+  }
+  return null;
+}
+
+function planFromTag(tag) {
+  const version = parseReleaseTag(tag, { prerelease: true });
+  if (!version) fail(`${TAG_FLAG} ${tag} is not v<x.y.z>[-<prerelease>] with major >= 2`);
+  const ls = lsRemoteTags();
+  const at = tagCommit(ls, tag);
+  if (at === "") fail(`tag ${tag} is not on ${GIT_REMOTE_NAME}`);
+  const head = mustGit("rev-parse", "HEAD").trim();
+  if (at !== head) fail(`tag ${tag} on ${GIT_REMOTE_NAME} points at ${at}, not HEAD ${head}`);
+  const start = previousTagStart(ls, tag, version);
+  const subjects = mustGit("log", "--format=%s", start === null ? "HEAD" : `${start}..HEAD`).split("\n").filter((s) => s.length > 0);
+  return { version: tag.slice(TAG_PREFIX.length), subjects };
 }
 
 function notesFor(subjects, skipLive) {
@@ -107,15 +141,24 @@ function notesFor(subjects, skipLive) {
 
 function main() {
   const args = process.argv.slice(2);
-  const unknown = args.find((a) => !FLAGS.includes(a));
+  let tag = null;
+  const flags = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== TAG_FLAG) { flags.push(args[i]); continue; }
+    if (i + 1 >= args.length) fail(`${TAG_FLAG} needs a value`);
+    tag = args[++i];
+  }
+  const unknown = flags.find((a) => !FLAGS.includes(a));
   if (unknown) fail(`unknown argument ${unknown}`);
-  const dryRun = args.includes("--dry-run");
-  const skipLive = args.includes("--skip-live");
+  const dryRun = flags.includes("--dry-run");
+  const skipLive = flags.includes("--skip-live");
 
-  const last = lastRelease();
   let version;
   let subjects;
-  if (last === null) {
+  const last = tag === null ? lastRelease() : undefined;
+  if (tag !== null) {
+    ({ version, subjects } = planFromTag(tag));
+  } else if (last === null) {
     version = FIRST_VERSION;
     subjects = mustGit("log", "--format=%s", "HEAD").split("\n").filter((s) => s.length > 0);
   } else {
