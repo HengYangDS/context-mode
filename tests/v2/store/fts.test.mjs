@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { openDb, closeDb } from "../../../src/core/store/db.ts";
-import { deleteSourceChunks, ftsInsert, ftsQuery, ftsQueryTimeline, highlight, rankTexts } from "../../../src/core/store/fts.ts";
+import { deleteSourceChunks, ftsInsert, ftsQuery, ftsQueryTimeline, highlight, porterRankSql, rankTexts } from "../../../src/core/store/fts.ts";
 import { appendEvent } from "../../../src/core/journal/append.ts";
 import * as C from "../../../src/core/contracts/constants.ts";
 
@@ -554,4 +554,9 @@ test("ftsQuery and rankTexts treat a NUL character as a word break, never an FTS
     closeDb(db);
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("[perf-P1] ftsQuery ranks scope session/worktree by BM25 with no window sort; only scope project computes the RRF windows (D-HQ-PERF-1)", () => {
+  for (const scope of ["session", "worktree"]) assert.ok(!porterRankSql(scope).includes(" OVER "), scope + " runs a window sort");
+  assert.ok(porterRankSql("project").includes(" OVER "), "project lost its RRF ranks");
 });
