@@ -62,7 +62,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   },
   {
     id: "copilot-cli", installMode: "plugin", projectSource: "arg:--agent+cwd", toolNamePrefix: copilotCli.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    nativeTools: { shell: ["bash"] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
     hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode.json" }, skillChannel: { kind: "home-dir", path: ".copilot/skills" }, // ADR-0020
@@ -94,7 +94,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   },
   {
     id: "pi", installMode: "in-process", projectSource: "pi:ctx.cwd", toolNamePrefix: pi.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    nativeTools: { shell: ["bash"], read: ["read"] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
     hookChannel: { kind: "in-process", path: "pi/index.js" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
@@ -117,7 +117,7 @@ const BY_ID = new Map<AgentId, AdapterRow>(ADAPTERS.map((r) => [r.id, r]));
 // pi tool_result rewrite). On these rows the main agent gets "run, then replace" and no Bash size-guess deny;
 // every other row keeps its one path (ADR-0001).
 // gemini: AfterTool decision deny + reason replaces the result (D-HA-GEMINI-REPLACE-1).
-const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "pi"]);
+const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "copilot-cli", "pi"]);
 
 export function hasReplace(row: AdapterRow): boolean {
   return REPLACE_ROWS.has(row.id);

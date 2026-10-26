@@ -1,7 +1,7 @@
 // impl/10 §6 + shared decode/encode pseudocode; spike-hooks-verified §2 (Copilot CLI 1.0.96).
 // Dual-cased payload: camelCase event names carry camelCase keys (hookEventName, sessionId, toolName,
 // toolArgs, toolResult); PascalCase event names carry snake_case keys (hook_event_name, session_id,
-// tool_name, tool_input, tool_response). Subagent fields [U] (S-NAMES): never set.
+// tool_name, tool_input, tool_result). Subagent fields [U] (S-NAMES): never set.
 // Deny is plain deny-with-reason, never modifiedArgs (ADR-0008 per-adapter table: unverified).
 // Decisions not fixed by the docs: DEVIATIONS D-M3-A3-1..4.
 import type { CanonicalEventName, CanonicalHookEvent, Decision, HookOutput, ToolCall, ToolResultInfo } from "../core/contracts/types.ts";
@@ -31,7 +31,7 @@ const COPILOT_SOURCES: Readonly<Record<string, Source>> = { startup: "startup", 
 
 const KEYS: Readonly<Record<Casing, { event: string; session: string; tool: string; args: string; result: string }>> = {
   camel: { event: "hookEventName", session: "sessionId", tool: "toolName", args: "toolArgs", result: "toolResult" },
-  snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_response" },
+  snake: { event: "hook_event_name", session: "session_id", tool: "tool_name", args: "tool_input", result: "tool_result" },
 };
 
 const MCP_PREFIX = "mcp_";
@@ -42,10 +42,14 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
 
+// copilot-cli 1.0.103 native shell tool id -> canonical name (D-HA-COPILOT-NAMES-1, SDK docs toolName "bash").
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { bash: "Bash" };
+
 // Own tool -> bare ctx_* name; mcp_<server>_<tool> -> "mcp:<server>:<tool>"; native names unchanged
 // (impl/10 §7 single-underscore rule, shared by the Copilot family).
 function canonicalName(name: string): string {
   if (name.startsWith(TOOL_NAME_PREFIX)) return name.slice(TOOL_NAME_PREFIX.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
   if (!name.startsWith(MCP_PREFIX)) return name;
   const rest = name.slice(MCP_PREFIX.length);
   const sep = rest.indexOf(MCP_SEP);
@@ -65,15 +69,18 @@ function readArgs(v: unknown): Record<string, unknown> {
   }
 }
 
+// One result shape per casing (D-HA-COPILOT-REPLACE-1): camel toolResult {resultType, textResultForLlm},
+// snake tool_result {result_type, text_result_for_llm}.
+const RESULT_KEYS: Readonly<Record<Casing, { type: string; text: string }>> = {
+  camel: { type: "resultType", text: "textResultForLlm" },
+  snake: { type: "result_type", text: "text_result_for_llm" },
+};
+
 function readResult(v: unknown, casing: Casing, failure: boolean): ToolResultInfo {
-  if (casing === "camel") {
-    const r = isRecord(v) ? v : {};
-    const text = typeof r.textResultForLlm === "string" ? r.textResultForLlm : "";
-    const isError = failure || (typeof r.resultType === "string" && r.resultType !== RESULT_SUCCESS);
-    return { isError, bytes: Buffer.byteLength(text), text };
-  }
-  const text = v === undefined ? "" : typeof v === "string" ? v : JSON.stringify(v);
-  const isError = failure || (isRecord(v) && v.is_error === true);
+  const k = RESULT_KEYS[casing];
+  const r = isRecord(v) ? v : {};
+  const text = typeof r[k.text] === "string" ? (r[k.text] as string) : "";
+  const isError = failure || (typeof r[k.type] === "string" && r[k.type] !== RESULT_SUCCESS);
   return { isError, bytes: Buffer.byteLength(text), text };
 }
 
@@ -113,6 +120,8 @@ export function encode(ev: CanonicalHookEvent, d: Decision, _extra?: string): Ho
         exitCode: 0,
       };
     case "replace":
-      return EMPTY; // no post-call output-replace field; case C has no substitute (impl/10 §6)
+      // D-HA-COPILOT-REPLACE-1: postToolUse output modifiedResult replaces the tool result (copilot SDK types.d.ts).
+      if (ev.event !== "PostToolUse") return EMPTY;
+      return { stdout: JSON.stringify({ modifiedResult: { resultType: RESULT_SUCCESS, textResultForLlm: d.output } }), exitCode: 0 };
   }
 }
