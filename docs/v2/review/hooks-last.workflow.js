@@ -9,6 +9,7 @@ export const meta = {
 
 const OPH = { model: 'claude-opus-5-5', effort: 'high' }
 const SNM = { model: 'claude-sonnet-5-5', effort: 'medium' }
+const SNH = { model: 'claude-sonnet-5-5', effort: 'high' }
 const HKM = { model: 'claude-haiku-5-5', effort: 'medium' }
 const RESULT = { type: 'object', properties: {
   done: { type: 'boolean' }, commits: { type: 'array', items: { type: 'string' } },
@@ -39,7 +40,7 @@ const ITEMS = [
 ]
 
 phase('Fix')
-const items = await parallel(ITEMS.map(([id, task]) => () => retry(`${base(id)}\n\nRole: fixer for one item.\n${task}\nReturn done, commits, numbers, summary.`, { label: `hl-${id}`, phase: 'Fix', schema: RESULT, ...OPH })))
+const items = await parallel(ITEMS.map(([id, task]) => () => retry(`${base(id)}\n\nRole: fixer for one item.\n${task}\nReturn done, commits, numbers, summary.`, { label: `hl-${id}`, phase: 'Fix', schema: RESULT, ...(id === 'ccskills' ? SNH : OPH) })))
 
 phase('Ship')
 const g = await retry(`${base('gate')}\n\nRole: gate on v2-design. Fresh clone, npm install, build, node scripts/gate.mjs --all twice, build/check-install-docs.mjs, build/check-secrets.mjs, build/check-prompt-static.mjs, node bench/fixtures/run.mjs --check. Do not fix. Return green, failing, summary.`, { label: 'hl-gate', phase: 'Ship', schema: GATE, ...HKM })
