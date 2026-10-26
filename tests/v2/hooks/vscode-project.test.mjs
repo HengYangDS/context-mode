@@ -6,7 +6,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -20,6 +20,7 @@ before(() => {
   repo = path.join(root, "repo");
   mkdirSync(repo);
   execFileSync("git", ["init", "-q", repo]);
+  writeFileSync(path.join(repo, "big.log"), "x".repeat(200_000));
   oldHome = process.env.HOME;
   process.env.HOME = root;
 });
@@ -43,5 +44,6 @@ test("H1: a VS Code hook run from a project resolves it from the payload cwd and
   assert.equal(out.exitCode, 0);
   const h = JSON.parse(out.stdout).hookSpecificOutput;
   assert.equal(h.permissionDecision, "deny");
-  assert.ok(h.permissionDecisionReason.includes("mcp_context-mode_ctx_execute"), h.permissionDecisionReason);
+  assert.ok(h.permissionDecisionReason.includes("ctx_execute"), h.permissionDecisionReason);
+  assert.ok(h.permissionDecisionReason.includes(path.join(repo, "big.log")) || h.permissionDecisionReason.includes("big.log"), h.permissionDecisionReason);
 });

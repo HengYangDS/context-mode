@@ -11,7 +11,7 @@ import {
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
-  SUBAGENT_RUN_DENY,
+  SUBAGENT_RUN_DENY, WORKSPACE_FOLDER_FLAG,
 } from "../contracts/constants.ts";
 import type {
   AdapterRow, CanonicalHookEvent, Chunk, Decision, DbHandle, EventKind, HookOutput, ProjectContext, ToolCall, ToolResultInfo,
@@ -71,7 +71,9 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   let project: ProjectContext;
   try {
     // D-HA-PI-PROJECT-1: on pi the entry puts ctx.cwd into the payload, so ev.cwd is the pi:ctx.cwd source.
-    project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd, piCwd: agent === "pi" ? ev.cwd : undefined }); // step 3
+    // D-HF-VSCODE-PROJECT-1: a VS Code hook has no launch args; its workspace folder is the payload cwd.
+    const argv = agent === "vscode" ? [WORKSPACE_FOLDER_FLAG, ev.cwd] : process.argv;
+    project = resolveProject(agent, { env, argv, cwd: ev.cwd, piCwd: agent === "pi" ? ev.cwd : undefined }); // step 3
   } catch (err) {
     // D-FU-PS-1: no project: never deny, never hint, no DB; one stderr line, never a silent drop.
     process.stderr.write("hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n");

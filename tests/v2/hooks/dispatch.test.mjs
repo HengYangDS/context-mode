@@ -148,10 +148,14 @@ test("UserPromptSubmit: detached prompt row, allow", async () => {
 });
 
 test("PreCompact (vscode, pending-flag): sets the pending_compact meta key", async () => {
+  // D-HF-VSCODE-PROJECT-1: a vscode hook resolves its project from the payload cwd.
   const p = cc({ hook_event_name: "PreCompact" });
   await handleHook("vscode", p, { ...env, CLAUDE_PROJECT_DIR: "" });
-  // vscode resolves its project from --workspace-folder; without one there is no project, so no flag.
-  assert.equal(query("SELECT value FROM meta WHERE key = ?", PENDING_COMPACT_META_PREFIX + p.session_id).length, 0);
+  assert.deepEqual(query("SELECT value FROM meta WHERE key = ?", PENDING_COMPACT_META_PREFIX + p.session_id).map((r) => r.value), ["1"]);
+  // No cwd in the payload: no project, so no flag.
+  const q = cc({ hook_event_name: "PreCompact", cwd: "" });
+  await handleHook("vscode", q, { ...env, CLAUDE_PROJECT_DIR: "" });
+  assert.equal(query("SELECT value FROM meta WHERE key = ?", PENDING_COMPACT_META_PREFIX + q.session_id).length, 0);
 });
 
 test("PreCompact (gemini PreCompress, pending-flag): sets pending_compact:<sid> = 1 (ADR-0009 §6)", async () => {

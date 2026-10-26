@@ -70,7 +70,8 @@ test("nativeTools and execReadOnlyHint follow impl/10 §1.3a and DECISIONS-r9 R4
   });
   assert.deepEqual(getAdapter("copilot-cli").nativeTools, { shell: ["bash"] }); // D-HA-COPILOT-NAMES-1
   assert.deepEqual(getAdapter("pi").nativeTools, { shell: ["bash"], read: ["read"] }); // D-HA-PI-NAMES-1
-  for (const id of ["vscode", "kiro", "opencode"]) {
+  assert.deepEqual(getAdapter("vscode").nativeTools, { shell: ["run_in_terminal"] }); // D-HF-VSCODE-PROJECT-1
+  for (const id of ["kiro", "opencode"]) {
     assert.deepEqual(getAdapter(id).nativeTools, { shell: [] }, id);
   }
   for (const r of ADAPTERS) assert.equal(r.execReadOnlyHint, r.id === "codex", r.id);

@@ -13,8 +13,13 @@ const SESSION_START_NEW = "new"; // impl/10 §7: SessionStart fires only with so
 
 // Own tool -> bare ctx_*; mcp_<server>_<tool> -> "mcp:<server>:<tool>", split at the first "_" after "mcp_"
 // (DEVIATIONS D-M3-A4-3); native names unchanged.
+// D-HF-VSCODE-PROJECT-1: the VS Code agent terminal tool is run_in_terminal; it is the shell tool (Bash).
+export const SHELL_TOOL_NAME = "run_in_terminal";
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { [SHELL_TOOL_NAME]: "Bash" };
+
 function canonicalName(name: string): string {
   if (name.startsWith(TOOL_NAME_PREFIX)) return name.slice(TOOL_NAME_PREFIX.length);
+  if (Object.hasOwn(NATIVE_TO_CANONICAL, name)) return NATIVE_TO_CANONICAL[name];
   if (!name.startsWith(MCP_PREFIX)) return name;
   const rest = name.slice(MCP_PREFIX.length);
   const sep = rest.indexOf(MCP_SEP);
@@ -33,8 +38,8 @@ export function decode(raw: unknown): CanonicalHookEvent {
   const p = raw as Record<string, unknown>;
   const event = VSCODE_EVENTS.find((e) => e === p.hook_event_name);
   if (event === undefined) throw new Error("vscode: unknown hook event " + String(p.hook_event_name));
-  // session_id optional; cwd only when the hook config sets it, else "" and the project comes from
-  // --workspace-folder (impl/10 §7, P1: no second native field). No subagent field (impl/10 §7 [U]).
+  // session_id optional. cwd is the common input field (VS Code hooks reference, "Common input"); it is the
+  // hook's one project channel (D-HF-VSCODE-PROJECT-1); the server's is --workspace-folder. No subagent field.
   const ev: CanonicalHookEvent = { event, agent: "vscode", sessionId: String(p.session_id ?? ""), cwd: String(p.cwd ?? "") };
   if (event === "SessionStart" && p.source === SESSION_START_NEW) ev.source = "startup"; // DEVIATIONS D-M3-A4-2
   if (event === "UserPromptSubmit" && typeof p.prompt === "string") ev.prompt = p.prompt;
