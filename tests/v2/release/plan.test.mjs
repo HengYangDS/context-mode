@@ -229,3 +229,69 @@ test("[M6] release/plan: origin that cannot be read -> exit 1, one stderr line",
   assert.ok(r.stderr.startsWith("release failed: git ls-remote origin: "), r.stderr);
   assert.equal(r.stderr.trim().split("\n").length, 1);
 });
+
+// Release-next (D-RN-TAG-1): release.yml started by a pushed v2.* tag passes --tag <name>. The version is
+// the tag without "v" (a semver prerelease is allowed), never a bump; notes cover commits since the last
+// tagged release, or all history on the first one.
+function pushTag(dir, name, ref = "HEAD") {
+  git(dir, "tag", "-a", name, "-m", name, ref);
+  git(dir, "push", "-q", "origin", `refs/tags/${name}`);
+}
+
+test("[RN] release/plan: --tag v2.0.0-next.1 on HEAD, first release -> that version, notes over all history", (t) => {
+  const dir = seed(t);
+  commit(dir, "feat: first");
+  commit(dir, "fix: second");
+  pushTag(dir, "v2.0.0-next.1");
+  const r = plan(dir, "--tag", "v2.0.0-next.1");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(versionOf(r.stdout), "version=2.0.0-next.1");
+  assert.ok(r.stdout.includes("- feat: first") && r.stdout.includes("- fix: second"), r.stdout);
+});
+
+test("[RN] release/plan: --tag after a tagged release -> no bump, notes since that release's Source-Commit", (t) => {
+  for (const name of ["v2.1.0-next.1", "v2.0.5"]) {
+    const dir = released(t, "2.0.0", ["feat: new", "docs: d"]);
+    pushTag(dir, name);
+    const r = plan(dir, "--tag", name);
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(versionOf(r.stdout), `version=${name.slice(1)}`);
+    assert.ok(r.stdout.includes("- feat: new"), r.stdout);
+    assert.ok(!r.stdout.includes("old feature") && !r.stdout.includes("old fix"), r.stdout);
+  }
+});
+
+test("[RN] release/plan: --tag with only non-releasable commits still plans (the tag is the decision)", (t) => {
+  const dir = released(t, "2.0.0", ["docs: only"]);
+  pushTag(dir, "v2.0.1-next.1");
+  const r = plan(dir, "--tag", "v2.0.1-next.1");
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(versionOf(r.stdout), "version=2.0.1-next.1");
+});
+
+test("[RN] release/plan: --tag that is not a v2+ semver tag -> exit 1, one stderr line", (t) => {
+  const dir = seed(t);
+  commit(dir, "feat: first");
+  for (const bad of ["2.0.0-next.1", "v2.0.0-", "v2.0.0-next..1", "v2.0.0-next.01", "v2.0", "v1.0.0-next.1", "v2.0.0+b"]) {
+    const r = plan(dir, "--tag", bad);
+    assert.equal(r.status, 1, bad);
+    assert.equal(r.stdout, "", bad);
+    assert.equal(r.stderr, `release failed: --tag ${bad} is not v<x.y.z>[-<prerelease>] with major >= 2\n`, bad);
+  }
+  const none = plan(dir, "--tag");
+  assert.equal(none.status, 1);
+  assert.equal(none.stderr, "release failed: --tag needs a value\n");
+});
+
+test("[RN] release/plan: --tag not pushed, or pushed on another commit -> refuse", (t) => {
+  const dir = seed(t);
+  const first = commit(dir, "feat: first");
+  commit(dir, "fix: second");
+  const missing = plan(dir, "--tag", "v2.0.0-next.1");
+  assert.equal(missing.status, 1);
+  assert.equal(missing.stderr, "release failed: tag v2.0.0-next.1 is not on origin\n");
+  pushTag(dir, "v2.0.0-next.1", first);
+  const other = plan(dir, "--tag", "v2.0.0-next.1");
+  assert.equal(other.status, 1);
+  assert.equal(other.stderr, `release failed: tag v2.0.0-next.1 on origin points at ${first}, not HEAD ${git(dir, "rev-parse", "HEAD")}\n`);
+});
