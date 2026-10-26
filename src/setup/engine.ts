@@ -346,7 +346,8 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   const edits: FileEdit[] = [];
   try { planHookInstall(row, edits); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
   if (!edits.length) return { name: "hook-registered", ok: true };
-  if (h.trust && edits.every((e) => e.file === h.trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${h.trust}; re-run setup` };
+  const trust = h.kind === "file" ? h.trust : undefined;
+  if (trust && edits.every((e) => e.file === trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${trust}; re-run setup` };
   return { name: "hook-registered", ok: false, detail: `${h.file} lacks the context-mode hook entry` };
 }
 
