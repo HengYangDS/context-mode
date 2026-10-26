@@ -12,6 +12,11 @@
 //     A `release` branch that holds only untagged (rehearsal) commits is replaced. A pushed annotated v2+
 //     tag whose commit is in `release` must be in the staged commit too, else refuse (D-FU-RF-1).
 //
+// Release-next (D-RN-TAG-1): <version> may be x.y.z-<prerelease>. When v<version> is already on the remote
+// (release.yml started by a pushed v2.* tag), stage requires it to name --source-commit and makes no tag;
+// promote requires it to name the staged Source-Commit and pushes no tag. A prerelease GitHub release gets
+// --prerelease --latest=false, so it never shows as Latest over v1.
+//
 // A failure writes one line "release failed: <reason>" to stderr and exits 1 (impl/13 §1, §10).
 // Node built-ins only; no regex (TECH-SPEC §11): arguments and git output are read with plain
 // string operations.
@@ -26,7 +31,7 @@ import {
   RELEASE_BRANCH,
   RELEASE_SUMS_FILE,
 } from "../../src/core/contracts/constants.ts";
-import { parseTaggedReleases } from "./release-tags.mjs";
+import { isPrerelease, isReleaseVersion, parseTaggedReleases, tagCommit } from "./release-tags.mjs";
 
 // Release-script values with no src/ reader (D-M6-P2-1; same pattern as plan.mjs, M6-P1).
 const RELEASE_STAGING_BRANCH = "release-staging";
@@ -53,15 +58,9 @@ function parseArgs(argv) {
     } else fail(`unknown argument ${a}`);
   }
   if (args.stage === args.promote) fail("pass exactly one of --stage or --promote");
-  if (!isSemver(args.version)) fail("--version <x.y.z> is required");
+  if (!isReleaseVersion(args.version)) fail("--version <x.y.z> is required");
   if (args.stage && !isSha(args.sourceCommit)) fail("--stage needs --source-commit <40-hex sha>");
   return args;
-}
-
-function isSemver(v) {
-  if (typeof v !== "string") return false;
-  const parts = v.split(".");
-  return parts.length === 3 && parts.every((p) => p.length > 0 && [...p].every((c) => c >= "0" && c <= "9"));
 }
 
 function isSha(s) {
@@ -83,6 +82,9 @@ function remoteHead(remote, branch) {
   return out === "" ? "" : out.split(LS_REMOTE_FIELD_SEP)[0];
 }
 
+// The commit v<version> names on the remote, or "" when the remote has no such tag.
+const remoteTag = (remote, tag) => tagCommit(git("ls-remote", "--tags", remote), tag);
+
 // --force-with-lease=<ref>:<expect>; an empty expect means "the ref must not exist yet".
 const lease = (branch, expect) => `--force-with-lease=refs/heads/${branch}:${expect}`;
 
@@ -91,6 +93,8 @@ function stage({ version, sourceCommit, remote }) {
   const outDir = path.join(cwd, RELEASE_OUT_DIR);
   if (!existsSync(path.join(outDir, RELEASE_SUMS_FILE))) fail(`${RELEASE_OUT_DIR}/${RELEASE_SUMS_FILE} not found`);
   const tag = RELEASE_TAG_PREFIX + version;
+  const pushed = remoteTag(remote, tag);
+  if (pushed !== "" && pushed !== sourceCommit) fail(`tag ${tag} on ${remote} points at ${pushed}, not source commit ${sourceCommit}`);
 
   const prior = remoteHead(remote, RELEASE_STAGING_BRANCH);
   if (prior === "") {
@@ -117,9 +121,12 @@ function stage({ version, sourceCommit, remote }) {
   git("read-tree", "--empty");
   git("add", "-A");
   git("commit", "--quiet", "--allow-empty", "-m", `release ${tag}`, "-m", `${SOURCE_COMMIT_TRAILER}: ${sourceCommit}`);
-  git("tag", "-a", tag, "-m", tag, "--no-sign");
+  if (pushed === "") git("tag", "-a", tag, "-m", tag, "--no-sign");
   git("push", remote, `HEAD:refs/heads/${RELEASE_STAGING_BRANCH}`, lease(RELEASE_STAGING_BRANCH, prior));
-  console.log(`staged ${tag} on ${RELEASE_STAGING_BRANCH} at ${git("rev-parse", "HEAD")} (tag local, not pushed)`);
+  const head = git("rev-parse", "HEAD");
+  console.log(pushed === ""
+    ? `staged ${tag} on ${RELEASE_STAGING_BRANCH} at ${head} (tag local, not pushed)`
+    : `staged ${tag} on ${RELEASE_STAGING_BRANCH} at ${head} (tag ${tag} already on ${remote} at ${pushed}, reused)`);
 }
 
 // 0 = ancestor, 1 = not, anything else = the commit is not in this clone (so not in the fetched branch).
@@ -149,6 +156,21 @@ function promote({ version, notes, remote }) {
   const staged = git("rev-parse", "FETCH_HEAD");
   refuseDroppedRelease(remote, tag, staged);
 
+  const pushed = remoteTag(remote, tag);
+  if (pushed !== "") {
+    const body = git("log", "-1", "--format=%B", staged);
+    const line = body.split("\n").find((l) => l.startsWith(`${SOURCE_COMMIT_TRAILER}: `));
+    const src = line ? line.slice(SOURCE_COMMIT_TRAILER.length + 2).trim() : "";
+    if (pushed !== src) fail(`tag ${tag} on ${remote} points at ${pushed}, not ${SOURCE_COMMIT_TRAILER} ${src} of ${RELEASE_STAGING_BRANCH} ${staged}`);
+    git("push", remote, `${staged}:refs/heads/${RELEASE_BRANCH}`, lease(RELEASE_BRANCH, remoteHead(remote, RELEASE_BRANCH)));
+    console.log(`promoted ${tag}: ${RELEASE_BRANCH} = ${staged} (tag ${tag} already on ${remote} at ${pushed}, not pushed)`);
+  } else {
+    pushDraftTag(remote, tag, staged);
+  }
+  githubRelease(remote, tag, version, notes);
+}
+
+function pushDraftTag(remote, tag, staged) {
   // The draft tag is local to the stage job's checkout; a fresh promote checkout makes the same
   // annotated tag on the staged commit (D-M6-P2-1). An existing tag must already point there.
   const local = spawnSync("git", ["rev-parse", "--verify", "--quiet", `refs/tags/${tag}^{commit}`], { encoding: "utf8" });
@@ -161,13 +183,16 @@ function promote({ version, notes, remote }) {
   git("push", remote, `${staged}:refs/heads/${RELEASE_BRANCH}`, lease(RELEASE_BRANCH, remoteHead(remote, RELEASE_BRANCH)));
   git("push", remote, `refs/tags/${tag}`);
   console.log(`promoted ${tag}: ${RELEASE_BRANCH} = ${staged}`);
+}
 
+function githubRelease(remote, tag, version, notes) {
   if (remote !== RELEASE_REMOTE_DEFAULT) {
     console.log(`gh release skipped: remote ${remote} is not ${RELEASE_REMOTE_DEFAULT} (D-M6-arch-5)`);
     return;
   }
   const sums = path.join(RELEASE_OUT_DIR, RELEASE_SUMS_FILE);
-  run("gh", ["release", "create", tag, "--verify-tag", "--title", tag, "--notes", notes ?? "", sums]);
+  const pre = isPrerelease(version) ? ["--prerelease", "--latest=false"] : [];
+  run("gh", ["release", "create", tag, "--verify-tag", ...pre, "--title", tag, "--notes", notes ?? "", sums]);
 }
 
 async function main(argv) {
