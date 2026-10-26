@@ -91,7 +91,14 @@ function hostEntries(id) {
     assert.deepEqual(keysOf(doc), ["hooks"], id);
     assert.deepEqual(keysOf(doc.hooks), ["enabled", "events"], id);
     assert.equal(doc.hooks.enabled, true, id);
-    for (const [event, list] of Object.entries(doc.hooks.events)) for (const e of list) out.push({ event, entry: e, matcher: e.matcher });
+    // D-HF-ZCODE-SHAPE-1: matcher groups, each with a nested hooks array of command entries.
+    for (const [event, groups] of Object.entries(doc.hooks.events)) {
+      for (const g of groups) {
+        assert.ok(Array.isArray(g.hooks), `${id} ${event}: nested hooks array`);
+        assert.ok(!("matcher" in g.hooks[0]), `${id} ${event}: matcher sits on the group, not the handler`);
+        for (const e of g.hooks) out.push({ event, entry: e, matcher: g.matcher });
+      }
+    }
   } else if (id === "copilot-cli" || id === "vscode") {
     // Flat schema: entries sit directly under the event, no nested `hooks` array, no host matcher (#1240 class).
     assert.deepEqual(keysOf(doc), ["hooks", "version"], id);

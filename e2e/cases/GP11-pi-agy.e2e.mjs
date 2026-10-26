@@ -121,7 +121,14 @@ const SCHEMA = {
     assert.equal(keys(doc), "hooks");
     assert.equal(keys(doc.hooks), "enabled,events");
     assert.equal(doc.hooks.enabled, true);
-    for (const [ev, list] of Object.entries(doc.hooks.events)) assert.ok(list.every((e) => cmd(e, "timeoutMs")), ev);
+    // D-HF-ZCODE-SHAPE-1: matcher groups {matcher?, hooks:[{type,command,timeoutMs}]}.
+    for (const [ev, groups] of Object.entries(doc.hooks.events)) {
+      assert.ok(Array.isArray(groups) && groups.length > 0, ev);
+      for (const g of groups) {
+        assert.ok(Array.isArray(g.hooks) && g.hooks.every((e) => cmd(e, "timeoutMs") && !("matcher" in e)), `${ev}: nested command entries`);
+        if ("matcher" in g) assert.doesNotThrow(() => new RegExp(g.matcher), `${ev}: matcher compiles`);
+      }
+    }
   },
 };
 

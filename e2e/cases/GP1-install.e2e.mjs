@@ -97,7 +97,8 @@ function hookEntries(id) {
   if (id === "kiro") {
     for (const h of doc.hooks) out.push({ event: h.trigger, entry: { ...h.action, timeout: h.timeout }, matcher: h.matcher });
   } else if (id === "zcode") {
-    for (const [event, list] of Object.entries(doc.hooks.events)) for (const e of list) out.push({ event, entry: e, matcher: e.matcher });
+    // D-HF-ZCODE-SHAPE-1: matcher groups {matcher?, hooks:[{type,command,timeoutMs}]} under hooks.events.<Event>.
+    for (const [event, groups] of Object.entries(doc.hooks.events)) for (const g of groups) for (const e of g.hooks) out.push({ event, entry: e, matcher: g.matcher });
   } else if (id === "copilot-cli" || id === "vscode") {
     for (const [event, list] of Object.entries(doc.hooks)) for (const e of list) out.push({ event, entry: e, matcher: undefined });
   } else {
