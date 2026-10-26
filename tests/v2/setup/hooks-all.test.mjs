@@ -46,9 +46,12 @@ function sandbox(t) {
   mkdirSync(home, { recursive: true });
   mkdirSync(bin, { recursive: true });
   // copilot-cli adds its MCP server through its own CLI; a stub that already lists context-mode stands in for it.
-  writeFileSync(path.join(bin, "copilot"), "#!/bin/sh\necho context-mode\n", { mode: 0o755 });
+  // On Windows whichBin matches PATHEXT names only (npm's <bin>.cmd shim), so the stub is a .cmd there and cmd.exe needs its env.
+  if (process.platform === "win32") writeFileSync(path.join(bin, "copilot.cmd"), "@echo context-mode\r\n");
+  else writeFileSync(path.join(bin, "copilot"), "#!/bin/sh\necho context-mode\n", { mode: 0o755 });
+  const win = process.platform === "win32" ? { SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec } : {};
   return { root, home, pkgDir: pkg(root),
-    env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
+    env: { PATH: [bin, "/usr/bin", "/bin"].join(path.delimiter), HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000", ...win } };
 }
 
 const hookCmd = (pkgDir, id) => `"${NODE}" "${path.join(pkgDir, "hook.mjs")}" --agent ${id}`;

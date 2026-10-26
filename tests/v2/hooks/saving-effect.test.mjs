@@ -15,6 +15,16 @@ const SAVING = {
   "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "R",
   vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "D",
 };
+// D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
+// an open file, so temp cleanup there is best-effort. The assertions are unchanged.
+function rmTemp(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) {
+    if (process.platform !== "win32" || err.code !== "EPERM") throw err;
+  }
+}
+
 const CURL = "curl -s https://x.io/a.json";
 
 test("ADR-0020: every row has exactly one saving effect and it matches the ADR table", () => {
@@ -51,7 +61,7 @@ test("ADR-0020: gemini AfterTool run_shell_command with a large output is replac
   const root = mkdtempSync(path.join(tmpdir(), "cm-saving-"));
   const oldHome = process.env.HOME;
   process.env.HOME = root;
-  t.after(() => { process.env.HOME = oldHome; rmSync(root, { recursive: true, force: true }); });
+  t.after(() => { process.env.HOME = oldHome; rmTemp(root); });
   const repo = path.join(root, "repo");
   mkdirSync(path.join(repo, ".git"), { recursive: true });
   const lines = [];

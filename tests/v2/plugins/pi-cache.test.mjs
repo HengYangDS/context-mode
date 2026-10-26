@@ -29,7 +29,11 @@ before(() => {
 
 after(() => {
   process.env.HOME = oldHome;
-  rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  try {
+    rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) { // D-M3-F-9: a kept DB handle blocks the delete on Windows; cleanup is best-effort there
+    if (process.platform !== "win32" || err.code !== "EPERM") throw err;
+  }
 });
 
 function fakeHost(sid) {

@@ -15,6 +15,16 @@ import { handleHook } from "../../../src/core/hooks/dispatch.ts";
 import { decode as copilotDecode } from "../../../src/adapters/copilot-cli.ts";
 import { READ_DENY_MESSAGE } from "../../../src/core/policy/read-deny.ts";
 
+// D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
+// an open file, so temp cleanup there is best-effort. The assertions are unchanged.
+function rmTemp(dir) {
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) {
+    if (process.platform !== "win32" || err.code !== "EPERM") throw err;
+  }
+}
+
 function bigLog() {
   const lines = [];
   for (let i = 0; i < 4000; i++) lines.push("line " + i + (i === 3001 ? " FATAL disk quota code=QX-7731-ZETA" : " filler words here"));
@@ -25,7 +35,7 @@ function sandbox(t) {
   const root = mkdtempSync(path.join(tmpdir(), "cm-live-shape-"));
   const oldHome = process.env.HOME;
   process.env.HOME = root;
-  t.after(() => { process.env.HOME = oldHome; rmSync(root, { recursive: true, force: true }); });
+  t.after(() => { process.env.HOME = oldHome; rmTemp(root); });
   const repo = path.join(root, "repo");
   mkdirSync(path.join(repo, ".git"), { recursive: true });
   writeFileSync(path.join(repo, ".git", "HEAD"), "ref: refs/heads/main\n");
