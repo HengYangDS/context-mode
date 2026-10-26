@@ -16,7 +16,9 @@ Prefer to do it by hand? Run `context-mode setup --print kiro` and follow what i
 ## What setup changes
 
 - Adds the `context-mode` entry to `~/.kiro/settings/mcp.json`. Other servers stay.
-- Writes no hooks.
+- Writes the hooks to `~/.kiro/hooks/context-mode.json` (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse).
+- Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.kiro/skills/<name>/SKILL.md`.
+- Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect). Kiro reads a deny as exit code 2 with plain text.
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 

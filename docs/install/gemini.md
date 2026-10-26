@@ -22,8 +22,9 @@ gemini extensions install https://github.com/mksglu/context-mode --ref release -
 ## What setup changes
 
 - Runs `gemini extensions link` on the installed package folder, with `--consent`. It uses `link`, because `install` on a folder hangs on a trust prompt (D-INST-1).
-- The extension brings the MCP server and the hooks.
+- The extension brings the MCP server, the hooks (`hooks/hooks.json`: BeforeAgent, BeforeTool, AfterTool, PreCompress) and the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade`.
 - Removes old context-mode hook commands from `~/.gemini/settings.json`.
+- Effect: the call runs, then a large result is replaced by a short selection that names `ctx_search` (replace). Gemini AfterTool `decision: deny` carries the selection (D-HA-GEMINI-REPLACE-1).
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 

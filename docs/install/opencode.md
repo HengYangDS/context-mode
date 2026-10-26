@@ -16,7 +16,9 @@ Prefer to do it by hand? Run `context-mode setup --print opencode` and follow wh
 ## What setup changes
 
 - Adds `mcp.context-mode` (`type: local`, `enabled: true`) to `~/.config/opencode/opencode.json`. Other keys stay.
-- Writes no hooks.
+- Adds the plugin `opencode/plugin.js` to the `plugin` list in the same file. It runs the hooks in process (execute.before, execute.after, prompt, context, compaction).
+- Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.config/opencode/skills/<name>/SKILL.md`.
+- Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect).
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 

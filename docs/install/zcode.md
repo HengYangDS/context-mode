@@ -16,7 +16,9 @@ Prefer to do it by hand? Run `context-mode setup --print zcode` and follow what 
 ## What setup changes
 
 - Adds the `context-mode` entry to `~/.zcode/cli/config.json`. Other servers stay.
-- Writes no hooks.
+- Merges the hooks into the same file under `hooks` (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse) and sets `hooks.enabled: true`.
+- Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.zcode/skills/<name>/SKILL.md`.
+- Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect).
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 

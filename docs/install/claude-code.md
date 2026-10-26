@@ -16,8 +16,9 @@ Prefer to do it by hand? Run `context-mode setup --print claude-code` and follow
 ## What setup changes
 
 - Runs `claude plugin marketplace add` on the installed package folder, then `claude plugin install context-mode@context-mode`.
-- The plugin brings the MCP server and the hooks.
+- The plugin brings the MCP server, the hooks (`hooks/claude-code.json`: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse, PreCompact) and the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade`.
 - Removes old context-mode hook commands from `~/.claude/settings.json`.
+- Effect: the call runs, then a large result is replaced by a short selection that names `ctx_search` (replace).
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 

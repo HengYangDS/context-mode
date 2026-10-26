@@ -16,7 +16,9 @@ Prefer to do it by hand? Run `context-mode setup --print codex` and follow what 
 ## What setup changes
 
 - Adds a `[mcp_servers.context-mode]` table to `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`).
-- Updates old context-mode hook commands in `~/.codex/hooks.json`, only if they exist.
+- Writes the hooks to `~/.codex/hooks.json` (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse) and one `[hooks.state]` trust table per hook in `config.toml`, so Codex runs them (D-HA-CODEX-TRUST-1).
+- Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.codex/skills/<name>/SKILL.md`.
+- Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect).
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 

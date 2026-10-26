@@ -22,8 +22,10 @@ qwen extensions install https://github.com/mksglu/context-mode:context-mode --re
 ## What setup changes
 
 - Runs `qwen extensions link` on the installed package folder and answers its prompt with `y`.
-- The extension brings the MCP server and four hooks (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse).
+- The extension brings the MCP server and the hooks (`hooks/qwen.json`: SessionStart, UserPromptSubmit, PreToolUse, PostToolUse).
+- Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.qwen/skills/<name>/SKILL.md`.
 - Removes old context-mode hook commands from `~/.qwen/settings.json`.
+- Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect).
 - Backs up each file first. A failed step is rolled back byte for byte.
 - Never edits `CLAUDE.md`, `AGENTS.md` or other instruction files.
 
