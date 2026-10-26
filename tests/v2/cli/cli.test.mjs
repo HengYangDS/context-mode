@@ -415,7 +415,15 @@ function normPaths(text, s) {
 
 /** A fake agent CLI: logs every call; `... list` prints context-mode once an install command ran. */
 function fakeAgentBin(s, name) {
-  fakeBin(s, name, `echo "${name} $*" >> "$LOG"\ncase "$*" in *list*) [ -f "$LOG.done" ] && echo context-mode;; *) touch "$LOG.done";; esac\nexit 0`);
+  const script = `echo "${name} $*" >> "$LOG"\ncase "$*" in *list*) [ -f "$LOG.done" ] && echo context-mode;; *) touch "$LOG.done";; esac\nexit 0`;
+  if (name !== "claude") return fakeBin(s, name, script);
+  // OPEN-ITEMS H8: setup runs only the real Claude Code, so the fake lives in npm's layout for @anthropic-ai/claude-code.
+  const pkg = path.join(s.root, "npm", "lib", "node_modules", "@anthropic-ai", "claude-code");
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "@anthropic-ai/claude-code", version: "2.0.0" }));
+  writeFileSync(path.join(pkg, "cli.sh"), `#!/bin/sh\n${script}\n`);
+  chmodSync(path.join(pkg, "cli.sh"), 0o755);
+  if (!existsSync(path.join(s.bin, name))) symlinkSync(path.join(pkg, "cli.sh"), path.join(s.bin, name));
 }
 
 for (const a of ADAPTERS) {

@@ -45,7 +45,8 @@ function passDetail(a: AgentResult): string {
 }
 
 function table(agents: readonly AgentResult[]): string {
-  const rows = agents.map((a) => `${a.id.padEnd(13)} ${a.status.padEnd(7)} ${a.reason ?? passDetail(a)}${a.rolledBack ? " (rolled back)" : ""}`.trimEnd());
+  // OPEN-ITEMS H8: the row names the host CLI file that ran, so a wrapper on PATH is visible.
+  const rows = agents.map((a) => `${a.id.padEnd(13)} ${a.status.padEnd(7)} ${a.reason ?? passDetail(a)}${a.bin ? `; bin: ${a.bin}` : ""}${a.rolledBack ? " (rolled back)" : ""}`.trimEnd());
   return [`${"AGENT".padEnd(13)} STATUS  DETAIL`, ...rows].join("\n");
 }
 

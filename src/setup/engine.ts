@@ -3,7 +3,7 @@
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { CODEX_TRUST_PATH, codexTrustEntries } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, constants as fsc, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { accessSync, closeSync, constants as fsc, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -36,6 +36,8 @@ export interface Change { file?: string; path?: string; before?: unknown; after?
 export interface Check { name: string; ok: boolean; warn?: boolean; detail?: string; overheadP95Ms?: number; wallP95Ms?: number; bareP95Ms?: number; }
 export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
+  /** OPEN-ITEMS H8: the host CLI file setup and doctor ran for this agent (absolute, resolved). */
+  bin?: string;
 }
 export interface SetupResult { exitCode: number; agents: AgentResult[]; backupDir?: string; error?: string; }
 export interface SetupOptions extends SetupContext {
@@ -71,6 +73,50 @@ export function whichBin(bin: string, env: SetupContext["env"], platform: NodeJS
 }
 const which = whichBin;
 
+/** OPEN-ITEMS H8, ADR-0012 traps, D-FU-RF-2: a wrapper (the claude-worktree shim) can sit first on PATH. The real
+ *  Claude Code is a native file (Mach-O, ELF, PE magic) or a file of the package named @anthropic-ai/claude-code; npm on
+ *  Windows keeps the native claude.exe under node_modules beside its claude.cmd shim. */
+const REAL_HOST: Readonly<Record<string, { pkg: string; extra: readonly (readonly string[])[] }>> = Object.freeze({
+  claude: { pkg: "@anthropic-ai/claude-code", extra: [["claude.exe"], ["node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"]] },
+});
+const BINARY_MAGICS = Object.freeze(["cffaedfe", "cefaedfe", "7f454c46", "4d5a"]);
+
+function isNativeBinary(file: string): boolean {
+  const head = Buffer.alloc(4);
+  const fd = openSync(file, "r");
+  try { readSync(fd, head, 0, 4, 0); } finally { closeSync(fd); }
+  const hex = head.toString("hex");
+  return BINARY_MAGICS.some((m) => hex.startsWith(m));
+}
+
+/** Name of the nearest package.json at or above dir, or undefined when there is none. */
+function owningPackage(dir: string): string | undefined {
+  for (let d = dir; ; d = path.dirname(d)) {
+    const f = path.join(d, "package.json");
+    if (existsSync(f)) { try { return String(JSON.parse(readFileSync(f, "utf8")).name); } catch { return undefined; } }
+    if (path.dirname(d) === d) return undefined;
+  }
+}
+
+/** The host CLI file setup runs. An agent with no REAL_HOST row: the first PATH hit. claude: the first PATH candidate
+ *  that is the real Claude Code; every other candidate seen before it is listed in `shims` and never run. */
+export function hostBin(bin: string, env: SetupContext["env"], platform: NodeJS.Platform = process.platform): { file: string | undefined; shims: string[] } {
+  const real = REAL_HOST[bin];
+  if (!real) return { file: which(bin, env, platform), shims: [] };
+  const get = (k: string): string | undefined => env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
+  const shims: string[] = [];
+  for (const dir of (get("PATH") ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean)) {
+    const own = which(bin, { PATH: dir, ...(get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {}) }, platform);
+    for (const f of [own, ...real.extra.map((p) => path.join(dir, ...p))]) {
+      if (!f || !existsSync(f) || !statSync(f).isFile()) continue;
+      const file = realpathSync(f);
+      if (isNativeBinary(file) || owningPackage(path.dirname(file)) === real.pkg) return { file, shims };
+      shims.push(f);
+    }
+  }
+  return { file: undefined, shims };
+}
+
 /** cmd.exe line for a .cmd/.bat shim: Node refuses to spawn those without a shell (CVE-2024-27980). Each argument is
  *  quoted, so paths with spaces survive; the outer quotes are the /s form. */
 export function winCmdLine(file: string, args: string[]): string {
@@ -80,7 +126,7 @@ export function winCmdLine(file: string, args: string[]): string {
 
 /** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe. */
 function runBin(bin: string, args: string[], env: SetupContext["env"], input?: string): ReturnType<typeof spawnSync> {
-  const file = which(bin, env) ?? bin;
+  const file = hostBin(bin, env).file ?? bin;
   if (process.platform === "win32" && /\.(cmd|bat)$/i.test(file)) {
     return spawnSync(env.ComSpec || "cmd.exe", ["/d", "/s", "/c", winCmdLine(file, args)],
       { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: true, windowsHide: true });
@@ -244,7 +290,7 @@ function planRow(row: CheckRow, listed: boolean): Plan {
 
 function listCheck(row: CheckRow, env: SetupContext["env"]): Check | undefined {
   const l = row.listCommand;
-  if (!l || !which(l.bin, env)) return undefined;
+  if (!l || !hostBin(l.bin, env).file) return undefined;
   const r = runBin(l.bin, l.args, env);
   // Gemini 0.65.0 writes the list to stderr (D-INST-2), so both streams count.
   const ok = r.status === 0 && `${r.stdout}${r.stderr}`.includes("context-mode");
@@ -522,7 +568,12 @@ export async function runSetup(opts: SetupOptions): Promise<SetupResult> {
 async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: boolean): Promise<AgentResult> {
   const res: AgentResult = { id: row.id, status: "PASS", v1: [], changes: [], checks: [] };
   const needsBin = !row.config && row.cli;
-  if (needsBin && !which(row.cli!.bin, ctx.env)) return { ...res, status: "SKIPPED", reason: `${row.cli!.bin} not on PATH` };
+  if (needsBin) {
+    const hb = hostBin(row.cli!.bin, ctx.env);
+    if (!hb.file && hb.shims.length) return { ...res, status: "FAIL", reason: `no real ${row.cli!.bin} binary on PATH; found only shim script(s): ${hb.shims.join(", ")}` };
+    if (!hb.file) return { ...res, status: "SKIPPED", reason: `${row.cli!.bin} not on PATH` };
+    res.bin = hb.file;
+  }
   if (!row.config && !row.cli) return { ...res, status: "SKIPPED", reason: `${row.id}: no setup path in the registry` };
   let plan: Plan;
   try {
