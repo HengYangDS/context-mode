@@ -47,7 +47,7 @@ export type HookInstall =
 /** ADR-0020: the one skill channel. dir = setup writes <dir>/<name>/SKILL.md rendered with the agent's tool name
  *  prefix from the package's skills/; package = the installed package ships skills/ itself. */
 export interface SkillFile { name: string; src: string; file: string; }
-export type SkillInstall = { kind: "dir"; dir: string; files: SkillFile[]; prefix: string } | { kind: "package"; via: string };
+export type SkillInstall = { kind: "dir"; dir: string; files: SkillFile[]; prefixes: readonly string[] } | { kind: "package"; via: string };
 
 export const COMMAND_SKILLS: readonly string[] = Object.freeze(["ctx-doctor", "ctx-stats", "ctx-upgrade"]);
 export const SKILLS_DIR = "skills";
@@ -55,11 +55,24 @@ export const SKILL_FILE = "SKILL.md";
 const OPENCODE_PLUGIN = ["opencode", "plugin.js"];
 const CODEX_CONFIG_FILE = "config.toml";
 
-/** The skill text with every ctx tool name given the agent's tool name prefix (plain split/join, no regex). */
-export function renderSkill(text: string, prefix: string): string {
-  if (prefix === "") return text;
+/** The skill text with every ctx tool name given the agent's tool name prefix (plain split/join, no regex).
+ *  A skill dir shared by several agents names each agent's tool, joined by " or " (D-HQ-COPILOT-NAMES-2). */
+export function renderSkill(text: string, prefix: string | readonly string[]): string {
+  const prefixes = typeof prefix === "string" ? [prefix] : prefix;
+  if (prefixes.length === 1 && prefixes[0] === "") return text;
   let out = text;
-  for (const tool of TOOL_ORDER) out = out.split(tool).join(prefix + tool);
+  for (const tool of TOOL_ORDER) out = out.split(tool).join(prefixes.map((p) => p + tool).join(SKILL_NAME_JOIN));
+  return out;
+}
+
+const SKILL_NAME_JOIN = " or ";
+
+/** Every distinct tool name prefix of the agents whose skill channel is this home dir, in table order. */
+function skillDirPrefixes(dirPath: string): string[] {
+  const out: string[] = [];
+  for (const r of ADAPTERS) {
+    if (r.skillChannel.kind === "home-dir" && r.skillChannel.path === dirPath && !out.includes(r.toolNamePrefix)) out.push(r.toolNamePrefix);
+  }
   return out;
 }
 
@@ -184,7 +197,7 @@ function skillInstallFor(ctx: SetupContext, row: AdapterRow): SkillInstall {
   const ch = row.skillChannel;
   if (ch.kind === "package") return { kind: "package", via: ch.path };
   const dir = path.join(ctx.home, ch.path);
-  return { kind: "dir", dir, prefix: row.toolNamePrefix, files: COMMAND_SKILLS.map((name) => ({
+  return { kind: "dir", dir, prefixes: skillDirPrefixes(ch.path), files: COMMAND_SKILLS.map((name) => ({
     name, src: path.join(ctx.pkgDir, SKILLS_DIR, name, SKILL_FILE), file: path.join(dir, name, SKILL_FILE) })) };
 }
 

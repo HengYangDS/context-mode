@@ -36,7 +36,7 @@ export function printPlan(row: CheckRow): PrintPlan {
   else if (h.kind === "plugin-list") steps.push({ kind: "hook", file: h.file, block: JSON.stringify({ [h.key[0]]: [h.entry] }, null, 2) + "\n" });
   const sk = row.skillInstall;
   if (sk.kind === "dir") {
-    for (const f of sk.files) steps.push({ kind: "skill", file: f.file, block: renderSkill(readFileSync(f.src, "utf8"), sk.prefix) });
+    for (const f of sk.files) steps.push({ kind: "skill", file: f.file, block: renderSkill(readFileSync(f.src, "utf8"), sk.prefixes) });
   }
   return { agent: row.id, steps, verify: `context-mode doctor --agents ${row.id}` };
 }

@@ -263,7 +263,7 @@ function planSkills(row: CheckRow, edits: FileEdit[]): void {
   if (s.kind !== "dir") return;
   for (const f of s.files) {
     if (!existsSync(f.src)) throw new Error(`preflight: ${f.src} is missing`);
-    const after = renderSkill(readFileSync(f.src, "utf8"), s.prefix);
+    const after = renderSkill(readFileSync(f.src, "utf8"), s.prefixes);
     const before = readOr(f.file);
     if (before !== after) edits.push({ file: f.file, before, after, changes: [{ file: f.file, path: f.name, before: before === undefined ? null : "old", after: "SKILL.md" }] });
   }
@@ -449,8 +449,8 @@ function skillsCheck(row: CheckRow, pkgDir: string): Check {
     const miss = COMMAND_SKILLS.map((n) => path.join(pkgDir, s.via, n, SKILL_FILE)).filter((f) => !existsSync(f));
     return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : undefined };
   }
-  const bad = s.files.filter((f) => readOr(f.file) !== (existsSync(f.src) ? renderSkill(readFileSync(f.src, "utf8"), s.prefix) : undefined));
-  return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f) => f.file).join(", ")} missing or without the ${s.prefix || "plain"} tool prefix` : undefined };
+  const bad = s.files.filter((f) => readOr(f.file) !== (existsSync(f.src) ? renderSkill(readFileSync(f.src, "utf8"), s.prefixes) : undefined));
+  return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f) => f.file).join(", ")} missing or without the ${s.prefixes.join(" / ") || "plain"} tool prefix` : undefined };
 }
 
 async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
