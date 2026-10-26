@@ -3,8 +3,9 @@
 // opencode adapter decodes (D-M5-A1-1) and calls handleHook; this file never opens context.db.
 import { INTERNAL_ERROR_LINE, PLUGIN_ID } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
-import type { HookOutput, ProjectContext, ToolContext } from "../core/contracts/types.ts";
+import type { HookOutput, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
 import { handleHook } from "../core/hooks/dispatch.ts";
+import { ownJournal } from "../core/journal/own-call.ts";
 import { resolveProject } from "../core/project/resolve.ts";
 import { TOOLS, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "../prompt/_generated.ts";
@@ -54,6 +55,8 @@ export async function setup(app: OpenCodeApp) {
     return p;
   }
 
+  const journal = ownJournal(); // D-HF-INPROC-JOURNAL-1
+
   function project(): ProjectContext {
     return resolveProject(AGENT, { env, argv: process.argv, cwd: cwd ?? "" });
   }
@@ -79,11 +82,15 @@ export async function setup(app: OpenCodeApp) {
           signal: toolCtx.abort ?? new AbortController().signal,
           protocolVersion: "",
         };
+        let reply: ToolReply;
         try {
-          return (await tool.handler(parsed.data, ctx)).text;
+          reply = await tool.handler(parsed.data, ctx);
         } catch (err) {
           return err instanceof CtxError ? err.toLine() : INTERNAL_ERROR_LINE;
         }
+        // D-HF-INPROC-JOURNAL-1: the row the MCP server writes; an unresolved project has no DB, so no row.
+        if (resolved !== undefined) await journal(resolved, ctx, tool.name, reply);
+        return reply.text;
       },
     });
   }

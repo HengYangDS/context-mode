@@ -10,6 +10,7 @@ import { INTERNAL_ERROR_LINE } from "../core/contracts/constants.ts";
 import { CtxError, formatError } from "../core/contracts/errors.ts";
 import type { HookOutput, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
 import { handleHook } from "../core/hooks/dispatch.ts";
+import { ownJournal } from "../core/journal/own-call.ts";
 import { resolveProject } from "../core/project/resolve.ts";
 import { TOOLS, type RegisteredTool } from "../core/tools/registry.ts";
 import { INSTRUCTIONS } from "./server.ts";
@@ -79,6 +80,7 @@ export default function piExtension(pi: PiApi): void {
   // prompt to base on a turn that returns no systemPrompt (agent-session.js:791-797), so every turn returns
   // base + payload, byte-identical between compactions. "" until a successful delivery (§3.3 step 8).
   let payload = "";
+  const journal = ownJournal(); // D-HF-INPROC-JOURNAL-1
   let toolsRegistered = false; // #1098: a failed registration retries on the next before_agent_start
 
   function identify(ctx: PiContext | undefined): void {
@@ -109,11 +111,15 @@ export default function piExtension(pi: PiApi): void {
       signal: signal ?? new AbortController().signal,
       protocolVersion: "",
     };
+    let reply: ToolReply;
     try {
-      return await tool.handler(parsed.data, ctx);
+      reply = await tool.handler(parsed.data, ctx);
     } catch (err) {
       return errorReply(err);
     }
+    // D-HF-INPROC-JOURNAL-1: the row the MCP server writes; an unresolved project has no DB, so no row.
+    if (project !== undefined) await journal(project, ctx, tool.name, reply);
+    return reply;
   }
 
   function piTool(tool: RegisteredTool<unknown>): PiTool {
