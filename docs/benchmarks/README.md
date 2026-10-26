@@ -154,3 +154,5 @@ node bench/live/ab-quick.mjs --v1 <v1 dir> --runs 3 --tasks multi-1,json-1,big-t
 ```
 
 Reading: all 81 sessions pass in every arm. On LARGE, v2 shows the model 564.5 median bytes against 4,608 (off) and 4,717.5 (v1), and costs the least. v2 tokens are 3.8 % below off and 17.6 % below v1 (median over tasks). On SMALL, v2 uses 5.6 % more tokens than off (plugin overhead) and 10.2 % fewer than v1. json-1 is the weak task: v2 tokens stay above off (58,197 / 58,110 vs 55,036 / 55,113) because the model makes a check call. Raw rows stay private.
+
+- [Hooks: bytes saved on 10 agents](hooks-saving/README.md): 99.7%–99.9% less output on a 200 KB log, 2026-10-26.
