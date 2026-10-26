@@ -26,6 +26,8 @@ const PROMPT_DIR = path.join(REPO_ROOT, "src", "prompt");
 const SHIPPED_SKILLS = [
   "skills/ctx-stats/SKILL.md", "skills/ctx-doctor/SKILL.md", "skills/ctx-upgrade/SKILL.md",
   "pi/skills/ctx-stats/SKILL.md", "pi/skills/ctx-doctor/SKILL.md", "pi/skills/ctx-upgrade/SKILL.md",
+  // claude-code gets its own rendered copy (plugin.json skills key, 02e28bc4).
+  "claude-code/skills/ctx-stats/SKILL.md", "claude-code/skills/ctx-doctor/SKILL.md", "claude-code/skills/ctx-upgrade/SKILL.md",
 ];
 const REPO_ONLY_PREFIX = ".claude/"; // .claude/skills/release/ stays in the repo (impl/13 §7 step 5)
 const LEGACY_PROTOCOL = "2025-11-25";
