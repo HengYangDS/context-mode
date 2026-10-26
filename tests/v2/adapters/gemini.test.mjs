@@ -43,9 +43,9 @@ test("decode BeforeAgent reads prompt", () => {
   assert.deepEqual(decode(FX.BeforeAgent), { event: "UserPromptSubmit", ...head, prompt: "run the tests" });
 });
 
-test("decode BeforeTool native tool keeps its name; no subagent field on Gemini", () => {
+test("decode BeforeTool maps the native shell tool to Bash; no subagent field on Gemini (D-HA-GEMINI-NAMES-1)", () => {
   const ev = decode({ ...FX.BeforeTool, agent_id: "x", agent_type: "y" });
-  assert.deepEqual(ev, { event: "PreToolUse", ...head, tool: { name: "run_shell_command", canonicalName: "run_shell_command", input: { command: "cat big.log" } } });
+  assert.deepEqual(ev, { event: "PreToolUse", ...head, tool: { name: "run_shell_command", canonicalName: "Bash", input: { command: "cat big.log" } } });
   assert.equal("agentId" in ev, false);
   assert.equal("agentType" in ev, false);
 });
@@ -71,9 +71,13 @@ test("decode another MCP server's tool from mcp_context to mcp:<server>:<tool> (
 test("decode AfterTool reads tool_response size and error", () => {
   const ok = decode(FX.AfterTool);
   assert.equal(ok.event, "PostToolUse");
-  assert.equal(ok.tool.canonicalName, "run_shell_command");
-  const text = JSON.stringify(FX.AfterTool.tool_response);
+  assert.equal(ok.tool.canonicalName, "Bash"); // D-HA-GEMINI-NAMES-1
+  // D-HA-GEMINI-REPLACE-1: a string llmContent is the text the model sees, so it is the result text.
+  const text = FX.AfterTool.tool_response.llmContent;
   assert.deepEqual(ok.result, { isError: false, bytes: Buffer.byteLength(text), text });
+  const parts = { llmContent: [{ text: "a" }], returnDisplay: "a" };
+  const pj = JSON.stringify(parts);
+  assert.deepEqual(decode({ ...FX.AfterTool, tool_response: parts }).result, { isError: false, bytes: Buffer.byteLength(pj), text: pj });
   const bad = decode({ ...FX.AfterTool, tool_response: { llmContent: "", returnDisplay: "", error: { message: "boom" } } });
   assert.equal(bad.result.isError, true);
   const nullErr = decode({ ...FX.AfterTool, tool_response: { llmContent: "x", error: null } });
@@ -133,12 +137,20 @@ test("encode deny on SessionStart, AfterTool, PreCompress is a no-op (no deny ch
   }
 });
 
-test("encode replace is a no-op (no replace field on Gemini)", () => {
-  for (const e of ["PreToolUse", "PostToolUse"]) {
-    assert.deepEqual(encode(ev(e), { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
-  }
+// gemini-cli 0.65.0 docs/hooks/reference.md AfterTool: decision "deny" + reason, the reason replaces the tool result
+// sent to the model (D-HA-GEMINI-REPLACE-1). BeforeTool has no replace.
+test("encode replace on AfterTool is decision deny with the output as reason; no-op on BeforeTool", () => {
+  assert.deepEqual(encode(ev("PostToolUse"), { kind: "replace", output: "x" }), { stdout: JSON.stringify({ decision: "deny", reason: "x" }), exitCode: 0 });
+  assert.deepEqual(encode(ev("PreToolUse"), { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
 });
 
 test("GP3 synthetic round trip: every payload decodes and encodes allow to the native empty shape", () => {
   for (const p of Object.values(FX)) assert.deepEqual(encode(decode(p), { kind: "allow" }), { stdout: "", exitCode: 0 });
+});
+
+// gemini-cli 0.65.0 bundle: SHELL_TOOL_NAME run_shell_command, READ_FILE_TOOL_NAME read_file, GREP_TOOL_NAME
+// grep_search, WEB_FETCH_TOOL_NAME web_fetch (D-HA-GEMINI-NAMES-1).
+test("decode maps Gemini native tool ids to canonical names", () => {
+  const want = { run_shell_command: "Bash", read_file: "Read", grep_search: "Grep", web_fetch: "WebFetch", list_directory: "list_directory" };
+  for (const [name, canonical] of Object.entries(want)) assert.equal(decode({ ...FX.BeforeTool, tool_name: name }).tool.canonicalName, canonical, name);
 });

@@ -68,6 +68,11 @@ export interface JournalFacts { kind: EventKind; key: string | null; path: strin
 export interface ToolReply { text: string; isError: boolean; sandboxBytes: number; journal?: JournalFacts; }
 export interface ToolDef<I> { name: string; description: string; schema: import("zod").ZodType<I>; readOnly: boolean; alwaysLoad: boolean; handler(input: I, ctx: ToolContext): Promise<ToolReply>; }
 
+// ADR-0020: "package" = file inside the installed package dir; "home-file"/"home-dir" = path under HOME;
+// "in-process" = plugin entry the host loads from the package dir.
+export interface HookChannel { kind: "package" | "home-file" | "in-process"; path: string; }
+export interface SkillChannel { kind: "package" | "home-dir"; path: string; }
+
 export interface AdapterRow {
   id: AgentId;
   installMode: "marketplace" | "config-mcp" | "extension" | "plugin" | "mcp-entry" | "hooks+mcp" | "in-process";
@@ -80,6 +85,8 @@ export interface AdapterRow {
   compactSummary: "host" | "none";  // "host": host writes its own compact summary (verified by LV-COMPACT, M3); "none": inject the 2,048 B D1 block via the ADR-0009 §6 path. DECISIONS-r6 D6.
   hookTimeoutMs: number;
   denyChannel: "deny-reason" | "hint-only";
+  hookChannel: HookChannel;   // ADR-0020: the one hook channel setup writes (required, no exception rows)
+  skillChannel: SkillChannel; // ADR-0020: the one skill channel setup writes (required)
   decode(raw: unknown): CanonicalHookEvent;
   encode(ev: CanonicalHookEvent, d: Decision, extra?: string): HookOutput;
 }

@@ -238,9 +238,10 @@ function read(ev: CanonicalHookEvent, input: Record<string, unknown>): Decision 
   return ALLOW; // ranged Read is never denied; no Read hint (D-M7-RR-2)
 }
 
-/** 6a on hosts with no Read tool: null = not a dump, ALLOW = bounded dump, deny = unbounded dump over the cap. */
+/** 6a: null = not a dump, ALLOW = bounded dump, deny = unbounded dump over the cap. Skipped only on a row with a
+ *  Read tool and a replace channel: there the dump runs and PostToolUse replaces it (D-HA-QWEN-DUMP-1). */
 function shellDump(cmds: SimpleCommand[], cwd: string, row: AdapterRow): Decision | null {
-  if (row.nativeTools.read !== undefined && row.nativeTools.read.length > 0) return null;
+  if (row.nativeTools.read !== undefined && row.nativeTools.read.length > 0 && hasReplace(row)) return null;
   if (cmds.length !== 1) return null;
   const c = cmds[0];
   if (c.redirectsToFile || c.endsInBoundedSink) return null;

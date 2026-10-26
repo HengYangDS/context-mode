@@ -4,7 +4,7 @@
 // initialize + tools/list, hook.mjs answers a hook call), fake agent binaries on a temp PATH.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -32,6 +32,8 @@ rl.on("line", (l) => {
 `);
   writeFileSync(path.join(dir, "hook.mjs"), `let s = ""; process.stdin.on("data", (d) => { s += d; }); process.stdin.on("end", () => { JSON.parse(s); });\n`);
   writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0" }));
+  // ADR-0020: the release package ships skills/; setup renders them into the host skill dir.
+  cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(dir, "skills"), { recursive: true });
   return dir;
 }
 

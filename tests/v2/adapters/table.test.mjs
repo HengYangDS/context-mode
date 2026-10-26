@@ -37,13 +37,13 @@ const CLAUDE_NATIVE = { shell: ["Bash"], read: ["Read"], grep: ["Grep"], webfetc
 const NATIVE = {
   "claude-code": CLAUDE_NATIVE,
   codex: { shell: ["Bash"], edit: ["apply_patch"] },
-  gemini: { shell: [] },
+  gemini: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, // gemini-cli 0.65.0 *_TOOL_NAME
   qwen: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
-  "copilot-cli": { shell: [] },
+  "copilot-cli": { shell: ["bash"] }, // D-HA-COPILOT-NAMES-1
   vscode: { shell: [] },
   kiro: { shell: [] },
   zcode: CLAUDE_NATIVE,
-  pi: { shell: [] },
+  pi: { shell: ["bash"], read: ["read"] }, // D-HA-PI-NAMES-1
   opencode: { shell: [] },
 };
 
@@ -193,5 +193,41 @@ test("each spawn row decodes every native event name its eventMap emits", () => 
       const payload = { hook_event_name: native, session_id: "s", cwd: "/tmp/p", tool_name: "x", tool_input: {}, tool_response: "" };
       assert.equal(row.decode(payload).event, canonical, `${row.id}: ${native}`);
     }
+  }
+});
+
+// ADR-0020: every row names its one hook channel and its one skill channel. Expected values copied from the ADR table.
+const HOOK_CHANNEL = {
+  "claude-code": { kind: "package", path: "hooks/claude-code.json" },
+  codex: { kind: "home-file", path: ".codex/hooks.json" },
+  gemini: { kind: "package", path: "hooks/hooks.json" },
+  qwen: { kind: "package", path: "hooks/qwen.json" },
+  "copilot-cli": { kind: "home-file", path: ".copilot/hooks/context-mode.json" },
+  vscode: { kind: "home-file", path: ".copilot/hooks/context-mode-vscode.json" },
+  kiro: { kind: "home-file", path: ".kiro/hooks/context-mode.json" },
+  zcode: { kind: "home-file", path: ".zcode/cli/config.json" },
+  pi: { kind: "in-process", path: "pi/index.js" },
+  opencode: { kind: "in-process", path: "opencode/plugin.js" },
+};
+const SKILL_CHANNEL = {
+  "claude-code": { kind: "package", path: "skills" },
+  codex: { kind: "home-dir", path: ".codex/skills" },
+  gemini: { kind: "package", path: "skills" },
+  qwen: { kind: "home-dir", path: ".qwen/skills" },
+  "copilot-cli": { kind: "home-dir", path: ".copilot/skills" },
+  vscode: { kind: "home-dir", path: ".copilot/skills" },
+  kiro: { kind: "home-dir", path: ".kiro/skills" },
+  zcode: { kind: "home-dir", path: ".zcode/skills" },
+  pi: { kind: "package", path: "skills" },
+  opencode: { kind: "home-dir", path: ".config/opencode/skills" },
+};
+
+test("every row has a hookChannel and a skillChannel with a non-empty path (ADR-0020, no exception rows)", () => {
+  for (const id of AGENT_IDS) {
+    const r = getAdapter(id);
+    assert.ok(r.hookChannel && typeof r.hookChannel.path === "string" && r.hookChannel.path.length > 0, id + " hookChannel");
+    assert.ok(r.skillChannel && typeof r.skillChannel.path === "string" && r.skillChannel.path.length > 0, id + " skillChannel");
+    assert.deepEqual(r.hookChannel, HOOK_CHANNEL[id], id + " hookChannel");
+    assert.deepEqual(r.skillChannel, SKILL_CHANNEL[id], id + " skillChannel");
   }
 });

@@ -70,7 +70,8 @@ export async function handleHook(agent: AgentId, raw: unknown, env: NodeJS.Proce
   }
   let project: ProjectContext;
   try {
-    project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd }); // step 3
+    // D-HA-PI-PROJECT-1: on pi the entry puts ctx.cwd into the payload, so ev.cwd is the pi:ctx.cwd source.
+    project = resolveProject(agent, { env, argv: process.argv, cwd: ev.cwd, piCwd: agent === "pi" ? ev.cwd : undefined }); // step 3
   } catch (err) {
     // D-FU-PS-1: no project: never deny, never hint, no DB; one stderr line, never a silent drop.
     process.stderr.write("hooks: no project: " + String((err as { code?: unknown }).code ?? "ERROR") + " " + message(err) + "\n");

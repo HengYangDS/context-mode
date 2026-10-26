@@ -1,16 +1,17 @@
 // src/setup/engine.ts
 // ADR-0019 section 3 steps: preflight, detect, plan, apply, verify, rollback per agent, summary. No UI here.
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
+import { CODEX_TRUST_PATH, codexTrustEntries } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
 import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-import { AGENT_HOME_DIR, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
+import { AGENT_HOME_DIR, DB_FILE_NAME, PROJECTS_DIR_NAME, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
-import { BACKUP_DIR, LOCK_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString } from "./registry.ts";
+import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILLS_DIR, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
@@ -30,7 +31,7 @@ const V1_HOOK_MARK = "context-mode hook";
 
 export type AgentStatus = "PASS" | "FAIL" | "SKIPPED";
 export interface Change { file?: string; path?: string; before?: unknown; after?: unknown; command?: string[]; }
-export interface Check { name: string; ok: boolean; detail?: string; overheadP95Ms?: number; wallP95Ms?: number; bareP95Ms?: number; }
+export interface Check { name: string; ok: boolean; warn?: boolean; detail?: string; overheadP95Ms?: number; wallP95Ms?: number; bareP95Ms?: number; }
 export interface AgentResult {
   id: AgentId; status: AgentStatus; reason?: string; v1: V1Finding[]; changes: Change[]; checks: Check[]; rolledBack?: boolean;
 }
@@ -141,6 +142,85 @@ function planHookFile(row: CheckRow, hf: HookFile): FileEdit | undefined {
   return changes.length ? { file: hf.file, before, after: JSON.stringify(doc, null, 2) + "\n", changes } : undefined;
 }
 
+// ADR-0020 merge: objects merge key by key; in an array, an own item (it holds the hook command or plugin entry)
+// that differs from the wanted one is replaced, user items stay; scalars take the wanted value.
+const holds = (v: unknown, mark: string): boolean => JSON.stringify(v).includes(JSON.stringify(mark).slice(1, -1));
+const same = (a: unknown, b: unknown): boolean => JSON.stringify(a) === JSON.stringify(b);
+function mergeOwn(cur: unknown, want: unknown, mark: string): unknown {
+  if (isObj(want)) {
+    const base: Json = isObj(cur) ? { ...cur } : {};
+    for (const [k, v] of Object.entries(want)) base[k] = mergeOwn(base[k], v, mark);
+    return base;
+  }
+  if (Array.isArray(want)) {
+    const base = Array.isArray(cur) ? cur.filter((x) => !holds(x, mark) || want.some((w) => same(w, x))) : [];
+    for (const w of want) if (!base.some((x) => same(x, w))) base.push(w);
+    return base;
+  }
+  return want;
+}
+
+/** One edit of `file` (a JSON host file), chained on any earlier edit of the same file in this plan. */
+function planJsonKeys(row: CheckRow, edits: FileEdit[], file: string, want: (doc: Json) => [readonly string[], unknown][]): void {
+  const prior = edits.find((e) => e.file === file);
+  const text = prior ? prior.after : readOr(file);
+  let doc: unknown = {};
+  if (text !== undefined && text.trim() !== "") { try { doc = JSON.parse(text); } catch { throw new Error(parseFail(row, file)); } }
+  if (!isObj(doc)) throw new Error(parseFail(row, file));
+  let res;
+  try { res = editHostConfigText(row.id, file, text ?? "", "json", want(doc)); }
+  catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, file)); throw e; }
+  if (!res.edits.length) return;
+  const changes = res.edits.map((e) => ({ file, ...e }));
+  if (prior) { prior.after = res.text; prior.changes.push(...changes); }
+  else edits.push({ file, before: text, after: res.text, changes });
+}
+
+/** D-HA-CODEX-TRUST-1: one [hooks.state."<key>"] table per own handler in the planned hooks.json, chained on any
+ *  earlier edit of config.toml in this plan (the MCP server entry). */
+function planCodexTrust(row: CheckRow, edits: FileEdit[], hooksFile: string, file: string, command: string): void {
+  const hooksText = edits.find((e) => e.file === hooksFile)?.after ?? readOr(hooksFile);
+  if (hooksText === undefined) return;
+  const want = codexTrustEntries(hooksFile, JSON.parse(hooksText), command);
+  if (!want.length) return;
+  const prior = edits.find((e) => e.file === file);
+  const text = prior ? prior.after : readOr(file);
+  let res;
+  try { res = editHostConfigText(row.id, file, text ?? "", "toml", want); }
+  catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, file)); throw e; }
+  if (!res.edits.length) return;
+  const changes = res.edits.map((e) => ({ file, ...e }));
+  if (prior) { prior.after = res.text; prior.changes.push(...changes); }
+  else edits.push({ file, before: text, after: res.text, changes });
+}
+
+/** ADR-0020 hook channel: write or merge the host hook file, or add the in-process plugin list entry. */
+function planHookInstall(row: CheckRow, edits: FileEdit[]): void {
+  const h = row.hookInstall;
+  if (h.kind === "file") {
+    planJsonKeys(row, edits, h.file, (doc) => Object.keys(h.shape).map((k) => [[k], mergeOwn(doc[k], h.shape[k], h.command)]));
+    if (h.trust) planCodexTrust(row, edits, h.file, h.trust, h.command);
+  } else if (h.kind === "plugin-list") {
+    planJsonKeys(row, edits, h.file, (doc) => {
+      const cur = doc[h.key[0]];
+      const list = Array.isArray(cur) ? cur : [];
+      return [[h.key, list.includes(h.entry) ? list : [...list, h.entry]]];
+    });
+  }
+}
+
+/** ADR-0020 skill channel: <dir>/<name>/SKILL.md rendered with the agent's tool name prefix. */
+function planSkills(row: CheckRow, edits: FileEdit[]): void {
+  const s = row.skillInstall;
+  if (s.kind !== "dir") return;
+  for (const f of s.files) {
+    if (!existsSync(f.src)) throw new Error(`preflight: ${f.src} is missing`);
+    const after = renderSkill(readFileSync(f.src, "utf8"), s.prefix);
+    const before = readOr(f.file);
+    if (before !== after) edits.push({ file: f.file, before, after, changes: [{ file: f.file, path: f.name, before: before === undefined ? null : "old", after: "SKILL.md" }] });
+  }
+}
+
 function planRow(row: CheckRow, listed: boolean): Plan {
   const edits: FileEdit[] = [];
   if (row.config) {
@@ -152,6 +232,8 @@ function planRow(row: CheckRow, listed: boolean): Plan {
     if (res.edits.length) edits.push({ file: c.file, before, after: res.text, changes: res.edits.map((e) => ({ file: c.file, ...e })) });
   }
   for (const hf of row.hookFiles) { const e = planHookFile(row, hf); if (e) edits.push(e); }
+  planHookInstall(row, edits);
+  planSkills(row, edits);
   const cli = row.config || !row.cli || listed ? [] : row.cli.install;
   return { edits, cli };
 }
@@ -249,12 +331,72 @@ function parseCheck(row: CheckRow): Check {
   } catch (e) { return { name: "parse", ok: false, detail: (e as Error).message }; }
 }
 
-async function verifyRow(row: CheckRow, env: SetupContext["env"]): Promise<Check[]> {
+/** ADR-0020 hook-registered: the host channel holds our entry. A file or plugin-list channel is planned again (no
+ *  edit left means the entry is there); a package channel is registered when the host list command shows it. */
+function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Check | undefined): Check {
+  const h = row.hookInstall;
+  if (h.kind === "package") {
+    const l = row.listCommand;
+    if (!l) return { name: "hook-registered", ok: false, detail: `no list command for ${row.id}` };
+    if (!list) return { name: "hook-registered", ok: false, detail: `${l.bin} is not on PATH, so the hooks cannot be checked` };
+    return { name: "hook-registered", ok: list.ok, detail: list.ok ? undefined : `${l.bin} ${l.args.join(" ")} does not list context-mode (hooks ship in ${h.via})` };
+  }
+  const edits: FileEdit[] = [];
+  try { planHookInstall(row, edits); } catch (e) { return { name: "hook-registered", ok: false, detail: (e as Error).message }; }
+  if (!edits.length) return { name: "hook-registered", ok: true };
+  if (h.trust && edits.every((e) => e.file === h.trust && e.changes.every((c) => isTrust(row, c)))) return { name: "hook-registered", ok: false, detail: `${h.file}: the context-mode hooks are not trusted in ${h.trust}; re-run setup` };
+  return { name: "hook-registered", ok: false, detail: `${h.file} lacks the context-mode hook entry` };
+}
+
+/** ADR-0020 hook-runs: one sample event through the hook bundle for this agent (in-process agents too). */
+function hookRunsCheck(row: CheckRow, env: SetupContext["env"]): Check {
+  const cmd = row.hookRunCommand;
+  const r = spawnSync(cmd[0], cmd.slice(1), { env, input: JSON.stringify(row.goldenPayload), encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
+  if (r.status !== 0) return { name: "hook-runs", ok: false, detail: `hook exited ${r.status}: ${`${r.stderr}`.trim()}` };
+  const out = `${r.stdout}`.trim();
+  if (out) { let j: unknown; try { j = JSON.parse(out); } catch { /* below */ } if (!isObj(j)) return { name: "hook-runs", ok: false, detail: "hook answer is not a JSON object" }; }
+  return { name: "hook-runs", ok: true };
+}
+
+const SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
+export const NOT_SEEN_LINE = "not seen yet, run one tool call";
+/** ADR-0020 hook-seen: a journal row from this agent exists in any project db. None yet is a WARN, not a FAIL. */
+function hookSeenCheck(row: CheckRow, home: string): Check {
+  const base = path.join(home, STATE_DIR, PROJECTS_DIR_NAME);
+  const dirs = existsSync(base) ? readdirSync(base) : [];
+  let sqlite: typeof import("node:sqlite") | undefined;
+  try { sqlite = process.getBuiltinModule("node:sqlite") as typeof import("node:sqlite"); } catch { sqlite = undefined; }
+  for (const d of dirs) {
+    const file = path.join(base, d, DB_FILE_NAME);
+    if (!sqlite || !existsSync(file)) continue;
+    let db: import("node:sqlite").DatabaseSync | undefined;
+    try {
+      db = new sqlite.DatabaseSync(file, { readOnly: true });
+      if (db.prepare(SEEN_SQL).get(row.id)) return { name: "hook-seen", ok: true };
+    } catch { /* a busy or old db does not count as seen */ } finally { db?.close(); }
+  }
+  return { name: "hook-seen", ok: true, warn: true, detail: NOT_SEEN_LINE };
+}
+
+/** ADR-0020 skills: every skill file is present with this agent's tool name prefix (package: shipped skills/). */
+function skillsCheck(row: CheckRow, pkgDir: string): Check {
+  const s = row.skillInstall;
+  if (s.kind === "package") {
+    const miss = COMMAND_SKILLS.map((n) => path.join(pkgDir, SKILLS_DIR, n, SKILL_FILE)).filter((f) => !existsSync(f));
+    return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : undefined };
+  }
+  const bad = s.files.filter((f) => readOr(f.file) !== (existsSync(f.src) ? renderSkill(readFileSync(f.src, "utf8"), s.prefix) : undefined));
+  return { name: "skills", ok: bad.length === 0, detail: bad.length ? `${bad.map((f) => f.file).join(", ")} missing or without the ${s.prefix || "plain"} tool prefix` : undefined };
+}
+
+async function verifyRow(row: CheckRow, ctx: SetupContext): Promise<Check[]> {
+  const env = ctx.env;
   const checks: Check[] = [parseCheck(row)];
   const l = listCheck(row, env);
   if (l) checks.push(l);
   checks.push(await mcpCheck(row.serverCommand, env));
   if (row.hookCommand) checks.push(hookCheck(row, env));
+  checks.push(hookRegisteredCheck(row, env, l), hookRunsCheck(row, env), hookSeenCheck(row, ctx.home), skillsCheck(row, ctx.pkgDir));
   return checks;
 }
 
@@ -369,7 +511,9 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
     const listed = needsBin ? listCheck(row, ctx.env)?.ok === true : false;
     plan = planRow(row, listed);
   } catch (e) { return { ...res, status: "FAIL", reason: (e as Error).message }; }
-  res.v1 = detectV1(row.id, ctx.home).filter((f) => !(row.config && f.file === row.config.file && !plan.edits.some((e) => e.file === f.file)));
+  // The config entry is current when the plan changes nothing in that file but codex trust entries.
+  const configEdited = (file: string): boolean => plan.edits.some((e) => e.file === file && e.changes.some((c) => !isTrust(row, c)));
+  res.v1 = detectV1(row.id, ctx.home).filter((f) => !(row.config && f.file === row.config.file && !configEdited(f.file)));
   res.changes = [...plan.edits.flatMap((e) => e.changes), ...plan.cli.map((args) => ({ command: [row.cli!.bin, ...args] }))];
   if (dryRun) return res;
   try {
@@ -383,7 +527,7 @@ async function setupRow(row: CheckRow, ctx: SetupContext, run: Run, dryRun: bool
       if (r.status !== 0) throw new Error(`${row.cli!.bin} ${args.join(" ")} exited ${r.status}: ${`${r.stderr}`.trim()}`);
     }
     if (plan.cli.length) for (const args of row.cli!.remove) run.record({ agent: row.id, undo: { bin: row.cli!.bin, args } });
-    res.checks = await verifyRow(row, ctx.env);
+    res.checks = await verifyRow(row, ctx);
     const bad = res.checks.filter((c) => !c.ok);
     if (bad.length) throw new Error(bad.map((c) => `${c.name}: ${c.detail}`).join("; "));
   } catch (e) {
@@ -414,9 +558,9 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     if (res.status === "PASS") {
       // Report-only findings (shared temp file, user data dir) are never changed by setup, so they cannot be fixed by it.
       if (res.v1.some((f) => !UPGRADE_REPORT_ONLY_REASONS.includes(f.reason))) { res.status = "FAIL"; res.reason = V1_FORM_REASON; }
-      else if (res.changes.length) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
+      else if (res.changes.length && !onlyTrust(row, res.changes)) { res.status = "FAIL"; res.reason = NOT_SET_UP_REASON; }
       else {
-        res.checks = await verifyRow(row, ctx.env);
+        res.checks = await verifyRow(row, ctx);
         const bad = res.checks.filter((c) => !c.ok);
         if (bad.length) { res.status = "FAIL"; res.reason = bad.map((c) => `${c.name}: ${c.detail}`).join("; "); }
       }
@@ -425,6 +569,13 @@ export async function runDoctor(opts: SetupOptions): Promise<SetupResult> {
     opts.onAgent?.(id, "done", res);
   }
   return { exitCode: agents.some((a) => a.status === "FAIL") ? 1 : 0, agents };
+}
+
+/** D-HA-CODEX-TRUST-1: the only planned change is a trust entry, so the hooks are there and hook-registered names it. */
+function onlyTrust(row: CheckRow, changes: Change[]): boolean { return changes.every((c) => isTrust(row, c)); }
+function isTrust(row: CheckRow, c: Change): boolean {
+  const h = row.hookInstall;
+  return h.kind === "file" && h.trust !== undefined && c.file === h.trust && typeof c.path === "string" && c.path.startsWith(CODEX_TRUST_PATH);
 }
 
 /** setup --remove: undo every recorded run, newest first, so each touched file gets its pre-setup bytes back. */

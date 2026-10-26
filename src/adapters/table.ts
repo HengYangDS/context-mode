@@ -30,22 +30,26 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     id: "claude-code", installMode: "marketplace", projectSource: "env:CLAUDE_PROJECT_DIR", toolNamePrefix: claudeCode.TOOL_NAME_PREFIX,
     nativeTools: CLAUDE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
     decode: claudeCode.decode, encode: claudeCode.encode,
   },
   {
     id: "codex", installMode: "config-mcp", projectSource: "arg:--agent+cwd", toolNamePrefix: codex.TOOL_NAME_PREFIX,
     nativeTools: { shell: ["Bash"], edit: ["apply_patch"] }, execReadOnlyHint: true, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".codex/hooks.json" }, skillChannel: { kind: "home-dir", path: ".codex/skills" }, // ADR-0020
     decode: codex.decode, encode: codex.encode,
   },
   {
     id: "gemini", installMode: "extension", projectSource: "spawn-cwd", toolNamePrefix: gemini.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    // D-HA-GEMINI-NAMES-1: gemini-cli 0.65.0 *_TOOL_NAME constants.
+    nativeTools: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, execReadOnlyHint: false,
     // D-FU-GCH-1: no SessionStart. Claude Code also loads hooks/hooks.json (Gemini's file) and would run a SessionStart
     // entry through /bin/sh, which fails on ${extensionPath}. Gemini's SessionStart only sent the resume hint (compact never
     // arrives there), and GP6 forbids that hint on BeforeAgent, so Gemini goes without it.
     eventMap: { UserPromptSubmit: "BeforeAgent", PreToolUse: "BeforeTool", PostToolUse: "AfterTool", PreCompact: "PreCompress" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/hooks.json" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
     decode: gemini.decode, encode: gemini.encode,
   },
   {
@@ -53,13 +57,15 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, execReadOnlyHint: false,
     eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "package", path: "hooks/qwen.json" }, skillChannel: { kind: "home-dir", path: ".qwen/skills" }, // ADR-0020
     decode: qwen.decode, encode: qwen.encode,
   },
   {
     id: "copilot-cli", installMode: "plugin", projectSource: "arg:--agent+cwd", toolNamePrefix: copilotCli.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    nativeTools: { shell: ["bash"] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "sessionStart", UserPromptSubmit: "userPromptSubmitted", PreToolUse: "preToolUse", PostToolUse: "postToolUse" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode.json" }, skillChannel: { kind: "home-dir", path: ".copilot/skills" }, // ADR-0020
     decode: copilotCli.decode, encode: copilotCli.encode,
   },
   {
@@ -67,6 +73,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     // PreCompact sets the pending flag (ADR-0009 §6, DEVIATIONS D-M3-A4-1).
     nativeTools: { shell: [] }, execReadOnlyHint: false, eventMap: { ...CLAUDE_EVENTS, PreCompact: "PreCompact" },
     compactDelivery: "pending-flag", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".copilot/hooks/context-mode-vscode.json" }, skillChannel: { kind: "home-dir", path: ".copilot/skills" }, // ADR-0020
     decode: vscode.decode, encode: vscode.encode,
   },
   {
@@ -74,6 +81,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     nativeTools: { shell: [] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" },
     compactDelivery: "none", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "hint-only",
+    hookChannel: { kind: "home-file", path: ".kiro/hooks/context-mode.json" }, skillChannel: { kind: "home-dir", path: ".kiro/skills" }, // ADR-0020
     decode: kiro.decode, encode: kiro.encode,
   },
   {
@@ -81,13 +89,15 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     id: "zcode", installMode: "hooks+mcp", projectSource: "spawn-cwd", toolNamePrefix: zcode.TOOL_NAME_PREFIX,
     nativeTools: CLAUDE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "home-file", path: ".zcode/cli/config.json" }, skillChannel: { kind: "home-dir", path: ".zcode/skills" }, // ADR-0020
     decode: zcode.decode, encode: zcode.encode,
   },
   {
     id: "pi", installMode: "in-process", projectSource: "pi:ctx.cwd", toolNamePrefix: pi.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    nativeTools: { shell: ["bash"], read: ["read"] }, execReadOnlyHint: false,
     eventMap: { SessionStart: "session_start", UserPromptSubmit: "input", PreToolUse: "tool_call", PostToolUse: "tool_result" },
     compactDelivery: "pi-flag", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "pi/index.js" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
     decode: pi.decode, encode: pi.encode, checkPermission: pi.checkPermission,
   },
   {
@@ -96,6 +106,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     // Usage: step-finish cost row (DEVIATIONS D-M5-arch-2).
     eventMap: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     compactDelivery: "opencode-cache", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",
+    hookChannel: { kind: "in-process", path: "opencode/plugin.js" }, skillChannel: { kind: "home-dir", path: ".config/opencode/skills" }, // ADR-0020
     decode: opencode.decode, encode: opencode.encode, toCanonicalTool: opencode.toCanonicalTool,
   },
 ] satisfies Row[]);
@@ -105,7 +116,8 @@ const BY_ID = new Map<AgentId, AdapterRow>(ADAPTERS.map((r) => [r.id, r]));
 // D-M7-RR-1 (DECISIONS-r10): rows whose encode writes a PostToolUse replace (claude-code updatedToolOutput,
 // pi tool_result rewrite). On these rows the main agent gets "run, then replace" and no Bash size-guess deny;
 // every other row keeps its one path (ADR-0001).
-const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "pi"]);
+// gemini: AfterTool decision deny + reason replaces the result (D-HA-GEMINI-REPLACE-1).
+const REPLACE_ROWS: ReadonlySet<AgentId> = new Set<AgentId>(["claude-code", "gemini", "copilot-cli", "pi"]);
 
 export function hasReplace(row: AdapterRow): boolean {
   return REPLACE_ROWS.has(row.id);

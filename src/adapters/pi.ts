@@ -26,6 +26,9 @@ export interface PiHookOutput extends HookOutput {
   timestamp: number;
 }
 
+// pi 1.4.0 built-in tool names -> canonical names (D-HA-PI-NAMES-1, dist/core/tools name: "bash" / "read").
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { bash: "Bash", read: "Read" };
+
 function record(v: unknown): Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 }
@@ -49,7 +52,7 @@ export function decode(raw: unknown): CanonicalHookEvent {
   if (row.event === "UserPromptSubmit" && typeof p.message === "string") ev.prompt = p.message;
   if (row.event === "PreToolUse" || row.event === "PostToolUse") {
     const name = String(p.toolName ?? "");
-    ev.tool = { name, canonicalName: name, input: record(p.input) };
+    ev.tool = { name, canonicalName: Object.hasOwn(NATIVE_TO_CANONICAL, name) ? NATIVE_TO_CANONICAL[name] : name, input: record(p.input) };
     if (typeof p.toolCallId === "string") ev.tool.callId = p.toolCallId;
   }
   if (row.event === "PostToolUse") ev.result = readResult(p);

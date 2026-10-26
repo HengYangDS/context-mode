@@ -51,7 +51,7 @@ test("decode UserPromptSubmit reads prompt when present, else leaves it undefine
 
 test("decode PreToolUse toolArgs: object or JSON string", () => {
   const obj = decode({ ...camel, hookEventName: "preToolUse", toolName: "bash", toolArgs: { command: "cat big.log" } });
-  assert.deepEqual(obj.tool, { name: "bash", canonicalName: "bash", input: { command: "cat big.log" } });
+  assert.deepEqual(obj.tool, { name: "bash", canonicalName: "Bash", input: { command: "cat big.log" } }); // D-HA-COPILOT-NAMES-1
   const str = decode({ ...camel, hookEventName: "preToolUse", toolName: "bash", toolArgs: "{\"command\":\"ls\"}" });
   assert.deepEqual(str.tool.input, { command: "ls" });
   const bad = decode({ ...camel, hookEventName: "preToolUse", toolName: "bash", toolArgs: "not json" });
@@ -62,7 +62,7 @@ test("decode PreToolUse toolArgs: object or JSON string", () => {
 
 test("decode snake_case PreToolUse reads tool_name / tool_input", () => {
   const ev = decode({ ...snake, hook_event_name: "PreToolUse", tool_name: "bash", tool_input: { command: "ls" } });
-  assert.deepEqual(ev.tool, { name: "bash", canonicalName: "bash", input: { command: "ls" } });
+  assert.deepEqual(ev.tool, { name: "bash", canonicalName: "Bash", input: { command: "ls" } }); // D-HA-COPILOT-NAMES-1
 });
 
 test("decode maps the own prefix to bare ctx_* and other MCP servers to mcp:<server>:<tool>", () => {
@@ -84,7 +84,8 @@ test("decode PostToolUse: toolResult text and size; failure variant or non-succe
   assert.equal(variant.result.isError, true);
   const none = decode({ ...camel, hookEventName: "postToolUse", toolName: "bash", toolArgs: {} });
   assert.deepEqual(none.result, { isError: false, bytes: 0, text: "" });
-  const snakeOut = decode({ ...snake, hook_event_name: "PostToolUse", tool_name: "bash", tool_input: {}, tool_response: "abc" });
+  // D-HA-COPILOT-REPLACE-1: snake_case result is tool_result {result_type, text_result_for_llm}.
+  const snakeOut = decode({ ...snake, hook_event_name: "PostToolUse", tool_name: "bash", tool_input: {}, tool_result: { result_type: "success", text_result_for_llm: "abc" } });
   assert.deepEqual(snakeOut.result, { isError: false, bytes: 3, text: "abc" });
 });
 
@@ -138,8 +139,10 @@ test("encode deny on a non-PreToolUse event is a no-op (no deny field there)", (
   }
 });
 
-test("encode replace is a no-op (no post-call output-replace field, case C gap)", () => {
-  assert.deepEqual(encode({ ...pre, event: "PostToolUse" }, { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
+test("encode replace on postToolUse is modifiedResult; on any other event a no-op (D-HA-COPILOT-REPLACE-1)", () => {
+  const out = encode({ ...pre, event: "PostToolUse" }, { kind: "replace", output: "x" });
+  assert.equal(out.exitCode, 0);
+  assert.deepEqual(JSON.parse(out.stdout), { modifiedResult: { resultType: "success", textResultForLlm: "x" } });
   assert.deepEqual(encode(pre, { kind: "replace", output: "x" }), { stdout: "", exitCode: 0 });
 });
 

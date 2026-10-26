@@ -54,6 +54,7 @@ function makePkg(dir) {
   writeFileSync(path.join(dir, "server.mjs"), FAKE_SERVER);
   writeFileSync(path.join(dir, "hook.mjs"), FAKE_HOOK);
   writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0", type: "module" }));
+  cpSync(path.join(REPO, "skills"), path.join(dir, "skills"), { recursive: true }); // ADR-0020: package ships skills/
   return dir;
 }
 
@@ -400,6 +401,9 @@ function normPaths(text, s) {
   for (const [p, tag] of [[realpathSync(s.pkg), "<PKG>"], [s.pkg, "<PKG>"], [realpathSync(s.home), "<HOME>"], [s.home, "<HOME>"], [process.execPath, "<NODE>"]]) {
     t = t.replaceAll(JSON.stringify(p).slice(1, -1), tag).replaceAll(p, tag);
   }
+  // D-HA-CODEX-TRUST-1: a codex trust hash covers the hook command, which holds this sandbox's paths; the golden
+  // holds the tag, and cli/print-apply proves the printed hash makes doctor PASS.
+  t = t.replace(/trusted_hash = "sha256:[0-9a-f]{64}"/g, 'trusted_hash = "sha256:<HASH>"');
   if (process.platform === "win32") {
     // The goldens hold the POSIX form. On Windows the same step has `\` (`\\` inside TOML/JSON strings) after a
     // tag, and shellWord single-quotes a word with a backslash. Map both back; the product output is right as is.
@@ -438,6 +442,16 @@ for (const a of ADAPTERS) {
     assert.equal(existsSync(path.join(s.home, ".context-mode")), false, "--json --print writes nothing");
     for (const step of j.print.steps) {
       if (step.kind === "config") {
+        assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
+        mkdirSync(path.dirname(step.file), { recursive: true });
+        writeFileSync(step.file, step.block);
+      } else if (step.kind === "hook") {
+        // ADR-0020: the hook block goes next to the user's keys (zcode and opencode share the config file).
+        assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
+        mkdirSync(path.dirname(step.file), { recursive: true });
+        const cur = existsSync(step.file) ? JSON.parse(readFileSync(step.file, "utf8")) : {};
+        writeFileSync(step.file, JSON.stringify({ ...cur, ...JSON.parse(step.block) }, null, 2) + "\n");
+      } else if (step.kind === "skill") {
         assert.ok(path.isAbsolute(step.file) && step.file.startsWith(s.home), step.file);
         mkdirSync(path.dirname(step.file), { recursive: true });
         writeFileSync(step.file, step.block);

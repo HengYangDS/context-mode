@@ -39,7 +39,9 @@ const fixFor = (id: AgentId): string => `context-mode setup --agents ${id}`;
 
 /** D-INST-7: a PASS row names the checks that ran, so a user sees what was verified. */
 function passDetail(a: AgentResult): string {
-  return a.status === "PASS" && a.checks.length ? `checked: ${a.checks.map((c) => c.name).join(", ")}` : "";
+  if (a.status !== "PASS" || !a.checks.length) return "";
+  const warns = a.checks.filter((c) => c.warn).map((c) => `; WARN ${c.name}: ${c.detail}`).join("");
+  return `checked: ${a.checks.map((c) => c.name).join(", ")}${warns}`;
 }
 
 function table(agents: readonly AgentResult[]): string {
@@ -52,7 +54,7 @@ function failLines(agents: readonly AgentResult[]): string[] {
 }
 
 function verboseLines(agents: readonly AgentResult[]): string[] {
-  return agents.flatMap((a) => a.checks.map((c) => `  ${a.id} ${c.ok ? "ok  " : "FAIL"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`));
+  return agents.flatMap((a) => a.checks.map((c) => `  ${a.id} ${c.warn ? "WARN" : c.ok ? "ok  " : "FAIL"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`));
 }
 
 function planText(res: SetupResult): string {
@@ -135,7 +137,7 @@ export function buildIssueReport(command: string, res: SetupResult, ui: Ui): { t
     "",
     "## Checks",
     "",
-    ...res.agents.flatMap((a) => a.checks.map((c) => `- ${a.id} ${c.ok ? "ok" : "FAIL"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`)),
+    ...res.agents.flatMap((a) => a.checks.map((c) => `- ${a.id} ${c.warn ? "WARN" : c.ok ? "ok" : "FAIL"} ${c.name}${c.detail ? `: ${c.detail}` : ""}`)),
     "",
     "## Old entries",
     "",
