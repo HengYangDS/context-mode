@@ -1,5 +1,7 @@
 # impl/13 §9, A10, ADR-0013. One run: ci -> plan -> build -> publish-stage -> smoke -> publish-promote.
 # Started by the /release skill with `gh workflow run`. mode=rollback runs only ci -> rollback.
+# A pushed v2.* tag also starts it: the tag is the version, stage/promote reuse it, a x.y.z-<pre> version is a
+# GitHub prerelease, never Latest, and npm gets dist-tag next (D-RN-TAG-1).
 # Every ${{ }} value a shell reads goes through env, never into the run text.
 # publish-npm: ADR-0019 D2, DEVIATIONS D-NPM-PUB-1.
 # DEVIATIONS D-M6-arch-3, D-M6-arch-5, D-M6-Y1-1..5.
@@ -65,7 +67,16 @@ jobs:
         name: full commit sha (D-M6-Y1-3)
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - id: plan
-        run: node scripts/release/plan.mjs >> "$GITHUB_OUTPUT"
+        name: version and notes; a pushed v2.* tag is the version (D-RN-TAG-1)
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            node scripts/release/plan.mjs --tag "$REF_NAME" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/release/plan.mjs >> "$GITHUB_OUTPUT"
+          fi
   build:
     needs: plan
     runs-on: ubuntu-latest
