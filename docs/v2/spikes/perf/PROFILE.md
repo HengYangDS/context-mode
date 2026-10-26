@@ -50,3 +50,39 @@ total 3791.51 ms/run
   31.71 compileSourceTextModule utils:337
   30.89 (anon) server.mjs:31565
 ```
+
+## Root cause and fix (search)
+
+`ftsQuery`/`porter` are the top frames. Inside them, SQL time: the porter statement ran two
+`ROW_NUMBER() OVER` sorts over every match for every scope, but only scope `project` reads
+`rank_a`/`rank_b` (RRF). Scope `session`/`worktree` (the default, and the GP-SEARCH path) score by `-bm`.
+Fix (D-HQ-PERF-1): `porterRankSql(scope)` picks a statement without the window sorts for
+session/worktree. Same rows, same order on all 50 held-out queries. Porter SQL per query
+(kept held-out DB, min of 5 passes): 3.44 -> 2.20 ms. Without the `full` subquery it would be 1.58 ms,
+but `full` is ranking behaviour (D-SEARCH-2) and stays.
+
+## After (e52388ac)
+
+### Search, 500 ctx_search calls, self time per profile (ms), load average 20-30
+
+```
+total 3765.74 ms/run
+ 863.38 ftsQuery server.mjs:31561
+ 669.60 porter server.mjs:31566   (885.22 before)
+ 399.88 (idle) :-1
+ 341.47 withWrite server.mjs:28926
+ 153.69 stmt server.mjs:31509     (201.90 before)
+ 150.84 closeDb server.mjs:28937
+ 104.37 typoTerms server.mjs:31536
+```
+
+### Numbers (local, macOS, Node 26.8.1, shared host)
+
+- GP-SEARCH held-out p95, 10 runs of 50 queries, fresh server: worst run 21.5 ms (second pass;
+  first pass 32.6-36.8 ms under load average 30). Budget 50 ms; 30% headroom = 35 ms. Budget unchanged.
+- D3 hook overhead (`e2e/checks/setup-hook-overhead.mjs`): claude-code 5 ms, codex 11 ms (batch
+  medians 11/30/12/12/13 under load 20+). Budget 15 ms; 30% headroom = 10.5 ms. No hook code change in
+  this round: the hook profile is 52% idle (stdin wait, process start) and 18% ESM compile of the
+  122 KB bundle; the loaded built-in module list equals bare `node -e 0` (0 extra modules, D-CI-PERF-7
+  holds). `NODE_COMPILE_CACHE` gave 2-4 ms on wall time but D-CI-PERF-4 already rejected a cache dir
+  written by every hook call. Open: the codex number needs a quiet host to confirm headroom.
