@@ -518,6 +518,17 @@ test("[M7] cli/pass-detail: a PASS row in the setup and doctor table names the c
   assert.match(d.stdout, /codex\s+PASS\s+checked: .*mcp.*hook/);
 });
 
+// D-HL-GATE-1: cli tests check what setup and doctor print, not hook timing (timing is gated by the D3 engine
+// tests and e2e/checks/setup-hook-overhead.mjs). A loaded host (the full suite in parallel) must not flip a PASS row.
+test("[M7] cli/host-load: a hook slowed by host load still gives a PASS row in a cli functional test", (t) => {
+  const s = sandbox(t);
+  writeFileSync(path.join(s.pkg, "hook.mjs"), "Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 40);\n" + FAKE_HOOK);
+  codexHome(s, `model = "o3"\n`);
+  const r = run(s, ["setup", "--yes", "--agents", "codex"]);
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /codex\s+PASS\s+checked: .*mcp.*hook/);
+});
+
 // OPEN-ITEMS H8: a wrapper first on PATH (claude-worktree shim) is skipped; doctor names the claude it ran.
 test("[H8] cli/doctor-bin: setup and doctor skip a claude shim first on PATH and print the real binary they used", { skip: process.platform === "win32" && "fake agent CLIs are sh scripts" }, (t) => {
   const s = sandbox(t);
