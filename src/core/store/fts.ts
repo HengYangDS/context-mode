@@ -23,7 +23,7 @@ RETURNING id`;
 const INSERT_CHUNK = `
 INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
-// One statement for every scope (one path). Candidates = every MATCH row inside the scope and
+// One match set for every scope (PORTER_MATCH). Candidates = every MATCH row inside the scope and
 // source filter; both RRF rank lists run over that full set before LIMIT/OFFSET (ADR-0009 §8.3).
 // Order (M19 + #895, D-M2-R6-1): current session first, then the current worktree, then score desc,
 // newest source first, ord asc. The worktree tier only changes the order for scope "project".
@@ -34,8 +34,9 @@ INSERT INTO chunks(source_id, session_id, worktree, agent, ord, body, title) VAL
 const TITLE_WEIGHT = 1.0;
 
 // D-SEARCH-4: the porter list, every match in final order (rid only; bodies load for one page).
-const PORTER_RANK = `
-WITH m AS (
+// D-HQ-PERF-1: only scope "project" reads rank_a/rank_b (RRF). Scope session/worktree score by -bm, so
+// their statement skips the two window sorts over every match (same rows, same order, about 35% less SQL time).
+const PORTER_MATCH = `
   SELECT chunks.rowid AS rid, chunks.source_id AS source_id, chunks.session_id AS session_id,
          chunks.worktree AS worktree, chunks.ord AS ord, s.created_ts AS created_ts,
          bm25(chunks, 0, 0, 0, 0, 0, 1.0, ${TITLE_WEIGHT}) AS bm,
@@ -44,17 +45,28 @@ WITH m AS (
   WHERE chunks MATCH :match
     AND (:scope <> 'session' OR chunks.session_id = :session_id)
     AND (:scope <> 'worktree' OR chunks.worktree = :worktree)
-    AND (:source IS NULL OR s.label = :source)
+    AND (:source IS NULL OR s.label = :source)`;
+const PORTER_ORDER = `
+ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
+const PORTER_RANK_PROJECT = `
+WITH m AS (${PORTER_MATCH}
 ), r AS (
   SELECT *,
          ROW_NUMBER() OVER (ORDER BY full DESC, bm ASC, source_id DESC, ord ASC) AS rank_a,
          ROW_NUMBER() OVER (ORDER BY created_ts DESC, source_id DESC, ord ASC) AS rank_b
   FROM m
 )
-SELECT rid, source_id, session_id, worktree, ord, full,
-       CASE WHEN :scope = 'project' THEN 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) ELSE -bm END AS score
-FROM r
-ORDER BY (session_id = :session_id) DESC, (worktree = :worktree) DESC, full DESC, score DESC, source_id DESC, ord ASC`;
+SELECT rid, source_id, session_id, worktree, ord, full, 1.0 / (:k + rank_a) + 1.0 / (:k + rank_b) AS score
+FROM r${PORTER_ORDER}`;
+const PORTER_RANK_BM25 = `
+WITH m AS (${PORTER_MATCH}
+)
+SELECT rid, source_id, session_id, worktree, ord, full, -bm AS score
+FROM m${PORTER_ORDER}`;
+
+export function porterRankSql(scope: SearchScope): string {
+  return scope === "project" ? PORTER_RANK_PROJECT : PORTER_RANK_BM25;
+}
 
 // D-SEARCH-4: the trigram list (substrings: identifiers, paths, partial words), same filters.
 const TRI_RANK = `
@@ -334,8 +346,9 @@ export function ftsQuery(
   const filter = { scope, session_id: sessionId, worktree: ctx.worktree, source: source ?? null };
   // D-SEARCH-2: AND first, then OR. The OR form matches; chunks that also match the AND form (every term)
   // rank before partial matches inside each session/worktree tier.
+  const rrf = scope === "project" ? { k: RRF_K } : {};
   const porter = (t: string[]): RankRow[] =>
-    stmt(db.raw, PORTER_RANK).all({ ...filter, match: t.join(" OR "), all: t.join(" "), k: RRF_K }) as unknown as RankRow[];
+    stmt(db.raw, porterRankSql(scope)).all({ ...filter, match: t.join(" OR "), all: t.join(" "), ...rrf }) as unknown as RankRow[];
   let pList = porter(terms);
   // D-SEARCH-4: no porter hit -> typo correction from the index vocabulary, then the porter pass again.
   if (pList.length === 0) {
