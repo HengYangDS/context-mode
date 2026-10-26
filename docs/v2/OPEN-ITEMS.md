@@ -87,7 +87,7 @@ Result: `docs/v2/spikes/hooks-all/RESULT.md`. Rules: ADR-0020. Merged into v2-de
 | H5 | Doctor `hook-runs`/`hook-seen` passed on pi while the hook could not resolve a project | closed | D-HF-DOCTOR-RUNS-1: `hook-runs` sends a large shell read per host and FAILs unless the saving effect comes back with the project resolved |
 | H6 | opencode saving not recorded in `ctx_stats` (0 B; no execute rows in the journal) | closed | D-HF-INPROC-JOURNAL-1 (in-process ctx_* calls write the server row), D-HF-OPENCODE-SHELL-1 (bash is routed) |
 | H7 | No run used a logged-in model session; kiro not run | open | Live session per host when a login exists |
-| H8 | claude-code setup fails when a shim is first on PATH | open | Setup must find the real host CLI |
+| H8 | claude-code setup fails when a shim is first on PATH | closed | D-HF-CLAUDE-SHIM-1 (setup/doctor run the real claude past a shim; the row prints `bin: <file>`) |
 
 ## Method limits
 
