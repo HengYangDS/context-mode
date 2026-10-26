@@ -9,7 +9,8 @@
 //   1 v2-unit        node build/build.mjs --generated-only, then
 //                    node --test --test-reporter=tap tests/v2/                (>= M1, D-M1-13, D-M2-arch-6)
 //   1b ci-checks     node scripts/ci-gs4-lint.mjs,
-//                    node build/check-readme.mjs: the ci.yml steps no other layer runs (D-M4-GS4-1)
+//                    node build/check-readme.mjs, build/check-install-docs.mjs, build/check-secrets.mjs,
+//                    build/check-prompt-static.mjs: the ci.yml steps no other layer runs (D-M4-GS4-1, D-C5-PREFIX-1)
 //   2 gp-cases       node build/build.mjs --out release-out, then
 //                    node e2e/cases/run.mjs --milestone Mn                   (DEVIATIONS D-M0-2, D-M0-F1-1)
 //   3 prompt-lint    node docs/v2/prompt/lint.mjs drafts docs/v2/prompt/drafts.md   (< M2)
@@ -115,6 +116,7 @@ const CI_CHECKS = [
   ["build/check-readme.mjs"],
   ["build/check-install-docs.mjs"],
   ["build/check-secrets.mjs"],
+  ["build/check-prompt-static.mjs"], // ADR-0021 rule 1, OPEN-ITEMS C5: no dynamic token in prefix text
 ];
 function ciChecks() {
   const gone = missing(CI_CHECKS.map((c) => c[0]));

@@ -81,6 +81,9 @@ jobs:
       - run: node build/check-secrets.mjs
         name: No tenant id in tracked files (D-FU-OI-TENANT-1)
         if: ${{ !cancelled() }}
+      - run: node build/check-prompt-static.mjs
+        name: No dynamic token in tool descriptions or instructions (ADR-0021 rule 1, D-C5-PREFIX-1)
+        if: ${{ !cancelled() }}
       # GS5 repo-cleanup gate (impl/15 §2, DEVIATIONS D-M7-arch-3/4). The check-removed layer starts
       # at M7 (D-M6-arch-2), the same rule as scripts/gate.mjs LAYER_START.
       - run: node build/check-removed.mjs
