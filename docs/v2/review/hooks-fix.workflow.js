@@ -38,7 +38,7 @@ async function retry(prompt, opts, n = 3) {
   return null
 }
 
-const FIX = `${base('fix')}\n\nRole: fixer. Close each item at the root, one red test then the fix, using each host's official docs (web search, current version; cite URL + version in the DEVIATIONS row):
+const FIX = `${base('fix')}\n\nAlready done and pushed on v2-design, do not redo: H1 vscode (f2830f97, 51fd1891), H2 zcode (a7ef6b81..4e5c2eb4), Kiro shell matcher + stderr deny (288a7824..d7af950a). Start with H5.\nRole: fixer. Close each item at the root, one red test then the fix, using each host's official docs (web search, current version; cite URL + version in the DEVIATIONS row):
 H1 vscode: hook command and MCP args lack --workspace-folder, so every hook gets NO_PROJECT. Register the project the documented way for VS Code (MCP args \${workspaceFolder}; for the hook, the payload cwd or the documented variable), so a hook run from a project resolves it.
 H2 zcode: hook file must use matcher groups {matcher, hooks:[...]} per the host's strict schema; MCP under mcp.servers.<name> {type:"stdio", enabled:true, timeoutMs} plus features.mcp true. Doctor hook-registered must validate the documented shape.
 Kiro: PreToolUse/PostToolUse matcher is @mcp only, so a native shell cat never reaches the hook. Register the shell tool too. Kiro PostToolUse cannot replace output, so saving is PreToolUse deny + redirect to ctx_execute; per Kiro docs exit 2 returns STDERR to the model, so the deny text must go to stderr (extend HookOutput with a stderr channel used by the kiro encode only).
@@ -47,6 +47,7 @@ Skills: gemini and pi load skills from the package dir unrendered (bare ctx_stat
 H8 claude-code: setup fails when a shim is first on PATH; resolve the real claude binary the documented way and say which one doctor used.
 H6 opencode: saving done by the in-process plugin is not recorded in ctx_stats; journal it like the other hosts.
 C5 cache: add tests/v2/cache/prefix-determinism.test.mjs (byte-identical initialize + tools/list across 5 starts per agent with different cwd, TZ, store, env; no list_changed emitted) and a lint that tool descriptions and instructions hold no dynamic tokens; wire both into scripts/gate.mjs. Also pin pi and opencode system-prompt bytes identical across turns.
+P1 profiling (owner rule: never forget profiling): two CI timing checks sit at their limits: D3 hook overhead 17 ms vs 15 ms (windows, node 24) and GP-SEARCH heldout p95 67 ms vs 50 ms (ubuntu, node 24). Profile both (node --cpu-prof on the hook entry cold start and on the search path), write the top self-time frames before and after to docs/v2/spikes/perf/PROFILE.md, and make them faster at the root (less work at module load, lazy imports, prepared statements, fewer allocations) until each has at least 30% headroom on a local 10-run p95. Never raise a budget.
 Then node --test tests/v2/ 0 fail, gate --all --quick green, check-install-docs green, a clean-temp-HOME setup + doctor for all 10 agents with the release-out tarball. Update docs/install pages for the changed hosts and OPEN-ITEMS. Return done, commits, numbers, summary.`
 
 const testHost = (a, tag) => retry(`${base('t-' + a + tag)}\n\nRole: saving test for ${a} on the v2-design head (fresh clone, full build, npm pack inside release-out, install into a temp prefix, temp HOME).
@@ -67,12 +68,13 @@ log(`saving test pass ${tests.filter((t) => t.pass).length}/${AGENTS.length}`)
 
 phase('Ship')
 let fix2 = null
-const failed = AGENTS.filter((a) => !(tests.find((t) => t.agent.startsWith(a)) || {}).pass)
-if (failed.length) {
-  fix2 = await retry(`${base('fix2')}\n\nRole: fixer, round 2. Failed hosts: ${JSON.stringify(tests.filter((t) => !t.pass)).slice(0, 10000)}. Fix each at the root, test-first, then node --test tests/v2/ and gate --all --quick green. Return done, commits, numbers, summary.`, { label: 'hf-fix2', phase: 'Ship', schema: RESULT, ...OPH })
-  const again = (await parallel(failed.map((a) => () => testHost(a, '-r2')))).filter(Boolean)
+for (let round = 2; round <= 5; round++) {
+  const failed = AGENTS.filter((a) => !(tests.find((t) => t.agent.startsWith(a)) || {}).pass)
+  if (!failed.length) break
+  fix2 = await retry(`${base('fix' + round)}\n\nRole: fixer, round ${round}. The owner wants every host green. Failed hosts: ${JSON.stringify(tests.filter((t) => !t.pass)).slice(0, 10000)}. Fix each at the root, test-first, then node --test tests/v2/ and gate --all --quick green. Return done, commits, numbers, summary.`, { label: `hf-fix${round}`, phase: 'Ship', schema: RESULT, ...OPH })
+  const again = (await parallel(failed.map((a) => () => testHost(a, `-r${round}`)))).filter(Boolean)
   tests = tests.filter((t) => !failed.some((a) => t.agent.startsWith(a))).concat(again)
-  log(`after round 2: pass ${tests.filter((t) => t.pass).length}/${AGENTS.length}`)
+  log(`after round ${round}: pass ${tests.filter((t) => t.pass).length}/${AGENTS.length}`)
 }
 await retry(`${base('doc')}\n\nUpdate docs/install/README.md hooks table (agent, hook channel, saving effect, skills, test result bytes off -> v2, date, host version, "doc-verified") and docs/v2/spikes/hooks-all/RESULT.md with these runs: ${JSON.stringify(tests.map((t) => ({ a: t.agent, pass: t.pass, off: t.bytesOff, v2: t.bytesV2, p: t.problems.slice(0, 2) }))).slice(0, 7000)}. Update OPEN-ITEMS (close what passed). check-install-docs green. Commit, push. Return done, commits, numbers, summary.`, { label: 'hf-doc', phase: 'Ship', schema: RESULT, ...SNM })
 const g = await retry(`${base('gate')}\n\nRole: gate on v2-design. Fresh clone, npm install, build, node scripts/gate.mjs --all twice, build/check-install-docs.mjs, build/check-secrets.mjs, node bench/fixtures/run.mjs --check. Do not fix. Return green, failing, summary.`, { label: 'hf-gate', phase: 'Ship', schema: GATE, ...HKM })
