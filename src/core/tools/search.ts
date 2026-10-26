@@ -79,7 +79,13 @@ function page(db: DbHandle, q: string, input: CtxSearchInput, scope: SearchScope
   if (input.source === DECISION_SOURCE && q.trim() === "") {
     return ftsListSource(db, DECISION_SOURCE, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
   }
-  return ftsQuery(db, q, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset, input.source);
+  const hits = ftsQuery(db, q, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset, input.source);
+  // H9 (D-HL-H9-1): the replace handle line names a source and uses the command as the query. When no query
+  // word is in that source, the source's chunks are listed by position, so the handle line always returns rows.
+  if (hits.length > 0 || input.source === undefined) return hits;
+  const any = offset === 0 ? hits : ftsQuery(db, q, scope, ctx.project, ctx.sessionId, 1, 0, input.source);
+  if (any.length > 0) return hits;
+  return ftsListSource(db, input.source, scope, ctx.project, ctx.sessionId, SEARCH_PAGE_SIZE, offset);
 }
 
 // D-M2-JSON-3: a `source` that holds a JSON array of objects answers with whole rows, BM25-ranked over the row

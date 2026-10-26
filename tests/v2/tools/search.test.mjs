@@ -356,7 +356,9 @@ test("H9: a source query whose words match nothing lists that source's chunks, f
     await ctxIndex.handler({ content: "cat big log other words", source: "other" }, ctxFor(root));
     const r = await ctxSearch.handler({ queries: ["cat big.log"], source: "big-out" }, ctxFor(root));
     assert.equal(r.isError, false, r.text);
-    assert.ok(r.text.startsWith("big-out #0: "), r.text.slice(0, 300));
+    const lines = r.text.split("\n");
+    assert.equal(lines[0], 'Query "cat big.log":', r.text.slice(0, 300));
+    assert.ok(lines[1].startsWith("big-out #0: "), r.text.slice(0, 300));
     assert.ok(r.text.includes("big-out #1: "), r.text.slice(0, 300));
     assert.ok(!r.text.includes("other #"), r.text);
     // Words that do match keep the BM25 path.
