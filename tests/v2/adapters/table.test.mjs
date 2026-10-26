@@ -44,7 +44,7 @@ const NATIVE = {
   kiro: { shell: ["execute_bash"] }, // D-HF-KIRO-SHELL-1
   zcode: CLAUDE_NATIVE,
   pi: { shell: ["bash"], read: ["read"] }, // D-HA-PI-NAMES-1
-  opencode: { shell: [] },
+  opencode: { shell: ["bash"] }, // D-HF-OPENCODE-SHELL-1
 };
 
 const CLAUDE_EVENTS = { SessionStart: "SessionStart", UserPromptSubmit: "UserPromptSubmit", PreToolUse: "PreToolUse", PostToolUse: "PostToolUse" };
@@ -162,7 +162,7 @@ test("opencode decodes its call-site payloads, webfetch is WebFetch, step-finish
   const pre = r.decode({ type: "execute.before", sessionID: "s", directory: "/p", tool: "webfetch", callID: "c1", args: { url: "https://x.test" } });
   assert.deepEqual(pre, { event: "PreToolUse", agent: "opencode", sessionId: "s", cwd: "/p", tool: { name: "webfetch", canonicalName: "WebFetch", input: { url: "https://x.test" }, callId: "c1" } });
   assert.equal(r.decode({ type: "execute.before", sessionID: "s", directory: "/p", tool: "context-mode_ctx_execute", args: {} }).tool.canonicalName, "ctx_execute");
-  assert.equal(r.decode({ type: "execute.before", sessionID: "s", directory: "/p", tool: "bash", args: {} }).tool.canonicalName, "bash");
+  assert.equal(r.decode({ type: "execute.before", sessionID: "s", directory: "/p", tool: "bash", args: {} }).tool.canonicalName, "Bash"); // D-HF-OPENCODE-SHELL-1
   assert.equal(r.toCanonicalTool("webfetch"), "WebFetch");
   assert.equal(r.decode({ type: "context", sessionID: "s", directory: "/p" }).event, "SessionStart");
   assert.equal(r.decode({ type: "compaction", sessionID: "s", directory: "/p" }).event, "PreCompact");

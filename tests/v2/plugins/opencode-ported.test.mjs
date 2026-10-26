@@ -57,14 +57,17 @@ test("plugin tool map: the factory registers every ctx_* tool and returns the 6 
   }
 });
 
-test("tool.execute.before: webfetch is denied by throwing the policy line; the shell tool is not routed on OpenCode (nativeTools.shell is empty)", async () => {
+test("tool.execute.before: webfetch is denied by throwing the policy line; the bash tool is routed like every other host (D-HF-OPENCODE-SHELL-1)", async () => {
   const { hooks } = await load();
   await assert.rejects(
     hooks["tool.execute.before"]({ tool: "webfetch", sessionID: "s-block", callID: "c1" }, { args: { url: "https://example.com" } }),
     (err) => err instanceof Error && err.message !== "",
   );
-  // v1 blocked curl/wget here. v2 table row opencode has shell: [] (impl/10 §1.3), so a bash call passes untouched.
-  await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c2" }, { args: { command: "curl https://example.com" } });
+  // D-HF-OPENCODE-SHELL-1: the row lists shell ["bash"], so an inline HTTP call is denied like on every other host.
+  await assert.rejects(
+    hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c2" }, { args: { command: "curl https://example.com" } }),
+    (err) => err instanceof Error && err.message.includes("ctx_"),
+  );
   await hooks["tool.execute.before"]({ tool: "bash", sessionID: "s-block", callID: "c3" }, { args: { command: "ls" } });
 });
 

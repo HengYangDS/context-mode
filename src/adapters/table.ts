@@ -102,7 +102,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
   },
   {
     id: "opencode", installMode: "in-process", projectSource: "spawn-cwd", toolNamePrefix: opencode.TOOL_NAME_PREFIX,
-    nativeTools: { shell: [] }, execReadOnlyHint: false,
+    nativeTools: { shell: [opencode.SHELL_TOOL_NAME] }, execReadOnlyHint: false, // D-HF-OPENCODE-SHELL-1
     // Usage: step-finish cost row (DEVIATIONS D-M5-arch-2).
     eventMap: { SessionStart: "context", UserPromptSubmit: "prompt", PreToolUse: "execute.before", PostToolUse: "execute.after", PreCompact: "compaction", Usage: "step-finish" },
     compactDelivery: "opencode-cache", compactSummary: "none", hookTimeoutMs: IN_PROCESS_TIMEOUT_MS, denyChannel: "deny-reason",

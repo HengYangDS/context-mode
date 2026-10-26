@@ -20,7 +20,9 @@ const OPENCODE_EVENTS: Readonly<Record<string, CanonicalEventName | AuxEventName
 };
 
 // OpenCode native tool name -> canonical name decide() knows (#1052). Names not listed stay as received.
-const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { webfetch: "WebFetch" };
+// D-HF-OPENCODE-SHELL-1: OpenCode's built-in shell tool is `bash` with `args.command` (opencode.ai/docs/tools, opencode-ai 1.19.4).
+export const SHELL_TOOL_NAME = "bash";
+const NATIVE_TO_CANONICAL: Readonly<Record<string, string>> = { webfetch: "WebFetch", [SHELL_TOOL_NAME]: "Bash" };
 
 export function toCanonicalTool(name: string): string {
   if (name.startsWith(OWN_WIRE_PREFIX)) return name.slice(OWN_WIRE_PREFIX.length);
