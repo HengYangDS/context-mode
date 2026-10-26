@@ -6,7 +6,7 @@
 // (apps/zcode-cli/docs/usage/07-mcp.md: "先确保 features.mcp 已启用"; zcode.z.ai/en/docs/mcp-services, ZCode 3.16.3).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -17,6 +17,7 @@ import { generateManifests } from "../../../build/manifests.ts";
 import { runDoctor, runSetup } from "../../../src/setup/index.ts";
 
 const NODE = process.execPath;
+const REPO = path.resolve(import.meta.dirname, "../../..");
 
 function sandbox(t) {
   const root = mkdtempSync(path.join(tmpdir(), "cm-zcode-shape-"));
@@ -40,6 +41,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   writeFileSync(path.join(pkgDir, "hook.mjs"), `let s = ""; process.stdin.on("data", (d) => { s += d; }); process.stdin.on("end", () => { JSON.parse(s); });\n`);
   writeFileSync(path.join(pkgDir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0" }));
   generateManifests(pkgDir);
+  for (const k of ["ctx-doctor", "ctx-stats", "ctx-upgrade"]) cpSync(path.join(REPO, "skills", k), path.join(pkgDir, "skills", k), { recursive: true });
   return { home, pkgDir, env: { PATH: "/usr/bin:/bin", HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
 }
 

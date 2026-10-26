@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 import { editHostConfigText } from "../core/ops/host-config.ts";
 import { codexTrustEntries } from "./codex-trust.ts";
-import { renderSkill } from "./registry.ts";
+import { configEdits, renderSkill } from "./registry.ts";
 import type { CheckRow } from "./registry.ts";
 
 export type PrintStep =
@@ -27,7 +27,7 @@ export function printPlan(row: CheckRow): PrintPlan {
     const c = row.config;
     // D-HA-CODEX-TRUST-1: codex trusts its hooks in the same config.toml, so the printed block carries the trust tables.
     const trust = h.kind === "file" && h.trust === c.file ? codexTrustEntries(h.file, h.shape, h.command) : [];
-    const block = editHostConfigText(row.id, c.file, "", c.format, [[c.key, c.value], ...trust]).text;
+    const block = editHostConfigText(row.id, c.file, "", c.format, [...configEdits(c), ...trust]).text;
     steps.push({ kind: "config", file: c.file, format: c.format, key: c.key, block });
   } else if (row.cli) {
     for (const args of row.cli.install) steps.push({ kind: "run", argv: [row.cli.bin, ...args], ...(row.cli.input ? { input: row.cli.input } : {}) });

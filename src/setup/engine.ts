@@ -11,7 +11,7 @@ import { CtxError } from "../core/contracts/errors.ts";
 import type { AgentId, V1Finding } from "../core/contracts/types.ts";
 import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
-import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILLS_DIR, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, hookCommandString, renderSkill } from "./registry.ts";
+import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILLS_DIR, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
@@ -227,7 +227,7 @@ function planRow(row: CheckRow, listed: boolean): Plan {
     const c = row.config;
     const before = readOr(c.file);
     let res;
-    try { res = editHostConfigText(row.id, c.file, before ?? "", c.format, [[c.key, c.value]]); }
+    try { res = editHostConfigText(row.id, c.file, before ?? "", c.format, configEdits(c)); }
     catch (e) { if (e instanceof CtxError) throw new Error(parseFail(row, c.file)); throw e; }
     if (res.edits.length) edits.push({ file: c.file, before, after: res.text, changes: res.edits.map((e) => ({ file: c.file, ...e })) });
   }
@@ -326,7 +326,7 @@ function parseCheck(row: CheckRow): Check {
   const c = row.config;
   if (!c) return { name: "parse", ok: true };
   try {
-    const r = editHostConfigText(row.id, c.file, readFileSync(c.file, "utf8"), c.format, [[c.key, c.value]]);
+    const r = editHostConfigText(row.id, c.file, readFileSync(c.file, "utf8"), c.format, configEdits(c));
     return { name: "parse", ok: r.edits.length === 0, detail: r.edits.length ? "entry differs after write" : undefined };
   } catch (e) { return { name: "parse", ok: false, detail: (e as Error).message }; }
 }

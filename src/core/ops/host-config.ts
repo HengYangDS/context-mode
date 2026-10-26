@@ -480,9 +480,9 @@ function ownTargets(agent: AgentId): OwnTarget[] {
       key: mcp.key,
       next(current) {
         const keep = isPlainObject(current) ? current : {};
-        return { ...keep, [MCP_COMMAND_FIELD]: HOST_NODE_COMMAND, [MCP_ARGS_FIELD]: [serverScript(), AGENT_ARG, agent] };
+        return { ...keep, ...mcp.fields, [MCP_COMMAND_FIELD]: HOST_NODE_COMMAND, [MCP_ARGS_FIELD]: [serverScript(), AGENT_ARG, agent] };
       },
-    }];
+    }, ...(mcp.also ?? []).map(([key, value]): OwnTarget => ({ key, next: () => value }))];
   }
   if (agent === "opencode") return [listTarget(OPENCODE_PLUGIN_KEY, OPENCODE_GIT_SPEC, V1_OPENCODE_PLUGIN_SPEC)];
   if (agent === "pi") return [listTarget(PI_PACKAGES_KEY, PI_GIT_PACKAGE, V1_PI_PACKAGE)];

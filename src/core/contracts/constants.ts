@@ -613,11 +613,22 @@ export const MCP_COMMAND_FIELD = "command";
 export const MCP_ARGS_FIELD = "args";
 // The one host config file (segments under $HOME) and key path of context-mode's own MCP entry, for the
 // agents whose MCP entry lives in a host config file (installMode config-mcp, mcp-entry, hooks+mcp).
-export const OWN_MCP_ENTRY: Readonly<Partial<Record<AgentId, { file: readonly string[]; key: readonly string[] }>>> = Object.freeze({
+// fields = host-required members of the entry next to command/args; also = sibling key paths the host needs set
+// for the entry to load. D-HF-ZCODE-SHAPE-1: ZCode CLI docs usage/07-mcp.md, mcp.servers.<name> {type:"stdio",
+// command, args, enabled, timeoutMs} and features.mcp true.
+export interface OwnMcpEntry {
+  file: readonly string[]; key: readonly string[];
+  fields?: Readonly<Record<string, unknown>>; also?: readonly (readonly [readonly string[], unknown])[];
+}
+export const ZCODE_MCP_FEATURE_KEY = Object.freeze(["features", "mcp"] as const);
+export const OWN_MCP_ENTRY: Readonly<Partial<Record<AgentId, OwnMcpEntry>>> = Object.freeze({
   codex: { file: [".codex", "config.toml"], key: ["mcp_servers", SERVER_KEY] },
   vscode: { file: [".vscode", "mcp.json"], key: ["servers", SERVER_KEY] },
   kiro: { file: [".kiro", "settings", "mcp.json"], key: ["mcpServers", SERVER_KEY] },
-  zcode: { file: [".zcode", "cli", "config.json"], key: ["mcpServers", SERVER_KEY] },
+  zcode: {
+    file: [".zcode", "cli", "config.json"], key: ["mcp", "servers", SERVER_KEY],
+    fields: { type: "stdio", enabled: true, timeoutMs: EXEC_TIMEOUT_MS }, also: [[ZCODE_MCP_FEATURE_KEY, true]],
+  },
 });
 
 // ctx_doctor report env lines (impl/07 §4, ADR-0014 §3; DEVIATIONS D-M5-O3-1). Header, rule, FAIL string and

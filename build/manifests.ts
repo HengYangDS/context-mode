@@ -94,13 +94,14 @@ function kiroShape(row: AdapterRow): JsonObject {
   return { version: "v1", hooks };
 }
 
-// {hooks:{enabled:true,events:{<Event>:[{type,command,timeoutMs,matcher?}]}}} — zcode.
+// {hooks:{enabled:true,events:{<Event>:[{matcher?,hooks:[{type,command,timeoutMs}]}]}}} — zcode matcher groups
+// (ZCode CLI docs usage/09-hooks.md, zcode.z.ai/en/docs/hooks; D-HF-ZCODE-SHAPE-1).
 function zcodeShape(row: AdapterRow): JsonObject {
   const byEvent: JsonObject = {};
   for (const [canonical, native] of events(row)) {
-    const entry: JsonObject = { ...command(row), timeoutMs: row.hookTimeoutMs };
-    if (isToolEvent(canonical)) entry.matcher = buildMatcher(row, native);
-    byEvent[native] = [entry];
+    const group: JsonObject = { hooks: [{ ...command(row), timeoutMs: row.hookTimeoutMs }] };
+    if (isToolEvent(canonical)) group.matcher = buildMatcher(row, native);
+    byEvent[native] = [group];
   }
   return { hooks: { enabled: true, events: byEvent } };
 }

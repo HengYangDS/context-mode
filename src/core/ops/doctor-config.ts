@@ -79,7 +79,7 @@ function ownHooks(block: unknown, shape: string, timeoutKey: string, native: str
   const entries = isObject(block) ? list(block[native]) : [];
   for (const e of entries) {
     if (!isObject(e)) continue;
-    if (shape === "nested") {
+    if (shape === "nested" || shape === "zcode") { // zcode: matcher groups (D-HF-ZCODE-SHAPE-1)
       for (const h of list(e[HOOK_GROUP_HOOKS_FIELD])) {
         if (isObject(h) && isOwnCommand(h[HOOK_COMMAND_FIELD], agent)) {
           out.push({ command: h[HOOK_COMMAND_FIELD] as string, matcher: e[HOOK_MATCHER_FIELD], timeout: h[timeoutKey] });

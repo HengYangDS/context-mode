@@ -24,7 +24,13 @@ export const INSTRUCTION_FILES: readonly string[] = Object.freeze([
 export interface SetupContext { home: string; pkgDir: string; env: Record<string, string | undefined>; }
 
 /** A config file setup edits itself: the exact diff is known before apply. */
-export interface ConfigTarget { file: string; format: HostConfigFormat; key: readonly string[]; value: unknown; }
+export interface ConfigTarget {
+  file: string; format: HostConfigFormat; key: readonly string[]; value: unknown;
+  /** Sibling key paths the host needs set for the entry to load (zcode features.mcp, D-HF-ZCODE-SHAPE-1). */
+  also?: [readonly string[], unknown][];
+}
+/** Every key path a config target writes: the entry, then its sibling keys. */
+export function configEdits(c: ConfigTarget): [readonly string[], unknown][] { return [[c.key, c.value], ...(c.also ?? [])]; }
 
 /** Host settings files that may hold v1 hook commands (S-V1). rewrite = setup owns the hooks (D4: absolute form);
  *  drop = the installed package ships its own hooks, so a v1 copy would run twice. */
@@ -108,7 +114,8 @@ function configFor(ctx: SetupContext, id: AgentId): ConfigTarget | undefined {
     // D-HF-VSCODE-PROJECT-1: VS Code expands ${workspaceFolder} in MCP server args (VS Code MCP configuration
     // reference, predefined variables); the server reads the project from --workspace-folder (D-M1-5).
     const args = id === "vscode" ? [server, flag, agent, WORKSPACE_FOLDER_FLAG, VSCODE_WORKSPACE_VAR] : [server, flag, agent];
-    return { file, format, key: own.key, value: { command: node, args } };
+    const also = own.also?.map(([k, v]): [readonly string[], unknown] => [k, v]);
+    return { file, format, key: own.key, value: { ...own.fields, command: node, args }, ...(also ? { also } : {}) };
   }
   if (id === "opencode") { // docs/install/opencode.md: a local MCP entry in opencode.json
     return {
