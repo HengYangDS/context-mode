@@ -15,8 +15,8 @@ Prefer to do it by hand? Run `context-mode setup --print zcode` and follow what 
 
 ## What setup changes
 
-- Adds the `context-mode` entry to `~/.zcode/cli/config.json`. Other servers stay.
-- Merges the hooks into the same file under `hooks` (SessionStart, UserPromptSubmit, PreToolUse, PostToolUse) and sets `hooks.enabled: true`.
+- Adds the `context-mode` server to `~/.zcode/cli/config.json` under `mcp.servers` (`type: "stdio"`, `enabled: true`, `timeoutMs`) and sets `features.mcp: true`. Other servers stay.
+- Merges the hooks into the same file under `hooks.events` as matcher groups (`{matcher, hooks: [...]}`) for SessionStart, UserPromptSubmit, PreToolUse and PostToolUse, and sets `hooks.enabled: true`.
 - Writes the skills `/ctx-doctor`, `/ctx-stats` and `/ctx-upgrade` to `~/.zcode/skills/<name>/SKILL.md`.
 - Effect: a large shell or read call is denied, and the reason names `ctx_execute` (deny + redirect).
 - Backs up each file first. A failed step is rolled back byte for byte.
@@ -40,7 +40,6 @@ It puts each touched file back. To remove the package too, see [Uninstall](./REA
 
 ## Known limits
 
-- Setup writes no hooks for ZCode.
 - ZCode has no npm package, so no run showed ZCode load the server. The ZCode desktop app is not covered.
 
 ## Report a problem
