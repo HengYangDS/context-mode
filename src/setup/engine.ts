@@ -3,7 +3,8 @@
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { CODEX_TRUST_PATH, codexTrustEntries } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, constants as fsc, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { accessSync, constants as fsc, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { AGENT_HOME_DIR, DB_FILE_NAME, PROJECTS_DIR_NAME, TOOL_ORDER, UPGRADE_REPORT_ONLY_REASONS } from "../core/contracts/constants.ts";
@@ -13,6 +14,7 @@ import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
 import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILLS_DIR, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
+import { SAMPLE_FILE, hookSample, sampleText, sampleVerdict } from "./hook-sample.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
 /** CI-only knob: shared runners add jitter the D3 budget was not measured on. Unset means the 15 ms budget. */
@@ -348,16 +350,31 @@ function hookRegisteredCheck(row: CheckRow, env: SetupContext["env"], list: Chec
   return { name: "hook-registered", ok: false, detail: `${h.file} lacks the context-mode hook entry` };
 }
 
-/** ADR-0020 hook-runs: one sample event through the hook bundle for this agent (in-process agents too). */
-function hookRunsCheck(row: CheckRow, env: SetupContext["env"]): Check {
-  const cmd = row.hookRunCommand;
-  const r = spawnSync(cmd[0], cmd.slice(1), { env, input: JSON.stringify(row.goldenPayload), encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
-  if (r.status !== 0) return { name: "hook-runs", ok: false, detail: `hook exited ${r.status}: ${`${r.stderr}`.trim()}` };
-  const out = `${r.stdout}`.trim();
-  if (out) { let j: unknown; try { j = JSON.parse(out); } catch { /* below */ } if (!isObj(j)) return { name: "hook-runs", ok: false, detail: "hook answer is not a JSON object" }; }
-  return { name: "hook-runs", ok: true };
+/**
+ * ADR-0020 hook-runs, OPEN-ITEMS H5 (D-HF-DOCTOR-RUNS-1): one large shell read, in the host's own wire shape, through
+ * the hook bundle for this agent (in-process agents too). PASS only on the host's saving effect with the project
+ * resolved. The sample runs in its own temp HOME and project, so doctor never writes into the user's store.
+ */
+export function hookRunsCheck(row: CheckRow, env: SetupContext["env"]): Check {
+  const root = mkdtempSync(path.join(tmpdir(), "cm-doctor-runs-"));
+  try {
+    const home = path.join(root, "home");
+    const proj = path.join(root, "proj");
+    mkdirSync(home);
+    mkdirSync(proj);
+    const text = sampleText();
+    writeFileSync(path.join(proj, SAMPLE_FILE), text);
+    const { effect, payload } = hookSample(row.id, proj, text);
+    const sampleEnv: NodeJS.ProcessEnv = { ...env, HOME: home, USERPROFILE: home };
+    delete sampleEnv.CLAUDE_PROJECT_DIR; // the sample project is the payload cwd, never the caller's project
+    const cmd = row.hookRunCommand;
+    const r = spawnSync(cmd[0], cmd.slice(1), { env: sampleEnv, cwd: proj, input: JSON.stringify(payload), encoding: "utf8", timeout: VERIFY_TIMEOUT_MS });
+    const bad = sampleVerdict(row.id, effect, text, { status: r.status, stdout: `${r.stdout ?? ""}`, stderr: `${r.stderr ?? ""}` });
+    return bad === null ? { name: "hook-runs", ok: true } : { name: "hook-runs", ok: false, detail: bad };
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 }
-
 const SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
 export const NOT_SEEN_LINE = "not seen yet, run one tool call";
 /** ADR-0020 hook-seen: a journal row from this agent exists in any project db. None yet is a WARN, not a FAIL. */
