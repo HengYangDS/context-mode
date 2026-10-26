@@ -4,13 +4,13 @@
 // initialize + tools/list, hook.mjs answers a hook call), fake agent binaries on a temp PATH.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
 import { ADAPTERS } from "../../../src/adapters/table.ts";
 import { TOOL_ORDER } from "../../../src/core/contracts/constants.ts";
-import { assertWritable, buildRegistry, runRemove, runSetup, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
+import { assertWritable, buildRegistry, hostBin, runDoctor, runRemove, runSetup, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
 
 const NODE = process.execPath;
 
@@ -43,6 +43,29 @@ function fakeBin(root, name, script) {
   const file = path.join(dir, name);
   writeFileSync(file, `#!/bin/sh\n${script}\n`);
   chmodSync(file, 0o755);
+  return dir;
+}
+
+/** The real Claude Code in npm's global layout (ADR-0012: a package.json named @anthropic-ai/claude-code):
+ *  <binDir>/claude -> <root>/npm/lib/node_modules/@anthropic-ai/claude-code/cli.sh. Returns the resolved file. */
+function fakeClaude(root, binDir, script) {
+  const pkg = path.join(root, "npm", "lib", "node_modules", "@anthropic-ai", "claude-code");
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(path.join(pkg, "package.json"), JSON.stringify({ name: "@anthropic-ai/claude-code", version: "2.0.0" }));
+  const file = path.join(pkg, "cli.sh");
+  writeFileSync(file, `#!/bin/sh\n${script}\n`);
+  chmodSync(file, 0o755);
+  mkdirSync(binDir, { recursive: true });
+  symlinkSync(file, path.join(binDir, "claude"));
+  return realpathSync(file);
+}
+
+/** A wrapper first on PATH (like the claude-worktree shim): a script outside the Claude Code package. */
+function claudeShim(root, ran) {
+  const dir = path.join(root, "shims");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, "claude"), `#!/bin/sh\ntouch "${ran}"\nexit 1\n`);
+  chmodSync(path.join(dir, "claude"), 0o755);
   return dir;
 }
 
@@ -201,7 +224,7 @@ test("setup: CLI agents use the agent's own command; missing binary is SKIPPED w
   const s = sandbox(t);
   const log = path.join(s.root, "claude.log");
   const state = path.join(s.root, "claude.state");
-  fakeBin(s.root, "claude", `echo "$@" >> "${log}"
+  fakeClaude(s.root, s.bin, `echo "$@" >> "${log}"
 case "$1 $2" in
   "plugin list") if [ -f "${state}" ]; then echo "context-mode@context-mode 2.0.0"; fi ;;
   "plugin install") touch "${state}" ;;
@@ -215,6 +238,52 @@ exit 0`);
   assert.equal(byId.gemini.status, "SKIPPED");
   assert.match(byId.gemini.reason, /not on PATH/);
   assert.equal(readdirSync(s.home).includes(".gemini"), false);
+});
+
+const CLAUDE_FAKE = (state) => `case "$1 $2" in
+  "plugin list") if [ -f "${state}" ]; then echo "context-mode@context-mode 2.0.0"; fi ;;
+  "plugin install") touch "${state}" ;;
+esac
+exit 0`;
+
+test("[H8] setup: a shim first on PATH is skipped; setup and doctor run the real claude behind it and name it", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  const ran = path.join(s.root, "shim-ran");
+  const real = fakeClaude(s.root, s.bin, CLAUDE_FAKE(path.join(s.root, "claude.state")));
+  const env = { ...s.env, PATH: [claudeShim(s.root, ran), s.env.PATH].join(path.delimiter) };
+  const opts = { home: s.home, pkgDir: s.pkgDir, env, agents: ["claude-code"] };
+  const res = await runSetup({ ...opts, runId: "r" });
+  assert.equal(res.agents[0].status, "PASS", JSON.stringify(res.agents[0], null, 2));
+  assert.equal(res.agents[0].bin, real, "setup names the binary it ran");
+  const doc = await runDoctor(opts);
+  assert.equal(doc.agents[0].status, "PASS", JSON.stringify(doc.agents[0], null, 2));
+  assert.equal(doc.agents[0].bin, real, "doctor names the binary it ran");
+  assert.equal(existsSync(ran), false, "the shim never ran");
+});
+
+test("[H8] setup: only a shim on PATH is a FAIL that names the shim; the shim never runs", { skip: process.platform === "win32" && "fake agent binaries are sh scripts" }, async (t) => {
+  const s = sandbox(t);
+  const ran = path.join(s.root, "shim-ran");
+  const shims = claudeShim(s.root, ran);
+  const env = { ...s.env, PATH: [shims, s.env.PATH].join(path.delimiter) };
+  const res = await runSetup({ home: s.home, pkgDir: s.pkgDir, env, agents: ["claude-code"], runId: "r" });
+  assert.equal(res.agents[0].status, "FAIL");
+  assert.equal(res.agents[0].reason, `no real claude binary on PATH; found only shim script(s): ${path.join(shims, "claude")}`);
+  assert.equal(existsSync(ran), false, "the shim never ran");
+});
+
+test("[H8] hostBin: claude resolves to a native binary (Mach-O/ELF/PE magic) behind a shim; other agents are the first PATH hit", { skip: process.platform === "win32" && "symlinks need admin on Windows" }, (t) => {
+  const s = sandbox(t);
+  const shims = claudeShim(s.root, path.join(s.root, "shim-ran"));
+  const native = path.join(s.root, "native");
+  mkdirSync(native);
+  symlinkSync(process.execPath, path.join(native, "claude"));
+  const env = { PATH: [shims, native].join(path.delimiter) };
+  assert.deepEqual(hostBin("claude", env), { file: realpathSync(process.execPath), shims: [path.join(shims, "claude")] });
+  assert.deepEqual(hostBin("claude", { PATH: shims }), { file: undefined, shims: [path.join(shims, "claude")] });
+  writeFileSync(path.join(shims, "codex"), "#!/bin/sh\n");
+  chmodSync(path.join(shims, "codex"), 0o755);
+  assert.deepEqual(hostBin("codex", env), { file: path.join(shims, "codex"), shims: [] });
 });
 
 test("[M7] setup/doctor: a report-only v1 finding (shared OS temp file) does not fail an agent that is set up", async (t) => {
