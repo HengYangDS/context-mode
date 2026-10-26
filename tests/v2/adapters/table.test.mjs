@@ -24,7 +24,7 @@ const MAIN = {
   codex: ["config-mcp", "arg:--agent+cwd", "mcp__context_mode__", "sessionstart", "none", 5000, "deny-reason"],
   gemini: ["extension", "spawn-cwd", "mcp_context-mode_", "pending-flag", "none", 5000, "deny-reason"],
   qwen: ["extension", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", 5000, "deny-reason"],
-  "copilot-cli": ["plugin", "arg:--agent+cwd", "mcp_context-mode_", "pending-flag", "none", 5000, "deny-reason"],
+  "copilot-cli": ["plugin", "arg:--agent+cwd", "context-mode-", "pending-flag", "none", 5000, "deny-reason"],
   vscode: ["mcp-entry", "arg:workspaceFolder", "mcp_context-mode_", "pending-flag", "none", 5000, "deny-reason"],
   kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context-mode_", "none", "none", 5000, "hint-only"],
   zcode: ["hooks+mcp", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", 5000, "deny-reason"],

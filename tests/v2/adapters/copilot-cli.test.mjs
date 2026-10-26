@@ -11,8 +11,10 @@ import { decode, encode, TOOL_NAME_PREFIX } from "../../../src/adapters/copilot-
 const camel = { sessionId: "cp-1", cwd: "/tmp/proj", timestamp: 1760000000000 };
 const snake = { session_id: "cp-2", cwd: "/tmp/proj", timestamp: 1760000000000 };
 
-test("own tool prefix is the A1 value mcp_context-mode_ (S-NAMES open)", () => {
-  assert.equal(TOOL_NAME_PREFIX, "mcp_context-mode_");
+// Copilot CLI 1.0.103 bundle names MCP tools <server>-<tool>: "github-mcp-server-search_code",
+// "playwright-browser_take_screenshot" (runtime.node strings). Server key is "context-mode" (D-HQ-COPILOT-NAMES-2).
+test("own tool prefix is <server>- : context-mode- (Copilot CLI 1.0.103 bundle)", () => {
+  assert.equal(TOOL_NAME_PREFIX, "context-mode-");
 });
 
 test("decode camelCase event names to canonical events", () => {
@@ -65,12 +67,12 @@ test("decode snake_case PreToolUse reads tool_name / tool_input", () => {
   assert.deepEqual(ev.tool, { name: "bash", canonicalName: "Bash", input: { command: "ls" } }); // D-HA-COPILOT-NAMES-1
 });
 
-test("decode maps the own prefix to bare ctx_* and other MCP servers to mcp:<server>:<tool>", () => {
-  const own = decode({ ...camel, hookEventName: "preToolUse", toolName: "mcp_context-mode_ctx_search", toolArgs: {} });
+test("decode maps the own prefix context-mode- to bare ctx_*; other MCP tool names stay unchanged", () => {
+  const own = decode({ ...camel, hookEventName: "preToolUse", toolName: "context-mode-ctx_search", toolArgs: {} });
   assert.equal(own.tool.canonicalName, "ctx_search");
-  assert.equal(own.tool.name, "mcp_context-mode_ctx_search");
-  const other = decode({ ...camel, hookEventName: "preToolUse", toolName: "mcp_linear_get_issue", toolArgs: {} });
-  assert.equal(other.tool.canonicalName, "mcp:linear:get_issue");
+  assert.equal(own.tool.name, "context-mode-ctx_search");
+  const other = decode({ ...camel, hookEventName: "preToolUse", toolName: "github-mcp-server-search_code", toolArgs: {} });
+  assert.equal(other.tool.canonicalName, "github-mcp-server-search_code");
   const native = decode({ ...camel, hookEventName: "preToolUse", toolName: "view", toolArgs: {} });
   assert.equal(native.tool.canonicalName, "view");
 });

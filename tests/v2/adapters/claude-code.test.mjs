@@ -35,7 +35,7 @@ test("table rows carry impl/10 §1.3 values", () => {
     codex: ["config-mcp", "arg:--agent+cwd", "mcp__context_mode__", "sessionstart", "none", "deny-reason"],
     gemini: ["extension", "spawn-cwd", "mcp_context-mode_", "pending-flag", "none", "deny-reason"],
     qwen: ["extension", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", "deny-reason"],
-    "copilot-cli": ["plugin", "arg:--agent+cwd", "mcp_context-mode_", "pending-flag", "none", "deny-reason"],
+    "copilot-cli": ["plugin", "arg:--agent+cwd", "context-mode-", "pending-flag", "none", "deny-reason"],
     vscode: ["mcp-entry", "arg:workspaceFolder", "mcp_context-mode_", "pending-flag", "none", "deny-reason"],
     kiro: ["mcp-entry", "arg:--agent+cwd", "mcp_context-mode_", "none", "none", "hint-only"],
     zcode: ["hooks+mcp", "spawn-cwd", "mcp__context-mode__", "sessionstart", "none", "deny-reason"],
