@@ -12,7 +12,7 @@ import { ADAPTERS, getAdapter, hasReplace } from "../../../src/adapters/table.ts
 import { decide } from "../../../src/core/policy/decide.ts";
 
 const SAVING = {
-  "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "D",
+  "claude-code": "R", codex: "D", gemini: "R", qwen: "D", "copilot-cli": "R",
   vscode: "D", kiro: "D", zcode: "D", pi: "R", opencode: "D",
 };
 const CURL = "curl -s https://x.io/a.json";

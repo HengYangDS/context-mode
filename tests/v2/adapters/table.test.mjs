@@ -39,11 +39,11 @@ const NATIVE = {
   codex: { shell: ["Bash"], edit: ["apply_patch"] },
   gemini: { shell: ["run_shell_command"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] }, // gemini-cli 0.65.0 *_TOOL_NAME
   qwen: { shell: ["run_shell_command", "Shell"], read: ["read_file"], grep: ["grep_search"], webfetch: ["web_fetch"] },
-  "copilot-cli": { shell: [] },
+  "copilot-cli": { shell: ["bash"] }, // D-HA-COPILOT-NAMES-1
   vscode: { shell: [] },
   kiro: { shell: [] },
   zcode: CLAUDE_NATIVE,
-  pi: { shell: [] },
+  pi: { shell: ["bash"], read: ["read"] }, // D-HA-PI-NAMES-1
   opencode: { shell: [] },
 };
 
