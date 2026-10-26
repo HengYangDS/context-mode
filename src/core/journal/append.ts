@@ -1,7 +1,7 @@
 // impl/02 §10, impl/00 §4 signature (DEVIATIONS D-M1-1), ADR-0009 §0: the one journal write path.
 // The server calls it for its own ctx_* calls; hooks call it for host tools. No retry. The only dedup is
 // the store-level cost-row index (D-M5-arch-2).
-import type { DbHandle, NewJournalRow } from "../contracts/types.ts";
+import type { DbHandle, NewJournalRow, ProjectContext, ToolContext, ToolReply } from "../contracts/types.ts";
 import { withWrite } from "../store/db.ts";
 
 const COLUMNS =
@@ -63,4 +63,30 @@ export function canonicalKey(tool: string, code: string): string {
     }
   }
   return tool + ":" + out;
+}
+
+/**
+ * impl/00 §5.2 step 5, ADR-0009 §0: the one row an own ctx_* call writes. The MCP server and the in-process
+ * entries (opencode plugin, pi extension) build it here, so ctx_stats counts the call the same way on every
+ * host (D-HF-INPROC-JOURNAL-1, OPEN-ITEMS H6).
+ */
+export function ownCallRow(project: ProjectContext, ctx: ToolContext, name: string, reply: ToolReply): NewJournalRow {
+  // D-M2-2: the handler's journal facts when it gives them, else the D-M1-T10-1 defaults (D-M4-A-1).
+  const facts = reply.journal;
+  return {
+    session_id: ctx.sessionId,
+    worktree: project.worktree,
+    agent: project.agent,
+    kind: reply.isError ? "toolerr" : facts?.kind ?? "cmd", // an error is toolerr, as the hook writes it
+    tool: name,
+    key: facts?.key ?? null,
+    path: facts?.path ?? null,
+    ok: reply.isError ? 0 : 1,
+    exit_code: facts?.exit_code ?? null,
+    bytes: reply.sandboxBytes,
+    body: reply.text,
+    turn: ctx.turn,
+    sandbox_bytes: reply.sandboxBytes,
+    returned_bytes: Buffer.byteLength(reply.text, "utf8"),
+  };
 }

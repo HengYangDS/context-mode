@@ -13,7 +13,7 @@ import {
 } from "../core/contracts/constants.ts";
 import { CtxError } from "../core/contracts/errors.ts";
 import type { DbHandle, ProjectContext, ToolContext, ToolReply } from "../core/contracts/types.ts";
-import { appendEvent } from "../core/journal/append.ts";
+import { appendEvent, ownCallRow } from "../core/journal/append.ts";
 import { installExitGuard } from "../core/lifecycle/exit.ts";
 import { resolveConfigDir } from "../core/project/config-dir.ts";
 import { resolveProject } from "../core/project/resolve.ts";
@@ -147,24 +147,7 @@ export async function startServer(argv: string[], env: NodeJS.ProcessEnv): Promi
   // impl/00 §5.2 step 5, ADR-0009 §0: one journal row per own call (D-M1-10).
   async function journal(project: ProjectContext, ctx: ToolContext, name: string, reply: ToolReply): Promise<void> {
     const db = await ownDb(project);
-    // D-M2-2: the handler's journal facts when it gives them, else the D-M1-T10-1 defaults (D-M4-A-1).
-    const facts = reply.journal;
-    appendEvent(db, {
-      session_id: ctx.sessionId,
-      worktree: project.worktree,
-      agent: project.agent,
-      kind: reply.isError ? "toolerr" : facts?.kind ?? "cmd", // an error is toolerr, as the hook writes it
-      tool: name,
-      key: facts?.key ?? null,
-      path: facts?.path ?? null,
-      ok: reply.isError ? 0 : 1,
-      exit_code: facts?.exit_code ?? null,
-      bytes: reply.sandboxBytes,
-      body: reply.text,
-      turn: ctx.turn,
-      sandbox_bytes: reply.sandboxBytes,
-      returned_bytes: Buffer.byteLength(reply.text, "utf8"),
-    });
+    appendEvent(db, ownCallRow(project, ctx, name, reply));
   }
 
   // §5 steps 5-7: stateless dispatch; ToolContext is built fresh from each request.
