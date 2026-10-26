@@ -20,7 +20,8 @@ const encoder = new TextEncoder();
 
 // maxBytes (D-M7-SV-1): a smaller chunk cap for the PostToolUse replace path; clamped to MAX_CHUNK_BYTES.
 // Under a smaller cap an over-long block is cut after its last whole line that fits (the chunk keeps that
-// newline), and only a single line over the cap is cut by code point.
+// newline); a single line over the small cap is its own whole chunk, and only a line over MAX_CHUNK_BYTES is
+// cut by code point (D-HQ-PI-LINE-1).
 // The default call is unchanged.
 export function chunkText(text: string, kind: "md" | "html" | "text", maxBytes: number = MAX_CHUNK_BYTES): Chunk[] {
   const src = normalize(text);
@@ -331,6 +332,7 @@ function cutPoint(src: string, start: number, end: number, scratch: Uint8Array):
 function merge(src: string, blocks: Span[], join: boolean, cap: number, lineCut: boolean): Chunk[] {
   const out: Chunk[] = [];
   const scratch = new Uint8Array(cap);
+  let wide: Uint8Array | undefined;
   let cur: Span | undefined;
   let curBytes = 0;
   const emit = (start: number, end: number, bytes: number): void => {
@@ -363,10 +365,30 @@ function merge(src: string, blocks: Span[], join: boolean, cap: number, lineCut:
         bytes -= w;
         continue;
       }
+      if (lineCut) {
+        // D-HQ-PI-LINE-1: one line over the small cap is its own chunk, whole, up to MAX_CHUNK_BYTES; only a
+        // line over MAX_CHUNK_BYTES is cut by code point. A search hit then holds the whole line.
+        const eol = src.indexOf("\n", start);
+        const lineEnd = eol < 0 || eol >= b.end ? b.end : eol + 1;
+        const w = utf8Bytes(src.slice(start, lineEnd));
+        if (w <= MAX_CHUNK_BYTES) {
+          emit(start, lineEnd, w);
+          start = lineEnd;
+          bytes -= w;
+          continue;
+        }
+        wide ??= new Uint8Array(MAX_CHUNK_BYTES);
+        const big = cutPoint(src, start, lineEnd, wide);
+        emit(start, big.end, big.written);
+        start = big.end;
+        bytes -= big.written;
+        continue;
+      }
       emit(start, cut.end, cut.written);
       start = cut.end;
       bytes -= cut.written;
     }
+    if (start >= b.end) continue; // the whole block went out as whole lines
     cur = { start, end: b.end };
     curBytes = bytes;
   }
