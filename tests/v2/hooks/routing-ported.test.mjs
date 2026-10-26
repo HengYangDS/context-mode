@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { decide, denyMessage } from "../../../src/core/policy/decide.ts";
 import { getAdapter } from "../../../src/adapters/table.ts";
 import { AGENT_IDS } from "../../../src/core/contracts/agents.ts";
-import { REQUIRE_SECURITY_ENV, POLICY_UNREADABLE_LINE, USER_DENY_REASON_PREFIX } from "../../../src/core/contracts/constants.ts";
+import { REQUIRE_SECURITY_ENV, POLICY_UNREADABLE_LINE, USER_DENY_REASON_PREFIX, prefixToolNames } from "../../../src/core/contracts/constants.ts";
 
 const CODEX = getAdapter("codex"); // no replace row: the size-guess denies stay (ADR-0001)
 const CC = getAdapter("claude-code");
@@ -85,7 +85,7 @@ test("require-security #468: env=1 and unreadable policy denies every tool, Read
   process.stderr.write = () => true;
   try {
     process.env[REQUIRE_SECURITY_ENV] = "1";
-    for (const t of ["Bash", "Read", "Grep"]) assert.deepEqual(decide(ev(t, { command: "ls", file_path: "a" }), CODEX, null), { kind: "deny", reason: POLICY_UNREADABLE_LINE }, t);
+    for (const t of ["Bash", "Read", "Grep"]) assert.deepEqual(decide(ev(t, { command: "ls", file_path: "a" }), CODEX, null), { kind: "deny", reason: prefixToolNames(POLICY_UNREADABLE_LINE, CODEX.toolNamePrefix) }, t);
     delete process.env[REQUIRE_SECURITY_ENV];
     assert.notEqual(decide(ev("Bash", { command: "ls" }), CODEX, null).kind, "deny");
     process.env[REQUIRE_SECURITY_ENV] = "1";

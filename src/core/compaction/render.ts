@@ -22,19 +22,20 @@ function bytesOf(s: string): number {
 }
 
 /** ADR-0009 §4, DECISIONS-r9 M10. */
-function lineOf(c: SectionCandidate): string {
-  return c.bytes > POINTER_MIN ? "#" + c.seq + " (" + c.bytes + " B) ctx_resume(seq:" + c.seq + ")" : c.text;
+// D-HL-NAMES-1: `prefix` is the host's toolNamePrefix; tool names in the block are the names the host calls.
+function lineOf(c: SectionCandidate, prefix: string): string {
+  return c.bytes > POINTER_MIN ? "#" + c.seq + " (" + c.bytes + " B) " + prefix + "ctx_resume(seq:" + c.seq + ")" : c.text;
 }
 
-function moreLine(queries: readonly string[]): string {
-  return "more: ctx_search(queries:" + JSON.stringify(queries) + ', scope:"session")';
+function moreLine(queries: readonly string[], prefix: string): string {
+  return "more: " + prefix + "ctx_search(queries:" + JSON.stringify(queries) + ', scope:"session")';
 }
 
 /**
  * The session is the one of the newest row (highest seq); rows of any other session are ignored
  * (GP6 "no foreign session rows"). Callers pass readSessionEvents rows, so this is one session (D-M4-S1-1).
  */
-export function renderState(rows: readonly JournalRow[], turn: number, extras?: StateExtras): string {
+export function renderState(rows: readonly JournalRow[], turn: number, extras?: StateExtras, prefix = ""): string {
   let newest: JournalRow | undefined;
   for (const r of rows) if (newest === undefined || r.seq > newest.seq) newest = r;
   const sessionId = newest === undefined ? "" : newest.session_id;
@@ -43,10 +44,10 @@ export function renderState(rows: readonly JournalRow[], turn: number, extras?: 
 
   // step 2 (DECISIONS-r9 M12): reserve the wrapper and an empty more: line before any item.
   const openTag = `<context_mode_state session="${sessionId}" upto="${upto}">`;
-  const emptyMoreBytes = bytesOf(moreLine([]));
+  const emptyMoreBytes = bytesOf(moreLine([], prefix));
   const budget = STATE_BUDGET - (bytesOf(openTag) + 1 + emptyMoreBytes + 1 + bytesOf(STATE_CLOSE_TAG));
   let used = 0;
-  const pinnedLine = set.lastRequest === null ? null : lineOf(set.lastRequest);
+  const pinnedLine = set.lastRequest === null ? null : lineOf(set.lastRequest, prefix);
   if (pinnedLine !== null) used += bytesOf(pinnedLine) + 1; // always taken first
 
   // steps 3-5: budgeted lazy greedy (ADR-0009 §4, DECISIONS-r6 D1). Each pick takes the best current
@@ -71,7 +72,7 @@ export function renderState(rows: readonly JournalRow[], turn: number, extras?: 
       }
     }
     const c = remaining.splice(best, 1)[0] as Scored;
-    const lineBytes = bytesOf(lineOf(c)) + 1;
+    const lineBytes = bytesOf(lineOf(c, prefix)) + 1;
     if (used + lineBytes <= budget) {
       used += lineBytes;
       taken.push(c);
@@ -86,7 +87,7 @@ export function renderState(rows: readonly JournalRow[], turn: number, extras?: 
   const lines: string[] = [openTag];
   if (pinnedLine !== null) lines.push(pinnedLine);
   for (const section of ["open_errors", "changed_files", "decisions", "earlier_requests", "indexed_sources"] as const) {
-    for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c));
+    for (const c of taken.filter((t) => t.section === section).sort((a, b) => a.seq - b.seq)) lines.push(lineOf(c, prefix));
   }
 
   // D-CR3-RESUME-1: sources by short id, then line units (pickUnits: MMR, whole units, the budget left).
@@ -109,10 +110,10 @@ export function renderState(rows: readonly JournalRow[], turn: number, extras?: 
   const seen = new Set<string>();
   for (const c of skipped.sort((a, b) => a.seq - b.seq)) {
     if (c.query === null || seen.has(c.query)) continue;
-    if (bytesOf(moreLine([...queries, c.query])) - emptyMoreBytes > budget - used) break;
+    if (bytesOf(moreLine([...queries, c.query], prefix)) - emptyMoreBytes > budget - used) break;
     queries.push(c.query);
     seen.add(c.query);
   }
-  lines.push(moreLine(queries), STATE_CLOSE_TAG);
+  lines.push(moreLine(queries, prefix), STATE_CLOSE_TAG);
   return lines.join("\n");
 }

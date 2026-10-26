@@ -14,6 +14,7 @@ import path from "node:path";
 import { handleHook } from "../../../src/core/hooks/dispatch.ts";
 import { decode as copilotDecode } from "../../../src/adapters/copilot-cli.ts";
 import { READ_DENY_MESSAGE } from "../../../src/core/policy/read-deny.ts";
+import { getAdapter } from "../../../src/adapters/table.ts";
 
 // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
 // an open file, so temp cleanup there is best-effort. The assertions are unchanged.
@@ -53,7 +54,7 @@ test("qwen PreToolUse run_shell_command `cat <large file>` is denied with the ct
   const j = JSON.parse(out.stdout);
   assert.equal(j.hookSpecificOutput.permissionDecision, "deny");
   const abs = path.join(repo, "logs", "app.log");
-  assert.equal(j.hookSpecificOutput.permissionDecisionReason, READ_DENY_MESSAGE(abs, statSync(abs).size));
+  assert.equal(j.hookSpecificOutput.permissionDecisionReason, READ_DENY_MESSAGE(abs, statSync(abs).size, getAdapter("qwen").toolNamePrefix));
 });
 
 test("copilot-cli preToolUse with the host's lowercase `bash` tool reaches the shell rules", async (t) => {

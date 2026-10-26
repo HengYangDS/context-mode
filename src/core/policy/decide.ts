@@ -10,7 +10,7 @@ import {
   DENY_EXEC_TOOL, DENY_INTENT_DEFAULT, DENY_PREFIX, DENY_RUN_HERE_LINE, DENY_TOOL_LABEL, DENY_WEBFETCH_JOIN,
   DENY_WEBFETCH_TOOLS, DENY_WHAT, DENY_WHAT_SUFFIX, DUMP_COUNT_COMMANDS, DUMP_COUNT_FLAGS, FETCH_CALL, FETCH_QUOTES,
   HTTP_SCHEME, INLINE_HTTP_CALLS, JQ_COMMAND, JQ_WHITELIST, NEVER_DENY_HOSTS,
-  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING,
+  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, prefixToolNames, POLICY_UNREADABLE_LINE, POLICY_UNREADABLE_WARNING,
   READ_PATH_KEYS, REQUIRE_SECURITY_ENV, SED_COMMAND, SED_QUIET_FLAGS, SHELL_DUMP_COMMANDS,
   USER_DENY_REASON_PREFIX,
 } from "../contracts/constants.ts";
@@ -55,7 +55,7 @@ export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string
   // step 3: user deny, always first, for every canonical name.
   let rules: string[];
   if (userDeny === null) {
-    if (process.env[REQUIRE_SECURITY_ENV] === FLAG_ON) return deny(POLICY_UNREADABLE_LINE);
+    if (process.env[REQUIRE_SECURITY_ENV] === FLAG_ON) return deny(prefixToolNames(POLICY_UNREADABLE_LINE, row.toolNamePrefix));
     process.stderr.write(POLICY_UNREADABLE_WARNING + "\n");
     rules = [];
   } else rules = userDeny;
@@ -64,7 +64,7 @@ export function decide(ev: CanonicalHookEvent, row: AdapterRow, userDeny: string
 
   if (canonical === WEBFETCH) return webFetch(input, row); // step 4
   if (canonical === BASH) return bash(ev, row, input, rules); // steps 5, 6a
-  if (canonical === READ) return read(ev, input); // step 6
+  if (canonical === READ) return read(ev, row, input); // step 6
   // Steps 5d, 7, 8 (Bash/PowerShell/Read/Grep/other-MCP hints) are retired: D-M7-RR-2, DECISIONS-r10 (2).
   return ALLOW; // step 9
 }
@@ -159,7 +159,7 @@ function webFetch(input: Record<string, unknown>, row: AdapterRow): Decision {
 function bash(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>, rules: string[]): Decision {
   const cmd = str(input.command) ?? "";
   const parsed = parseShell(cmd);
-  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(PARSE_ERROR_DENY_LINE) : ALLOW; // 5b, Q4
+  if (!parsed.ok) return couldMatch(cmd, rules) ? deny(prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix)) : ALLOW; // 5b, Q4
   const cmds = unwrap(parsed.commands);
   for (const c of cmds) {
     const h = segmentHit(c, rules);
@@ -226,13 +226,13 @@ function fileSize(abs: string): number {
   }
 }
 
-function read(ev: CanonicalHookEvent, input: Record<string, unknown>): Decision {
+function read(ev: CanonicalHookEvent, row: AdapterRow, input: Record<string, unknown>): Decision {
   if (!present(input.offset) && !present(input.limit)) {
     const p = readPath(input);
     if (p !== undefined) {
       const abs = resolve(ev.cwd, p);
       const size = fileSize(abs);
-      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size));
+      if (size > OUTPUT_CAP) return deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix));
     }
   }
   return ALLOW; // ranged Read is never denied; no Read hint (D-M7-RR-2)
@@ -252,7 +252,7 @@ function shellDump(cmds: SimpleCommand[], cwd: string, row: AdapterRow): Decisio
   if (d.bounded) return ALLOW;
   const abs = resolve(cwd, d.file);
   const size = fileSize(abs);
-  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size)) : null;
+  return size > OUTPUT_CAP ? deny(READ_DENY_MESSAGE(abs, size, row.toolNamePrefix)) : null;
 }
 
 const allDigits = (s: string): boolean => s !== "" && [...s].every((ch) => ch >= "0" && ch <= "9");

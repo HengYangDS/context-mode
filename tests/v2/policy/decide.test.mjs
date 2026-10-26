@@ -9,7 +9,7 @@ import { decide, denyMessage } from "../../../src/core/policy/decide.ts";
 import { getAdapter } from "../../../src/adapters/table.ts";
 import { READ_DENY_MESSAGE } from "../../../src/core/policy/read-deny.ts";
 import {
-  OUTPUT_CAP, PARSE_ERROR_DENY_LINE,
+  OUTPUT_CAP, PARSE_ERROR_DENY_LINE, prefixToolNames,
   POLICY_UNREADABLE_LINE, REQUIRE_SECURITY_ENV, USER_DENY_REASON_PREFIX,
 } from "../../../src/core/contracts/constants.ts";
 
@@ -86,7 +86,7 @@ test("§6.3 golden: WebFetch of a claude.ai artifact URL is allowed (GP3/webfetc
 
 test("§6.3 / DECISIONS-r8 Read-deny case 1: unranged Read over OUTPUT_CAP is denied", () => {
   const d = decide(ev("Read", { file_path: big }), CC, []);
-  assert.deepEqual(d, { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024) });
+  assert.deepEqual(d, { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024, CC.toolNamePrefix) });
 });
 test("Read-deny case 2: ranged Read over OUTPUT_CAP is never denied", () => {
   for (const input of [{ file_path: big, offset: 1 }, { file_path: big, limit: 200 }, { file_path: big, offset: 0, limit: 10 }]) {
@@ -97,7 +97,7 @@ test("Read-deny case 3: unbounded one-file shell dump over OUTPUT_CAP is denied 
   const p = big.split(sep).join("/"); // shell spelling of the path; "\\" is an escape in Bash
   for (const cmd of [`cat ${p}`, `head ${p}`, `tail ${p}`, `sed -n p ${p}`, `less ${p}`, `jq . ${p}`, `bat ${p}`, `more ${p}`, "cat big.log"]) {
     const d = bash(cmd, CODEX);
-    assert.deepEqual(d, { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024) }, cmd);
+    assert.deepEqual(d, { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024, CODEX.toolNamePrefix) }, cmd);
   }
 });
 test("Read-deny case 4: bounded shell dump is never denied", () => {
@@ -115,7 +115,7 @@ test("§6.3 golden: echo \"unterminated -> ParseError, Q4 verdict", () => {
   assert.notEqual(bash('echo "unterminated').kind, "deny"); // no user rule could match
   // step 3 sees the whole text first: a rule on the first command is a plain user deny
   assert.deepEqual(bash('echo "unterminated', CC, ["Bash(echo:*)"]), { kind: "deny", reason: USER_DENY_REASON_PREFIX + "Bash(echo:*)" });
-  assert.deepEqual(bash('ls; rm -rf / "x', CC, ["Bash(rm -rf:*)"]), { kind: "deny", reason: PARSE_ERROR_DENY_LINE });
+  assert.deepEqual(bash('ls; rm -rf / "x', CC, ["Bash(rm -rf:*)"]), { kind: "deny", reason: prefixToolNames(PARSE_ERROR_DENY_LINE, CC.toolNamePrefix) });
 });
 
 test("V8: 10 curl, 10 wget, 5 build commands -> 25/25 deny", () => {
@@ -166,7 +166,7 @@ test("E2: unreadable policy fails closed only with the env flag", () => {
   process.stderr.write = () => true;
   try {
     process.env[REQUIRE_SECURITY_ENV] = "1";
-    assert.deepEqual(bash("ls", CC, null), { kind: "deny", reason: POLICY_UNREADABLE_LINE });
+    assert.deepEqual(bash("ls", CC, null), { kind: "deny", reason: prefixToolNames(POLICY_UNREADABLE_LINE, CC.toolNamePrefix) });
     delete process.env[REQUIRE_SECURITY_ENV];
     assert.notEqual(bash("ls", CC, null).kind, "deny");
   } finally {
@@ -217,8 +217,8 @@ test("D-M7-RR-1: subagent calls keep the size-guess denies (ADR-0016 case A/B/C)
 
 test("D-M7-RR-1: kept on a replace row: user deny, parse-error deny, Read deny, WebFetch deny", () => {
   assert.deepEqual(bash(CURL, CC, ["Bash(curl:*)"]), { kind: "deny", reason: USER_DENY_REASON_PREFIX + "Bash(curl:*)" });
-  assert.deepEqual(bash('ls; rm -rf / "x', CC, ["Bash(rm -rf:*)"]), { kind: "deny", reason: PARSE_ERROR_DENY_LINE });
-  assert.deepEqual(decide(ev("Read", { file_path: big }), CC, []), { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024) });
+  assert.deepEqual(bash('ls; rm -rf / "x', CC, ["Bash(rm -rf:*)"]), { kind: "deny", reason: prefixToolNames(PARSE_ERROR_DENY_LINE, CC.toolNamePrefix) });
+  assert.deepEqual(decide(ev("Read", { file_path: big }), CC, []), { kind: "deny", reason: READ_DENY_MESSAGE(big, 300 * 1024, CC.toolNamePrefix) });
   assert.equal(decide(ev("WebFetch", { url: "https://example.com/a" }), CC, []).kind, "deny");
 });
 

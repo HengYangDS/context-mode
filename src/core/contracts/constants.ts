@@ -3,6 +3,13 @@ import type { AgentId } from "./agents.js";
 
 export const SERVER_KEY = "context-mode"; // TECH-SPEC §3.8 rule 3
 export const TOOL_ORDER = Object.freeze(["ctx_execute","ctx_batch","ctx_index","ctx_search","ctx_resume","ctx_stats","ctx_doctor","ctx_upgrade","ctx_purge"] as const); // PRD §8, Q3b
+/** D-HL-NAMES-1: a fixed hook text with each own tool name as the host calls it (prefix + name), by split/join. */
+export function prefixToolNames(text: string, prefix: string): string {
+  if (prefix === "") return text;
+  let out = text;
+  for (const name of TOOL_ORDER) out = out.split(name).join(prefix + name);
+  return out;
+}
 
 // Byte caps
 export const OUTPUT_CAP = 16384; // Q2, ADR-0008, ADR-0016: one cap for replies, replace path and Read deny threshold
@@ -24,8 +31,9 @@ export const REPLACE_CHUNK_BYTES = 48; // D-M7-SV-3: was 256; two whole chunks f
 // D-CR3-HANDLE-1: the last line of every replacement (it replaces the more line and the D-CR2-HANDLE-1 line).
 // One short line: the exact call over the stored source by its short id, then the full size.
 // D-R4-HANDLE-LABEL-1: no label text; the short id is the only name the line carries.
-export function REPLACE_HANDLE_LINE(intent: string, handle: string, bytes: number): string {
-  return "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output (" + bytes + " B).";
+// D-HL-NAMES-1: the tool name carries the host's toolNamePrefix; the intent is never rewritten.
+export function REPLACE_HANDLE_LINE(intent: string, handle: string, bytes: number, prefix = ""): string {
+  return prefix + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(handle) + "}) searches the whole output (" + bytes + " B).";
 }
 export const MAX_CHUNK_BYTES = 4096; // DECISIONS-r9 §C
 export const SEARCH_PAGE_SIZE = 20; // ADR-0009 §8.1 rule 3; DECISIONS-r9 M15

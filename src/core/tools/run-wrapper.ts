@@ -12,6 +12,7 @@ import {
   EXEC_TIMEOUT_MS,
   OUTPUT_CAP,
   PARSE_ERROR_DENY_LINE,
+  prefixToolNames,
   PLAIN_OUTPUT_ENV,
   POLICY_UNREADABLE_LINE,
   RUN_FAIL_EXIT,
@@ -66,7 +67,9 @@ function denyRules(b64: string): string[] | null {
 
 // D-M3-X1-1: the user's own rules refuse; a routing deny is why the hook sent the command here.
 function userPolicyDeny(reason: string): boolean {
-  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === POLICY_UNREADABLE_LINE || reason === PARSE_ERROR_DENY_LINE;
+  const prefix = getAdapter(RUN_WRAPPER_AGENT).toolNamePrefix; // D-HL-NAMES-1: decide() names tools as this row does
+  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === prefixToolNames(POLICY_UNREADABLE_LINE, prefix)
+    || reason === prefixToolNames(PARSE_ERROR_DENY_LINE, prefix);
 }
 
 // §4 step 5, D-M3-X1-3: the project is the wrapper's cwd (the subagent's Bash cwd), one path.

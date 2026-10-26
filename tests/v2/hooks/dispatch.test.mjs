@@ -11,12 +11,16 @@ import { DatabaseSync } from "node:sqlite";
 import { handleHook } from "../../../src/core/hooks/dispatch.ts";
 import { ctxSearch } from "../../../src/core/tools/search.ts";
 import { chunkText } from "../../../src/core/index/chunk.ts";
+import { getAdapter } from "../../../src/adapters/table.ts";
 import {
   COMPACT_POINTER_LINE, OUTPUT_CAP, REPLACE_TRIGGER_BYTES, REPLACE_RETURN_BYTES, REPLACE_CHUNK_BYTES, SYNC_INDEX_MAX_BYTES, PENDING_COMPACT_META_PREFIX,
 } from "../../../src/core/contracts/constants.ts";
 
 // D-M3-F-9: a hook or detached write keeps its DB handle open by design (A21), and Windows cannot delete
 // an open file, so temp cleanup there is best-effort. The assertions above it are unchanged.
+// D-HL-NAMES-1: hook texts name tools as claude-code calls them (its toolNamePrefix + ctx_*).
+const CCP = getAdapter("claude-code").toolNamePrefix;
+
 function rmTemp(dir) {
   try {
     rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
@@ -265,7 +269,7 @@ test("case C, OUTPUT_CAP < bytes <= SYNC_INDEX_MAX_BYTES: indexed inline, whole 
   assert.equal(src[0].label, "subagent:Read:0");
   assert.ok(src[0].bytes_total >= Buffer.byteLength(text) - 1, "the whole text is indexed, nothing cut");
   // Whole chunks only: the selected chunks, joined by one "\n", make up the body byte for byte.
-  const body = replaced.slice(0, replaced.lastIndexOf("\nctx_search(") < 0 ? replaced.length : replaced.lastIndexOf("\nctx_search("));
+  const body = replaced.slice(0, replaced.lastIndexOf("\n" + CCP + "ctx_search(") < 0 ? replaced.length : replaced.lastIndexOf("\n" + CCP + "ctx_search("));
   const whole = chunkText(text, "text", REPLACE_CHUNK_BYTES).filter((c) => body.includes(c.text));
   assert.ok(whole.length > 0);
   const joined = whole.reduce((n, c) => n + Buffer.byteLength(c.text), 0) + whole.length - 1;
@@ -331,7 +335,7 @@ test("D-M7-RR-1: main-agent Bash over OUTPUT_CAP on claude-code: selected whole 
   assert.ok(Buffer.byteLength(replaced) <= REPLACE_RETURN_BYTES + 512, "within budget plus the more line");
   assert.ok(Buffer.byteLength(replaced) < Buffer.byteLength(text));
   assert.ok(replaced.includes("needle target"));
-  const more = replaced.lastIndexOf("\nctx_search(");
+  const more = replaced.lastIndexOf("\n" + CCP + "ctx_search(");
   assert.ok(more > 0, "the more line names ctx_search");
   const body = replaced.slice(0, more);
   // Whole chunks of the plain stdout (not the JSON tool_response): nothing cut, no escaped newlines.
@@ -363,7 +367,7 @@ test("D-M7-RR-3: no Bash description: the intent is the command text, never an e
   delete p.tool_input.description;
   const out = parsed(await handleHook("claude-code", p, env));
   const replaced = replacedText(out.updatedToolOutput);
-  const more = replaced.slice(replaced.lastIndexOf("\nctx_search("));
+  const more = replaced.slice(replaced.lastIndexOf("\n" + CCP + "ctx_search("));
   assert.ok(!more.includes('[""]'), "the more line has no empty query: " + more);
   assert.ok(more.includes("cat big.log"), "the more line queries the command text: " + more);
 });
@@ -374,7 +378,7 @@ test("D-M7-RR-3: no description on Read, Grep, WebFetch: file path, pattern, URL
     const out = parsed(await handleHook("claude-code", p, env));
     if (typeof out.updatedToolOutput !== "string") continue; // row has no replace channel for this tool
     const replaced = out.updatedToolOutput;
-    const more = replaced.slice(replaced.lastIndexOf("\nctx_search("));
+    const more = replaced.slice(replaced.lastIndexOf("\n" + CCP + "ctx_search("));
     assert.ok(!more.includes('[""]'), tool + ": no empty query: " + more);
     assert.ok(more.includes(want), tool + ": the more line queries " + want + ": " + more);
   }
@@ -396,7 +400,7 @@ test("D-M7-SV-1: a 4-16K Bash output is replaced by at most REPLACE_RETURN_BYTES
   const p = mainBashPost(text);
   const out = parsed(await handleHook("claude-code", p, env));
   const replaced = replacedText(out.updatedToolOutput);
-  const more = replaced.lastIndexOf("\nctx_search(");
+  const more = replaced.lastIndexOf("\n" + CCP + "ctx_search(");
   assert.ok(more > 0, "the more line names ctx_search");
   assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
   assert.ok(replaced.includes("needle target"));
@@ -478,7 +482,7 @@ test("D-M7-SV-2: the replace return budget is at most 512 bytes, a constant of i
   const text = bigText(16000);
   const out = parsed(await handleHook("claude-code", mainBashPost(text), env));
   const replaced = replacedText(out.updatedToolOutput);
-  const more = replaced.lastIndexOf("\nctx_search(");
+  const more = replaced.lastIndexOf("\n" + CCP + "ctx_search(");
   assert.ok(more > 0, "the more line names ctx_search");
   assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= 512);
   assert.ok(replaced.includes("needle target"));
@@ -491,7 +495,7 @@ test("D-M7-SV-3: return budget 96 and chunk cap 48; two whole chunks fit; a 16K 
   const text = bigText(16000);
   const out = parsed(await handleHook("claude-code", mainBashPost(text), env));
   const replaced = replacedText(out.updatedToolOutput);
-  const more = replaced.lastIndexOf("\nctx_search(");
+  const more = replaced.lastIndexOf("\n" + CCP + "ctx_search(");
   assert.ok(more > 0, "the more line names ctx_search");
   assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= 96);
   assert.ok(replaced.includes("needle target"));
@@ -514,7 +518,7 @@ test("D-M7-SV-5: the replace selection also ranks by the last user prompt; budge
   post.tool_input = { command: "cat data/part1.txt" };
   const out = parsed(await handleHook("claude-code", post, env));
   const replaced = replacedText(out.updatedToolOutput);
-  const more = replaced.lastIndexOf("\nctx_search(");
+  const more = replaced.lastIndexOf("\n" + CCP + "ctx_search(");
   assert.ok(more > 0, "the more line names ctx_search");
   assert.ok(Buffer.byteLength(replaced.slice(0, more)) <= REPLACE_RETURN_BYTES);
   assert.ok(replaced.includes("SECRET-1 value=qz7k2m9x"), "the prompt term selects the asked-for line");
@@ -571,9 +575,9 @@ test("D-CR3-HANDLE-1: golden handle line: short id, exact call, full size, insid
   const nl = replaced.lastIndexOf("\n");
   assert.ok(nl > 0, "a body, then the handle line");
   const intent = p.tool_input.description ?? p.tool_input.command;
-  const golden = "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
+  const golden = CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).";
   assert.equal(replaced.slice(nl + 1), golden);
-  assert.equal(replaced.split("\nctx_search(").length, 2, "one call line, no second more line: " + replaced);
+  assert.equal(replaced.split("\n" + CCP + "ctx_search(").length, 2, "one call line, no second more line: " + replaced);
   for (const r of lintPromptText(golden)) assert.ok(r.ok, r.rule + " " + JSON.stringify(r.matches));
   const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
   assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
@@ -606,7 +610,7 @@ test("D-CR3-HANDLE-2: a > SYNC_INDEX_MAX_BYTES output: the handle is the short i
   const nl = replaced.lastIndexOf("\n");
   assert.ok(nl > 0, "a body, then the handle line");
   const intent = p.tool_input.description;
-  assert.equal(replaced.slice(nl + 1), "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).");
+  assert.equal(replaced.slice(nl + 1), CCP + "ctx_search({queries:[" + JSON.stringify(intent) + "], source:" + JSON.stringify(id) + "}) searches the whole output (" + Buffer.byteLength(text) + " B).");
   assert.ok(Buffer.byteLength(replaced.slice(0, nl)) > 0 && replaced.slice(0, nl).includes("needle target"), "the selection budget is not 0");
   const bound = REPLACE_RETURN_BYTES + Buffer.byteLength("\n" + moreLine(intent, src[0].label));
   assert.ok(Buffer.byteLength(replaced) <= bound, Buffer.byteLength(replaced) + " > " + bound);
@@ -630,7 +634,7 @@ test("D-M2-JSON-1: a 200 KB JSON cat returns the rare row whole next to a long h
   const replaced = replacedText(parsed(await handleHook("claude-code", post, env)).updatedToolOutput);
   assert.ok(replaced.includes('"amount":1234,"priority":true'), replaced);
   assert.ok(replaced.split("\n")[0].includes("{id,region,amount,priority,items,note}"), replaced);
-  const nl = replaced.lastIndexOf("\nctx_search(");
+  const nl = replaced.lastIndexOf("\n" + CCP + "ctx_search(");
   assert.ok(Buffer.byteLength(replaced.slice(0, nl)) <= 256, "digest within SHAPE_RETURN_BYTES");
 });
 
@@ -648,7 +652,7 @@ test("D-R4-BUDGET-1: end-to-end a replace never starts with a newline and ends w
   const out = parsed(await handleHook("claude-code", mainBashPost(bigText(40000), "needle target"), env));
   const replaced = replacedText(out.updatedToolOutput);
   assert.ok(!replaced.startsWith("\n"), JSON.stringify(replaced.slice(0, 40)));
-  assert.equal(replaced.split("\nctx_search(").length, 2, "body, newline, one handle line");
+  assert.equal(replaced.split("\n" + CCP + "ctx_search(").length, 2, "body, newline, one handle line");
 });
 
 test("D-R4-BUDGET-1: replaceBudget is 0 when the handle line is longer than the more line plus REPLACE_RETURN_BYTES", async () => {

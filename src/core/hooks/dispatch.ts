@@ -7,7 +7,7 @@ import { dirname, join } from "node:path";
 import { AGENT_IDS, type AgentId } from "../contracts/agents.ts";
 import {
   COMPACTED_META_PREFIX, COMPACT_POINTER_LINE, COMPACT_STATE_KEY, DECISION_OPTION_KEY, DECISION_SOURCE, DECISION_TOOL, EDIT_PATH_KEYS, EDIT_TOOLS, EXIT_CODE_LINE_PREFIX,
-  OWN_TOOL_PREFIX, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
+  OWN_TOOL_PREFIX, prefixToolNames, REPLACE_CHUNK_BYTES, REPLACE_HANDLE_LINE, REPLACE_RETURN_BYTES, REPLACE_TRIGGER_BYTES, SHAPE_RETURN_BYTES, PARSE_ERROR_DENY_LINE, PENDING_COMPACT_FLAG, PENDING_COMPACT_KEY,
   PENDING_COMPACT_META_PREFIX, POLICY_UNREADABLE_LINE, RECALL_KEY, RECALL_MAX_ROWS, RECALL_SEEN_META_PREFIX, RECALL_UNIT_CANDIDATES, RECALL_UNITS_SEEN_META_PREFIX, RESUME_HINT, RESUME_HINT_KEY, RUN_WRAPPER_FILE,
   RUN_WRAPPER_NODE, SHELL_TOOL, SOURCE_LABEL_MAX_CHARS, SUBAGENT_SOURCE_PREFIX, SYNC_INDEX_MAX_BYTES, TOOL_PREFIX_SLOT,
   USER_DENY_REASON_PREFIX,
@@ -116,8 +116,8 @@ function withPrefix(template: string, row: AdapterRow): string {
 // D6: "host" sends the fixed pointer line only; "none" sends the full renderState block (§4.3 step 1.3,
 // §4.4 step 2.4). Rows are this session's journal, read once per compact delivery.
 function compactText(db: DbHandle, ev: CanonicalHookEvent, row: AdapterRow): string {
-  if (row.compactSummary === "host") return COMPACT_POINTER_LINE;
-  return renderState(readSessionEvents(db, ev.sessionId), ev.turn ?? 0);
+  if (row.compactSummary === "host") return prefixToolNames(COMPACT_POINTER_LINE, row.toolNamePrefix);
+  return renderState(readSessionEvents(db, ev.sessionId), ev.turn ?? 0, undefined, row.toolNamePrefix);
 }
 
 async function sessionStart(ev: CanonicalHookEvent, row: AdapterRow, project: ProjectContext): Promise<Decision> {
@@ -312,8 +312,9 @@ function isShell(tool: ToolCall, row: AdapterRow): boolean {
 }
 
 // The user's own rules stay as they are: the wrapper would refuse them too (D-M3-H2-5).
-function isUserPolicyDeny(reason: string): boolean {
-  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === POLICY_UNREADABLE_LINE || reason === PARSE_ERROR_DENY_LINE;
+function isUserPolicyDeny(reason: string, row: AdapterRow): boolean {
+  return reason.startsWith(USER_DENY_REASON_PREFIX) || reason === prefixToolNames(POLICY_UNREADABLE_LINE, row.toolNamePrefix)
+    || reason === prefixToolNames(PARSE_ERROR_DENY_LINE, row.toolNamePrefix);
 }
 
 function b64(s: string): string {
@@ -323,7 +324,7 @@ function b64(s: string): string {
 // §4.5 step 3 case B, D-M3-arch-3: run.mjs sits next to the running hook bundle (impl/13 §2).
 function caseB(ev: CanonicalHookEvent, row: AdapterRow, d0: Extract<Decision, { kind: "deny" }>, userDeny: string[] | null): Decision {
   const tool = ev.tool;
-  if (tool === undefined || !isShell(tool, row) || isUserPolicyDeny(d0.reason)) return d0;
+  if (tool === undefined || !isShell(tool, row) || isUserPolicyDeny(d0.reason, row)) return d0;
   const command = tool.input.command;
   if (typeof command !== "string") return d0;
   const wrapper = '"' + join(dirname(process.argv[1] ?? ""), RUN_WRAPPER_FILE) + '"';
@@ -430,7 +431,7 @@ async function postToolUse(ev: CanonicalHookEvent, row: AdapterRow, project: Pro
   // D-CR3-HANDLE-1: one handle line replaces the more line and counts inside the budget. The budget per
   // replace is the size bound of D-CR3-HANDLE-1 (REPLACE_RETURN_BYTES of selection + the more line with the full
   // label); the selection gets that budget minus the handle line, so a replace never grows.
-  const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes);
+  const handleLine = REPLACE_HANDLE_LINE(intent, handle, result.bytes, row.toolNamePrefix);
   const budget = replaceBudget(handleLine, moreLine(intent, label));
   const digest = shapeDigest(text, rankQuery ?? intent, SHAPE_RETURN_BYTES); // D-M2-JSON-1
   if (digest !== null) return { kind: "replace", output: replaceOutput(digest, handleLine) };
