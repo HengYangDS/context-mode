@@ -3,15 +3,23 @@ Manual setup for zcode. Put this in <HOME>/.zcode/cli/config.json
 and keep the rest. These paths are for this machine.)
 
 {
-  "mcpServers": {
-    "context-mode": {
-      "command": "<NODE>",
-      "args": [
-        "<PKG>/server.mjs",
-        "--agent",
-        "zcode"
-      ]
+  "mcp": {
+    "servers": {
+      "context-mode": {
+        "type": "stdio",
+        "enabled": true,
+        "timeoutMs": 600000,
+        "command": "<NODE>",
+        "args": [
+          "<PKG>/server.mjs",
+          "--agent",
+          "zcode"
+        ]
+      }
     }
+  },
+  "features": {
+    "mcp": true
   }
 }
 

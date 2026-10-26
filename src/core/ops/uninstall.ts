@@ -115,13 +115,22 @@ function ownEntries(agent: AgentId, env: NodeJS.ProcessEnv): OwnEntry[] {
   const home = homeOf(env);
   const mcp = OWN_MCP_ENTRY[agent];
   if (mcp !== undefined) {
-    const [parent, own] = mcp.key;
+    // The own entry sits at key = [top, ...inner, own] (zcode: mcp.servers.context-mode, D-HF-ZCODE-SHAPE-1).
+    const top = mcp.key[0];
+    const inner = mcp.key.slice(1, -1);
+    const own = mcp.key[mcp.key.length - 1];
+    const holder = (v: unknown): unknown => inner.reduce<unknown>((cur, k) => (isObj(cur) ? cur[k] : undefined), v);
+    const without = (v: unknown, path: readonly string[]): unknown => {
+      const o = v as Record<string, unknown>;
+      if (path.length === 0) return Object.fromEntries(Object.entries(o).filter(([k]) => k !== own));
+      return { ...o, [path[0]]: without(o[path[0]], path.slice(1)) };
+    };
     return [{
       file: join(home, ...mcp.file),
-      key: parent,
+      key: top,
       shown: mcp.key.join(V1_KEY_PATH_SEP),
-      has: (v) => isObj(v) && Object.hasOwn(v, own),
-      drop: (v) => Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => k !== own)),
+      has: (v) => { const h = holder(v); return isObj(h) && Object.hasOwn(h, own); },
+      drop: (v) => without(v, inner),
     }];
   }
   if (agent === "opencode") {

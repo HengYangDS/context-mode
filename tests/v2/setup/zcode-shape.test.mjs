@@ -100,3 +100,17 @@ test("H2: doctor FAILs when features.mcp is off", async (t) => {
   const d = await runDoctor({ home: s.home, pkgDir: s.pkgDir, env: s.env, agents: ["zcode"] });
   assert.equal(d.agents[0].status, "FAIL", JSON.stringify(d.agents[0]));
 });
+
+test("H2: uninstall drops only mcp.servers.context-mode and keeps the user's other zcode servers", async (t) => {
+  const { runUninstall } = await import("../../../src/core/ops/uninstall.ts");
+  const root = mkdtempSync(path.join(tmpdir(), "cm-zcode-un-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const file = path.join(root, ".zcode", "cli", "config.json");
+  mkdirSync(path.dirname(file), { recursive: true });
+  const other = { type: "stdio", command: "o", args: [], enabled: true };
+  writeFileSync(file, JSON.stringify({ features: { mcp: true }, mcp: { servers: { other, "context-mode": { type: "stdio", command: "node", args: ["/p/server.mjs"] } } } }, null, 2));
+  runUninstall({ adapter: { id: "zcode", installMode: "hooks+mcp" }, project: { projectKey: "abcdef0123456789" }, env: { HOME: root }, confirmDelete: false });
+  const doc = JSON.parse(readFileSync(file, "utf8"));
+  assert.deepEqual(doc.mcp.servers, { other });
+  assert.equal(doc.features.mcp, true, "user feature flag kept");
+});

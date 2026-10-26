@@ -81,7 +81,8 @@ test("ADR-0020: setup writes the hook channel for every file agent with the abso
   }
   const zc = JSON.parse(readFileSync(path.join(s.home, ".zcode", "cli", "config.json"), "utf8"));
   assert.equal(zc.hooks.enabled, true, "zcode hooks.enabled");
-  assert.ok(zc.mcpServers["context-mode"], "zcode MCP entry kept next to the hooks");
+  assert.ok(zc.mcp.servers["context-mode"], "zcode MCP entry kept next to the hooks (D-HF-ZCODE-SHAPE-1)");
+  assert.equal(zc.features.mcp, true, "zcode features.mcp");
   const oc = JSON.parse(readFileSync(path.join(s.home, ".config", "opencode", "opencode.json"), "utf8"));
   assert.deepEqual(oc.plugin, [path.join(s.pkgDir, "opencode", "plugin.js")], "opencode plugin entry");
 });

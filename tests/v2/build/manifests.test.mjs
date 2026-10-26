@@ -159,7 +159,8 @@ test("hook files follow each host shape of impl/10 §1.5", (t) => {
   assert.equal("matcher" in kiro.hooks.find((h) => h.trigger === "UserPromptSubmit"), false);
   const z = readJson(dir, "hooks/zcode.json");
   assert.equal(z.hooks.enabled, true);
-  assert.deepEqual(z.hooks.events.PreToolUse, [{ command: cmd("zcode"), matcher: MATCHERS.zcode, timeoutMs: 5000, type: "command" }]);
+  // D-HF-ZCODE-SHAPE-1: ZCode CLI docs usage/09-hooks.md, matcher groups {matcher?, hooks:[...]}.
+  assert.deepEqual(z.hooks.events.PreToolUse, [{ hooks: [{ command: cmd("zcode"), timeoutMs: 5000, type: "command" }], matcher: MATCHERS.zcode }]);
 });
 
 // D-FU-GCH-1: Claude Code loads <plugin>/hooks/hooks.json by default, next to plugin.json "hooks", and runs any entry
