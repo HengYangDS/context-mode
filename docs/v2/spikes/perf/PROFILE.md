@@ -86,3 +86,29 @@ total 3765.74 ms/run
   122 KB bundle; the loaded built-in module list equals bare `node -e 0` (0 extra modules, D-CI-PERF-7
   holds). `NODE_COMPILE_CACHE` gave 2-4 ms on wall time but D-CI-PERF-4 already rejected a cache dir
   written by every hook call. Open: the codex number needs a quiet host to confirm headroom.
+
+### D3 hook bundle size experiment (macOS, Node 26.8.1, load average 7-14)
+
+Question: does a smaller hook bundle cut the PreToolUse cold start? Method: esbuild variants of
+`src/entries/hook.ts` (same options as build/build.mjs), each run with `--cpu-prof`; scripts were temp only.
+
+| variant | bytes | compileSourceTextModule (cpu-prof, mean of 15) | fresh-process `import()` p50 / p95 (80 runs) |
+|---|---|---|---|
+| shipped bundle | 122,227 | 3.0-3.6 ms | 5.88 / 8.54 ms |
+| PreToolUse code only (store, index, compaction, journal, detached, decision, throttle stubbed) | 81,083 | 2.29 ms | 5.03 / 6.72 ms |
+| store/words.ts stubbed | 112,911 | not run | 5.70 / 7.95 ms |
+| `pure: ["Object.freeze"]` (drops unused frozen constants) | 114,351 | 3.00 ms | 5.51 / 6.33 ms |
+
+End to end, 5 batches of 10 runs per host with `--cpu-prof` (wall minus bare-node median; `--cpu-prof`
+adds its own cost): shipped claude-code 15.3-17.8 ms, codex 15.2-17.0 ms; PreToolUse-only claude-code
+14.7-17.2 ms, codex 14.7-16.4 ms. Wall p95 46-54 ms against bare p95 30-32 ms for all variants.
+
+Result: the most a PreToolUse-only bundle can save is about 1.3 ms of compile (34% fewer bytes). On this
+host that gain is smaller than the batch-to-batch noise, so the batches do not show it. No hook code
+change. Two rules block the change:
+- impl/13 §2.2 step 2 "static imports only" (`assertStaticImports` in build/build.mjs) and GP1
+  `adapter-bundle-static-imports` (#1201: hook.mjs copied alone must load) forbid a lazy `import()` of a
+  sibling chunk.
+- A split per event needs one bundle per event and a hook command per event in every host config (setup
+  registry, OUT_FILES, manifests, goldens). That is a design decision for the owner, not one fixer item.
+Budget unchanged (15 ms). Open: measure the codex number on a quiet host or CI before any split.
