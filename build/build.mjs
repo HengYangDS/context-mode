@@ -31,6 +31,7 @@ import {
 } from "../src/core/contracts/constants.ts";
 import { OUT_FILES, assertOutPackageJson, generateManifests } from "./manifests.ts";
 import { writeHashes } from "./hash.mjs";
+import { isReleaseVersion } from "../scripts/release/release-tags.mjs"; // x.y.z[-pre], D-RN-TAG-1
 import { getAdapter } from "../src/adapters/table.ts";
 import { renderSkill } from "../src/setup/registry.ts";
 
@@ -45,9 +46,6 @@ const FIXTURE_OUT = path.join("fixtures", "hook-roundtrip.json");
 const SHA_LENGTH = 40;
 const SHA_ALPHABET = "0123456789abcdef";
 // D-M6-B2-1: --version is three dot-separated decimal numbers (the form plan.mjs computes).
-const VERSION_PARTS = 3;
-const VERSION_SEP = ".";
-const DIGITS = "0123456789";
 // §2.2 step 6 / impl/13 §5: the 3 command skills, copied verbatim (D-M6-arch-6: only these ship).
 const SKILLS_DIR = "skills";
 const SKILL_FILE = "SKILL.md";
@@ -96,8 +94,7 @@ function parseArgs(argv) {
       }
     } else if (argv[i] === "--version" && i + 1 < argv.length) {
       version = argv[++i];
-      const parts = version.split(VERSION_SEP);
-      if (parts.length !== VERSION_PARTS || parts.some((p) => p === "" || [...p].some((c) => !DIGITS.includes(c)))) {
+      if (!isReleaseVersion(version)) {
         throw new BuildError(`--version ${version} is not an x.y.z release version`);
       }
     } else if (argv[i] === "--generated-only") {

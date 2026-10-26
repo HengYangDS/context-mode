@@ -67,8 +67,10 @@ test("[M6] build/version-flag: --version lands in every manifest; no flag keeps 
   }
 });
 
-test("[M6] build/version-invalid: --version that is not x.y.z fails with one build failed line", (t) => {
-  for (const bad of ["2.0", "v2.0.0", "2.0.0-rc.1", "2..0", "2.0.x"]) {
+// D-RN-TAG-1: x.y.z-<prerelease> is now a release version (2.0.0-rc.1 builds, see [RN] build/version-prerelease);
+// a malformed prerelease (2.0.0-rc..1) takes its place here.
+test("[M6] build/version-invalid: --version that is not x.y.z[-pre] fails with one build failed line", (t) => {
+  for (const bad of ["2.0", "v2.0.0", "2.0.0-rc..1", "2..0", "2.0.x"]) {
     const { status, stderr } = build(t, ["--version", bad]);
     assert.equal(status, 1, bad);
     assert.equal(stderr, `build failed: --version ${bad} is not an x.y.z release version\n`);
@@ -111,6 +113,7 @@ test("[M6] build/hashes-last: SHA256SUMS lists every other file in the tree with
 
 // Release-next (D-RN-TAG-1): a pushed tag v2.0.0-next.1 builds version 2.0.0-next.1; bad prerelease parts fail.
 test("[RN] build/version-prerelease: --version x.y.z-next.N lands in every manifest and package.json", (t) => {
+  assert.equal(build(t, ["--version", "2.0.0-rc.1"]).status, 0, "2.0.0-rc.1 is a prerelease version now");
   const rel = build(t, ["--version", "2.0.0-next.1"]);
   assert.equal(rel.status, 0, rel.stderr);
   for (const m of [...MANIFESTS, "package.json"]) {
