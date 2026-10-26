@@ -22,7 +22,11 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..
 const CONSTANTS_FILE = path.join(REPO_ROOT, "src", "core", "contracts", "constants.ts");
 const PROMPT_DIR = path.join(REPO_ROOT, "src", "prompt");
 // GS5: the only SKILL.md files a release tree may carry (impl/13 §5).
-const SHIPPED_SKILLS = ["skills/ctx-stats/SKILL.md", "skills/ctx-doctor/SKILL.md", "skills/ctx-upgrade/SKILL.md"];
+// D-HQ-SKILLS-1: the same 3 skills, rendered for Pi, also ship under pi/skills/ (package.json pi.skills).
+const SHIPPED_SKILLS = [
+  "skills/ctx-stats/SKILL.md", "skills/ctx-doctor/SKILL.md", "skills/ctx-upgrade/SKILL.md",
+  "pi/skills/ctx-stats/SKILL.md", "pi/skills/ctx-doctor/SKILL.md", "pi/skills/ctx-upgrade/SKILL.md",
+];
 const REPO_ONLY_PREFIX = ".claude/"; // .claude/skills/release/ stays in the repo (impl/13 §7 step 5)
 const LEGACY_PROTOCOL = "2025-11-25";
 const MODERN_PROTOCOL = "2026-07-28";
