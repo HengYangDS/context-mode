@@ -148,7 +148,8 @@ const LIST: Partial<Record<AgentId, { bin: string; args: string[] }>> = {
   qwen: { bin: "qwen", args: ["extensions", "list"] },
   "copilot-cli": { bin: "copilot", args: ["mcp", "list"] },
   pi: { bin: "pi", args: ["list"] },
-  opencode: { bin: "opencode", args: ["mcp", "list"] },
+  // D-HF-OPENCODE-LIST-1: --pure skips external plugins, so a fresh HOME does not wait on the @opencode-ai/plugin install.
+  opencode: { bin: "opencode", args: ["mcp", "list", "--pure"] },
 };
 
 function hookFilesFor(home: string, id: AgentId): HookFile[] {
