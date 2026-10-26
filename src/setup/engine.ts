@@ -3,7 +3,7 @@
 // Owner decisions D3 (hook overhead budget) and D4 (v1 forms replaced by the absolute form).
 import { CODEX_TRUST_PATH, codexTrustEntries } from "./codex-trust.ts";
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, closeSync, constants as fsc, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -14,6 +14,8 @@ import { detectV1 } from "../core/ops/detect-v1.ts";
 import { editHostConfigText } from "../core/ops/host-config.ts";
 import { BACKUP_DIR, COMMAND_SKILLS, LOCK_FILE, SKILL_FILE, STATE_DIR, assertWritable, buildRegistry, configEdits, hookCommandString, renderSkill } from "./registry.ts";
 import type { CheckRow, HookFile, SetupContext } from "./registry.ts";
+import { spawnForm, whichBin, winCmdLine } from "./spawn-bin.ts";
+export { spawnForm, whichBin, winCmdLine };
 import { SAMPLE_FILE, hookSample, sampleText, sampleVerdict } from "./hook-sample.ts";
 
 export const OVERHEAD_P95_MS = 15; // D3: hook wall minus bare node wall, p95, same host and run
@@ -53,24 +55,6 @@ interface Manifest { runId: string; path: string; entries: Entry[]; }
 
 // ---------- small helpers ----------
 
-const WIN_EXT = ".COM;.EXE;.BAT;.CMD";
-
-/** PATH lookup the way the host shell does it. On Windows, npm installs an agent CLI as `<bin>.cmd` (next to an
- *  extensionless sh script that cmd.exe cannot run), so only PATHEXT names match there. Env keys are matched without
- *  case, since Windows spells PATH as `Path`. */
-export function whichBin(bin: string, env: SetupContext["env"], platform: NodeJS.Platform = process.platform): string | undefined {
-  const get = (k: string): string | undefined => env[Object.keys(env).find((x) => x.toUpperCase() === k) ?? k];
-  const win = platform === "win32";
-  const exts = win ? (get("PATHEXT") || WIN_EXT).split(";").filter(Boolean) : [""];
-  const names = win && path.extname(bin) ? [bin] : exts.map((e) => bin + e.toLowerCase());
-  for (const dir of (get("PATH") ?? "").split(win ? ";" : ":").filter(Boolean)) {
-    for (const n of names) {
-      const f = path.join(dir, n);
-      try { accessSync(f, fsc.X_OK); if (statSync(f).isFile()) return f; } catch { /* next */ }
-    }
-  }
-  return undefined;
-}
 const which = whichBin;
 
 /** OPEN-ITEMS H8, ADR-0012 traps, D-FU-RF-2: a wrapper (the claude-worktree shim) can sit first on PATH. The real
@@ -117,21 +101,10 @@ export function hostBin(bin: string, env: SetupContext["env"], platform: NodeJS.
   return { file: undefined, shims };
 }
 
-/** cmd.exe line for a .cmd/.bat shim: Node refuses to spawn those without a shell (CVE-2024-27980). Each argument is
- *  quoted, so paths with spaces survive; the outer quotes are the /s form. */
-export function winCmdLine(file: string, args: string[]): string {
-  const q = (a: string): string => (a === "" || /[\s"&|<>^()%!]/.test(a) ? `"${a.replace(/"/g, '""')}"` : a);
-  return `"${[file, ...args].map(q).join(" ")}"`;
-}
-
-/** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe. */
+/** Runs an agent CLI found on PATH; a Windows .cmd/.bat shim goes through cmd.exe (spawnForm). */
 function runBin(bin: string, args: string[], env: SetupContext["env"], input?: string): ReturnType<typeof spawnSync> {
-  const file = hostBin(bin, env).file ?? bin;
-  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(file)) {
-    return spawnSync(env.ComSpec || "cmd.exe", ["/d", "/s", "/c", winCmdLine(file, args)],
-      { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: true, windowsHide: true });
-  }
-  return spawnSync(file, args, { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
+  const f = spawnForm(hostBin(bin, env).file ?? bin, args, env);
+  return spawnSync(f.command, f.args, { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
 }
 
 function readOr(file: string): string | undefined { return existsSync(file) ? readFileSync(file, "utf8") : undefined; }

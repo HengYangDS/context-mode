@@ -14,8 +14,10 @@ import {
   OWN_MCP_ENTRY, PLUGIN_KEY_SEPARATOR, PLUGIN_MARKETPLACE_NAME, PLUGIN_NAME, RELEASE_BRANCH, RELEASE_REPO_URL,
   SERVER_ENTRY_FILE, SERVER_KEY, UPGRADE_GIT_TIMEOUT_MS,
 } from "../../src/core/contracts/constants.ts";
+import { spawnForm, whichBin } from "../../src/setup/spawn-bin.ts";
 
 class StepFailed extends Error {}
+const WIN_ENV_KEYS = Object.freeze(["ComSpec", "PATHEXT", "SystemRoot", "TEMP", "TMP"]);
 
 // The real claude binary, the way bench/live/run.mjs realClaude() finds it (D-FU-RF-2): the first claude on PATH
 // whose resolved file starts with a native-binary magic (Mach-O, ELF, PE). A shim script is skipped, because a
@@ -54,9 +56,14 @@ function realClaude(pathVar) {
   throw new StepFailed(`no real claude binary on PATH${seen}`);
 }
 
-// One spawned step. A missing binary (ENOENT) has status null and its error on r.error.
+// One spawned step. A missing binary (ENOENT) has status null and its error on r.error. A bare name is looked up on
+// PATH the way setup does it (PATHEXT on Windows, where npm puts only <bin>.cmd/.ps1 shims), and a .cmd shim runs
+// through cmd.exe (D-RN-WIN-1); a name not found keeps its ENOENT.
 function run(env, cwd, cmd, args, input) {
-  const r = spawnSync(cmd, args, { cwd, env, input, encoding: "utf8", timeout: UPGRADE_GIT_TIMEOUT_MS });
+  const file = path.basename(cmd) === cmd ? (whichBin(cmd, env) ?? cmd) : cmd;
+  const f = spawnForm(file, args, env);
+  const r = spawnSync(f.command, f.args, { cwd, env, input, encoding: "utf8", timeout: UPGRADE_GIT_TIMEOUT_MS,
+    windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
   return { cmd: [cmd, ...args].join(" "), ok: r.status === 0, missing: r.error?.code === "ENOENT",
     out: r.stdout ?? "", err: r.error ? String(r.error.message) : (r.stderr ?? "") };
 }
@@ -136,7 +143,9 @@ async function main(a) {
     process.exit(1);
   }
   const home = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), `${SERVER_KEY}-smoke-${a.agent}-`)));
-  const env = { PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, TMPDIR: os.tmpdir() };
+  // Windows: cmd.exe (ComSpec), PATHEXT and SystemRoot carry over, or a .cmd shim and the CLIs it starts cannot run.
+  const win = Object.fromEntries(WIN_ENV_KEYS.flatMap((k) => (process.env[k] ? [[k, process.env[k]]] : [])));
+  const env = { ...win, PATH: process.env.PATH ?? "", HOME: home, USERPROFILE: home, TMPDIR: os.tmpdir() };
   try {
     const res = step(env, home, a);
     if (typeof res === "object") process.stdout.write(`${a.agent}: SKIPPED: ${res.skipped}\n`);

@@ -124,7 +124,7 @@ function winShim(fx, name, src) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(path.join(dir, `${name}.js`), `${src}\n`);
   writeFileSync(path.join(dir, `${name}.cmd`), `@"${process.execPath}" "%~dp0${name}.js" %*\r\n`);
-  fx.PATH = [dir, fx.PATH].join(path.delimiter);
+  fx.PATH = [dir, path.dirname(process.execPath), fx.PATH].join(path.delimiter); // node.exe for the server handshake
   fx.env = { TEMP: fx.tmp, TMP: fx.tmp, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec };
 }
 
