@@ -76,18 +76,18 @@ Every agent gets hooks and the skills `/ctx-doctor`, `/ctx-stats`, `/ctx-upgrade
 
 "Live saving" is the bytes of one large tool result that reach the model: without context-mode -> with v2. No run used a logged-in model session: each run piped the host's documented payload into the installed hook or plugin. Full runs: [hooks-all RESULT](../v2/spikes/hooks-all/RESULT.md).
 
-| Agent | Hook channel | Skills | Effect | Live saving (bytes off -> v2) | Date | Host version |
-|---|---|---|---|---|---|---|
-| Claude Code | plugin `hooks/claude-code.json` | plugin `skills/` | R | pass: 200,079 -> 319 | 2026-10-26 | not recorded |
-| Codex | `~/.codex/hooks.json` + trust tables in `config.toml` | `~/.codex/skills` | D | pass: 200,090 -> 427 | 2026-10-26 | not recorded |
-| Gemini CLI | extension `hooks/hooks.json` | extension `skills/` | R | pass: 250,930 -> 208 | 2026-10-26 | not recorded |
-| Qwen Code | extension `hooks/qwen.json` | `~/.qwen/skills` | D | pass: 200,120 -> 286 | 2026-10-26 | 0.26.1 |
-| Copilot CLI | `~/.copilot/hooks/context-mode.json` | `~/.copilot/skills` | R | not run after the fix (D-HA-COPILOT-REPLACE-1) | - | 1.0.103 (probe) |
-| VS Code (Copilot) | `~/.copilot/hooks/context-mode-vscode.json` | `~/.copilot/skills` | D | fail: 200,049 -> 404, hook gets no `--workspace-folder` | 2026-10-26 | not run |
-| Kiro | `~/.kiro/hooks/context-mode.json` | `~/.kiro/skills` | D | not run | - | not installed |
-| ZCode | `~/.zcode/cli/config.json` `hooks` | `~/.zcode/skills` | D | fail: 200,067 -> 447, hook shape and MCP key | 2026-10-26 | not installed |
-| Pi | in process `pi/index.js` | package `skills/` | R | fail: 200,067 -> 200,067; fixed after the run (D-HA-PI-PROJECT-1), re-run open | 2026-10-26 | 1.4.0 |
-| OpenCode | in process `opencode/plugin.js` | `~/.config/opencode/skills` | D | pass: 200,072 -> 264, stats not recorded | 2026-10-26 | not installed |
+| Agent | Hook channel | Skills | Effect | Live saving (bytes off -> v2) | Date | Host version | Doc-verified |
+|---|---|---|---|---|---|---|---|
+| Claude Code | plugin `hooks/claude-code.json` | plugin `skills/` | R | pass: 196,149 -> 286 | 2026-10-26 | 2.1.309 | yes |
+| Codex | `~/.codex/hooks.json` + trust tables in `config.toml` | `~/.codex/skills` | D | pass: 217,858 -> 392 | 2026-10-26 | 0.164.0 | partly: the docs page has no skills directory |
+| Gemini CLI | extension `hooks/hooks.json` | extension `skills/` | R | pass: 168,875 -> 343 | 2026-10-26 | 0.65.0 | partly: AfterTool deny text names `ctx_search`, host name is `mcp_context-mode_ctx_search` |
+| Qwen Code | extension `hooks/qwen.json` | `~/.qwen/skills` | D | pass: 212,544 -> 332 | 2026-10-26 | 0.26.1 | partly: no headless hook list |
+| Copilot CLI | `~/.copilot/hooks/context-mode.json` | `~/.copilot/skills` | R | pass: 203,669 -> 384 | 2026-10-26 | 1.0.103 | partly: MCP tool-name prefix not checked |
+| VS Code (Copilot) | `~/.copilot/hooks/context-mode-vscode.json` | `~/.copilot/skills` | D | pass: 204,513 -> 560 | 2026-10-26 | not run | partly: no loader run |
+| Kiro | `~/.kiro/hooks/context-mode.json` | `~/.kiro/skills` | D | pass: 183,551 -> 242 | 2026-10-26 | not installed | partly: stdin payload from adapter, not docs |
+| ZCode | `~/.zcode/cli/config.json` `hooks` | `~/.zcode/skills` | D | pass: 169,068 -> 443 | 2026-10-26 | not installed | partly: skills dir not in docs |
+| Pi | in process `pi/index.js` | package `skills/` | R | pass: 200,062 -> 160 | 2026-10-26 | 0.73.1 | yes: docs shipped in the installed package |
+| OpenCode | in process `opencode/plugin.js` | `~/.config/opencode/skills` | D | pass: 198,645 -> 235 | 2026-10-26 | not installed | partly: plugin tool name unproven live |
 
 ## From source
 

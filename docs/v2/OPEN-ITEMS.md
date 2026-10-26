@@ -81,13 +81,13 @@ Result: `docs/v2/spikes/hooks-all/RESULT.md`. Rules: ADR-0020. Merged into v2-de
 
 | # | Item | Status | Next step |
 |---|---|---|---|
-| H1 | vscode: hook command and MCP args have no `--workspace-folder`, so the hook gets `NO_PROJECT` (live 200,049 -> 404, fail) | open | Red test, then register the folder in one defined channel |
-| H2 | zcode: hooks are bare handlers, not matcher groups; MCP under `mcpServers`, not `mcp.servers` + `features.mcp` | open | Red test from the zcode docs, then fix setup |
-| H3 | pi: hook never resolved a project (live 200,067 -> 200,067) | fixed in code (D-HA-PI-PROJECT-1, D-HA-PI-NAMES-1) | Live re-run |
-| H4 | copilot-cli: `bash` unmapped, no replace | fixed in code (D-HA-COPILOT-NAMES-1, D-HA-COPILOT-REPLACE-1) | Live run |
+| H1 | vscode: hook command and MCP args have no `--workspace-folder`, so the hook gets `NO_PROJECT` (live 200,049 -> 404, fail) | closed | Re-run 2026-10-26: vscode pass 204,513 -> 560 (RESULT.md) |
+| H2 | zcode: hooks are bare handlers, not matcher groups; MCP under `mcpServers`, not `mcp.servers` + `features.mcp` | closed | Re-run 2026-10-26: zcode pass 169,068 -> 443 (RESULT.md) |
+| H3 | pi: hook never resolved a project (live 200,067 -> 200,067) | closed | Re-run 2026-10-26: pi pass 200,062 -> 160 (RESULT.md) |
+| H4 | copilot-cli: `bash` unmapped, no replace | closed | Re-run 2026-10-26: copilot-cli pass 203,669 -> 384 (RESULT.md) |
 | H5 | Doctor `hook-runs`/`hook-seen` passed on pi while the hook could not resolve a project | closed | D-HF-DOCTOR-RUNS-1: `hook-runs` sends a large shell read per host and FAILs unless the saving effect comes back with the project resolved |
 | H6 | opencode saving not recorded in `ctx_stats` (0 B; no execute rows in the journal) | closed | D-HF-INPROC-JOURNAL-1 (in-process ctx_* calls write the server row), D-HF-OPENCODE-SHELL-1 (bash is routed) |
-| H7 | No run used a logged-in model session; kiro not run | open | Live session per host when a login exists |
+| H7 | No run used a logged-in model session; kiro CLI, zcode CLI, VS Code loader not run | open | Live session per host when a login exists. 2026-10-26 re-run: all 10 agents pass with piped payloads (RESULT.md) |
 | H8 | claude-code setup fails when a shim is first on PATH | closed | D-HF-CLAUDE-SHIM-1 (setup/doctor run the real claude past a shim; the row prints `bin: <file>`) |
 | H9 | gemini hooks-fast round 1: AfterTool replace had no FATAL line; the handle line hint (`queries:["cat big.log"], source:"s1"`) gave No hits | answerOk: closed (probe sent AfterTool with no BeforeAgent; Gemini CLI 0.65.0 fires BeforeAgent with the prompt first, pinned in `tests/v2/hooks/gemini-live-order.test.mjs`). Hint: open | The handle-line query is the intent; when the output holds none of its words a source-scoped ctx_search returns No hits. Shared code (`REPLACE_HANDLE_LINE`, `ctx_search` source path): needs a design call, not a gemini fix |
 
