@@ -36,6 +36,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   generateManifests(dir);
   for (const s of SKILLS) cpSync(path.join(REPO, "skills", s), path.join(dir, "skills", s), { recursive: true });
   for (const s of SKILLS) cpSync(path.join(REPO, "skills", s), path.join(dir, "pi", "skills", s), { recursive: true }); // D-HQ-SKILLS-1: pi prefix is ""
+  for (const s of SKILLS) cpSync(path.join(REPO, "skills", s), path.join(dir, "claude-code", "skills", s), { recursive: true }); // D-HQ-SKILLS-2
   return dir;
 }
 

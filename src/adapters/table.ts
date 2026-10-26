@@ -30,7 +30,7 @@ export const ADAPTERS: readonly AdapterRow[] = Object.freeze([
     id: "claude-code", installMode: "marketplace", projectSource: "env:CLAUDE_PROJECT_DIR", toolNamePrefix: claudeCode.TOOL_NAME_PREFIX,
     nativeTools: CLAUDE_TOOLS, execReadOnlyHint: false, eventMap: CLAUDE_EVENTS,
     compactDelivery: "sessionstart", compactSummary: "none", hookTimeoutMs: HOOK_TIMEOUT_MS, denyChannel: "deny-reason",
-    hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "skills" }, // ADR-0020
+    hookChannel: { kind: "package", path: "hooks/claude-code.json" }, skillChannel: { kind: "package", path: "claude-code/skills" }, // ADR-0020, D-HQ-SKILLS-2
     decode: claudeCode.decode, encode: claudeCode.encode,
   },
   {

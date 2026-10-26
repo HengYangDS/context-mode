@@ -43,6 +43,7 @@ createInterface({ input: process.stdin }).on("line", (l) => {
   generateManifests(pkgDir);
   for (const k of ["ctx-doctor", "ctx-stats", "ctx-upgrade"]) cpSync(path.join(REPO, "skills", k), path.join(pkgDir, "skills", k), { recursive: true });
   for (const k of ["ctx-doctor", "ctx-stats", "ctx-upgrade"]) cpSync(path.join(REPO, "skills", k), path.join(pkgDir, "pi", "skills", k), { recursive: true }); // D-HQ-SKILLS-1
+  for (const k of ["ctx-doctor", "ctx-stats", "ctx-upgrade"]) cpSync(path.join(REPO, "skills", k), path.join(pkgDir, "claude-code", "skills", k), { recursive: true }); // D-HQ-SKILLS-2
   return { home, pkgDir, env: { PATH: "/usr/bin:/bin", HOME: home, CM_HOOK_OVERHEAD_BUDGET_MS: "60000" } };
 }
 

@@ -105,11 +105,11 @@ test("plugin and extension manifests carry name, dev version and the --agent MCP
   // D-M3-F-5: Claude Code runs the plugin server with cwd = the project, so the path names the plugin root.
   const claudeEntry = { "context-mode": { command: "node", args: ["${CLAUDE_PLUGIN_ROOT}/server.mjs", "--agent", "claude-code"] } };
   assert.deepEqual(readJson(dir, ".claude-plugin/plugin.json"), {
-    hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", version: "0.0.0-dev",
+    hooks: "./hooks/claude-code.json", mcpServers: claudeEntry, name: "context-mode", skills: "./claude-code/skills", version: "0.0.0-dev",
   });
   // D-INST-3: `claude plugin marketplace add <package dir>` (what setup runs) needs this file in the npm package.
   assert.deepEqual(readJson(dir, ".claude-plugin/marketplace.json"), {
-    name: "context-mode", owner: { name: "context-mode" }, plugins: [{ description: "Context Mode for Claude Code", name: "context-mode", source: "./", version: "0.0.0-dev" }],
+    name: "context-mode", owner: { name: "context-mode" }, plugins: [{ description: "Context Mode for Claude Code", name: "context-mode", skills: "./claude-code/skills", source: "./", version: "0.0.0-dev" }],
   });
   // D-FU-RM-GEMINI-1: Gemini expands ${extensionPath} and ${/} in the manifest and reads hooks only from <ext>/hooks/hooks.json.
   const geminiEntry = { "context-mode": { command: "node", args: ["${extensionPath}${/}server.mjs", "--agent", "gemini"] } };
@@ -195,7 +195,7 @@ test("an unknown installMode is a build-time hard stop (step 4)", (t) => {
 // name, version, bin, type, engines, files and pi (Pi reads "pi".extensions from the package dir); no dependencies,
 // no scripts, no private.
 const D1_FILES = [
-  ".claude-plugin", "SHA256SUMS", "cli.mjs", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
+  ".claude-plugin", "SHA256SUMS", "claude-code", "cli.mjs", "copilot", "fixtures", "gemini-extension.json", "hook.mjs", "hooks",
   "opencode", "pi", "qwen-extension.json", "run.mjs", "search.mjs", "server.mjs", "skills",
 ];
 test("package.json is the D1 npm shape: name, version, bin, type, engines, files, pi (extensions, skills)", (t) => {

@@ -56,6 +56,7 @@ function makePkg(dir) {
   writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "context-mode", version: "2.0.0", type: "module" }));
   cpSync(path.join(REPO, "skills"), path.join(dir, "skills"), { recursive: true }); // ADR-0020: package ships skills/
   cpSync(path.join(REPO, "skills"), path.join(dir, "pi", "skills"), { recursive: true }); // D-HQ-SKILLS-1: pi prefix is ""
+  cpSync(path.join(REPO, "skills"), path.join(dir, "claude-code", "skills"), { recursive: true }); // D-HQ-SKILLS-2
   return dir;
 }
 

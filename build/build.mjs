@@ -217,7 +217,7 @@ function copyFixture(outDir) {
 // §2.2 step 6: verbatim copy of skills/<name>/SKILL.md for the 3 command skills (impl/13 §5).
 // D-HQ-SKILLS-1: gemini loads <extension>/skills and pi loads package.json pi.skills as they are, so each host
 // gets its own copy, rendered from the one skills/ source with that host's real tool names (split/join).
-const SKILL_HOSTS = Object.freeze(["gemini", "pi"]);
+const SKILL_HOSTS = Object.freeze(["claude-code", "gemini", "pi"]); // D-HQ-SKILLS-2: claude-code reads claude-code/skills
 
 function copySkills(outDir) {
   for (const id of SKILL_HOSTS) {

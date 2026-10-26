@@ -210,7 +210,7 @@ const HOOK_CHANNEL = {
   opencode: { kind: "in-process", path: "opencode/plugin.js" },
 };
 const SKILL_CHANNEL = {
-  "claude-code": { kind: "package", path: "skills" },
+  "claude-code": { kind: "package", path: "claude-code/skills" }, // D-HQ-SKILLS-2
   codex: { kind: "home-dir", path: ".codex/skills" },
   gemini: { kind: "package", path: "skills" },
   qwen: { kind: "home-dir", path: ".qwen/skills" },

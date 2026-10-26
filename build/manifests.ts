@@ -123,6 +123,9 @@ const HOOK_SHAPES: Readonly<Record<AgentId, ((row: AdapterRow) => JsonObject) | 
 const GEMINI_HOOK_FILE = "hooks.json";
 const hookFile = (row: AdapterRow): string => HOOKS_DIR + "/" + (row.id === "gemini" ? GEMINI_HOOK_FILE : row.id + ".json");
 
+// D-HQ-SKILLS-2: the host's own rendered skills dir, relative to the plugin root (Claude Code plugins reference: ./ prefix).
+const skillsDir = (row: AdapterRow): string => "./" + row.skillChannel.path;
+
 function mcpManifest(row: AdapterRow, version: string): JsonObject {
   return {
     name: SERVER_KEY,
@@ -135,7 +138,7 @@ function mcpManifest(row: AdapterRow, version: string): JsonObject {
 function manifestFor(row: AdapterRow, version: string): [string, JsonObject] | null {
   switch (row.installMode) {
     case "marketplace":
-      return [".claude-plugin/plugin.json", { ...mcpManifest(row, version), hooks: "./" + hookFile(row) }]; // D-M3-A7-3
+      return [".claude-plugin/plugin.json", { ...mcpManifest(row, version), hooks: "./" + hookFile(row), skills: skillsDir(row) }]; // D-M3-A7-3, D-HQ-SKILLS-2
     case "extension": // qwen reads config.hooks, a path relative to the extension (D-FU-RM-QWEN-1)
       return [row.id + "-extension.json", row.id === "qwen" ? { ...mcpManifest(row, version), hooks: hookFile(row) } : mcpManifest(row, version)];
     case "plugin":
@@ -163,7 +166,7 @@ const NODE_ENGINE = ">=24.15.0"; // D1
 // D1 "files = the release tree": every top-level name build.mjs writes, except package.json (npm always packs it).
 // build.mjs assertOutTree fails the build when the real tree and this list differ.
 export const OUT_FILES: readonly string[] = [
-  ".claude-plugin", CLI_BUNDLE, "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
+  ".claude-plugin", "claude-code", CLI_BUNDLE, "copilot", "fixtures", "gemini-extension.json", HOOK_BUNDLE, HOOKS_DIR, "opencode", "pi",
   "qwen-extension.json", "run.mjs", "search.mjs", SERVER_BUNDLE, "skills", RELEASE_SUMS_FILE,
 ].slice().sort();
 const OUT_PACKAGE_KEYS: readonly string[] = ["bin", "engines", "files", "name", "pi", "type", "version"];
@@ -224,7 +227,7 @@ export function generateManifests(outDir: string, version: string = DEV_VERSION,
     if (row.installMode === "marketplace") { // D-INST-3: setup runs `claude plugin marketplace add <package dir>`
       files.push([".claude-plugin/marketplace.json", {
         name: SERVER_KEY, owner: { name: SERVER_KEY }, // Claude Code rejects a marketplace file without an owner object
-        plugins: [{ name: SERVER_KEY, source: "./", description: "Context Mode for Claude Code", version }],
+        plugins: [{ name: SERVER_KEY, source: "./", description: "Context Mode for Claude Code", version, skills: skillsDir(row) }],
       }]);
     }
     const shape = HOOK_SHAPES[row.id];

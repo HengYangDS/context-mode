@@ -1,7 +1,7 @@
 // D-HQ-SKILLS-2: for every host, the skill text that host ends up with names that host's real tool name and no
 // other host's. Package hosts read the built dir of their skill channel; home-dir hosts get what setup writes
 // (renderSkill of the built package's skill source with the host prefixes, as planSkills does).
-import { test } from "node:test";
+import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -17,13 +17,19 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 const SKILLS = ["ctx-doctor", "ctx-stats", "ctx-upgrade"];
 const SOURCE = Object.fromEntries(SKILLS.map((s) => [s, readFileSync(path.join(REPO, "skills", s, "SKILL.md"), "utf8")]));
 
-function built(t) {
-  const out = mkdtempSync(path.join(tmpdir(), "cm-v2-host-skills-"));
-  t.after(() => rmSync(out, { recursive: true, force: true }));
-  const r = spawnSync(process.execPath, [path.join(REPO, "build", "build.mjs"), "--out", out], { encoding: "utf8" });
+// One build for both tests. --generated-only first, as the CI gate does: parallel test files that build too would
+// otherwise delete src/prompt/_generated.ts under this build (D-M5-P2-5).
+let scratch;
+let out;
+before(() => {
+  scratch = mkdtempSync(path.join(tmpdir(), "cm-v2-host-skills-"));
+  out = path.join(scratch, "out");
+  const build = (...args) => spawnSync(process.execPath, [path.join(REPO, "build", "build.mjs"), ...args], { encoding: "utf8" });
+  assert.equal(build("--generated-only").status, 0);
+  const r = build("--out", out);
   assert.equal(r.status, 0, r.stderr);
-  return out;
-}
+});
+after(() => rmSync(scratch, { recursive: true, force: true }));
 
 // The tool names the source skill text uses, and the names a host may have in its text.
 const toolsIn = (text) => TOOL_ORDER.filter((tool) => text.includes(tool));
@@ -38,8 +44,7 @@ function shipped(out, id) {
   return { prefixes: s.prefixes, texts: Object.fromEntries(s.files.map((f) => [f.name, renderSkill(readFileSync(f.src, "utf8"), s.prefixes)])) };
 }
 
-test("[D-HQ-SKILLS-2] every host's shipped skill text names exactly its own real tool names", (t) => {
-  const out = built(t);
+test("[D-HQ-SKILLS-2] every host's shipped skill text names exactly its own real tool names", () => {
   for (const row of ADAPTERS) {
     const { prefixes, texts } = shipped(out, row.id);
     assert.deepEqual(Object.keys(texts).sort(), SKILLS, row.id);
@@ -56,8 +61,7 @@ test("[D-HQ-SKILLS-2] every host's shipped skill text names exactly its own real
   }
 });
 
-test("[D-HQ-SKILLS-2] claude-code ships its own skills dir and the plugin reads only that dir", (t) => {
-  const out = built(t);
+test("[D-HQ-SKILLS-2] claude-code ships its own skills dir and the plugin reads only that dir", () => {
   const claude = ADAPTERS.find((a) => a.id === "claude-code");
   assert.equal(claude.skillChannel.path, "claude-code/skills");
   const plugin = JSON.parse(readFileSync(path.join(out, ".claude-plugin", "plugin.json"), "utf8"));

@@ -35,6 +35,7 @@ rl.on("line", (l) => {
   // ADR-0020: the release package ships skills/; setup renders them into the host skill dir.
   cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(dir, "skills"), { recursive: true });
   cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(dir, "pi", "skills"), { recursive: true }); // D-HQ-SKILLS-1: pi prefix is ""
+  cpSync(path.join(import.meta.dirname, "..", "..", "..", "skills"), path.join(dir, "claude-code", "skills"), { recursive: true }); // D-HQ-SKILLS-2
   return dir;
 }
 
