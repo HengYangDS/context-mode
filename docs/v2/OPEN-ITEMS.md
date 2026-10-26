@@ -72,7 +72,7 @@ Result: `docs/v2/spikes/cache/RESULT.md`. Rules: ADR-0021.
 | C2 | One v2 Claude Code cross pair read 0 | open | Repeat the pair |
 | C3 | No live Pi or opencode cache run | open | Run when a login exists |
 | C4 | Gemini, qwen, copilot-cli, vscode, kiro, zcode unknown | open | Live two-turn run per host |
-| C5 | No prefix-determinism test or dynamic-token lint in the gate | open | Add to `scripts/gate.mjs` |
+| C5 | No prefix-determinism test or dynamic-token lint in the gate | closed (D-C5-PREFIX-1) | `tests/v2/cache/prefix-determinism.test.mjs`; `build/check-prompt-static.mjs` in gate `ci-checks` and `ci.yml` |
 
 ## Hooks on every agent (2026-10-26)
 
