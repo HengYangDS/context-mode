@@ -74,6 +74,21 @@ Result: `docs/v2/spikes/cache/RESULT.md`. Rules: ADR-0021.
 | C4 | Gemini, qwen, copilot-cli, vscode, kiro, zcode unknown | open | Live two-turn run per host |
 | C5 | No prefix-determinism test or dynamic-token lint in the gate | open | Add to `scripts/gate.mjs` |
 
+## Hooks on every agent (2026-10-26)
+
+Result: `docs/v2/spikes/hooks-all/RESULT.md`. Rules: ADR-0020. Merged into v2-design at 87443e30.
+
+| # | Item | Status | Next step |
+|---|---|---|---|
+| H1 | vscode: hook command and MCP args have no `--workspace-folder`, so the hook gets `NO_PROJECT` (live 200,049 -> 404, fail) | open | Red test, then register the folder in one defined channel |
+| H2 | zcode: hooks are bare handlers, not matcher groups; MCP under `mcpServers`, not `mcp.servers` + `features.mcp` | open | Red test from the zcode docs, then fix setup |
+| H3 | pi: hook never resolved a project (live 200,067 -> 200,067) | fixed in code (D-HA-PI-PROJECT-1, D-HA-PI-NAMES-1) | Live re-run |
+| H4 | copilot-cli: `bash` unmapped, no replace | fixed in code (D-HA-COPILOT-NAMES-1, D-HA-COPILOT-REPLACE-1) | Live run |
+| H5 | Doctor `hook-runs`/`hook-seen` passed on pi while the hook could not resolve a project | open | Doctor must check the hook decision, not only exit 0 |
+| H6 | opencode saving not recorded in `ctx_stats` (0 B; no execute rows in the journal) | open | Journal the execute.before deny |
+| H7 | No run used a logged-in model session; kiro not run | open | Live session per host when a login exists |
+| H8 | claude-code setup fails when a shim is first on PATH | open | Setup must find the real host CLI |
+
 ## Method limits
 
 - Test evidence is a name match between the map and test files. I did not read each assertion.
