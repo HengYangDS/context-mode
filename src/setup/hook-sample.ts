@@ -48,7 +48,8 @@ export function hookSample(id: AgentId, cwd: string, text: string): HookSample {
     case "gemini":
       return { effect, payload: { hook_event_name: event, session_id: SAMPLE_SESSION, cwd, tool_name: tool, tool_input: command, tool_response: { llmContent: text } } };
     case "copilot-cli":
-      return { effect, payload: { hookEventName: event, sessionId: SAMPLE_SESSION, cwd, toolName: tool, toolArgs: command, toolResult: { resultType: "success", textResultForLlm: text } } };
+      // D-HQ-COPILOT-EVENT-1: the documented payload names no event; toolArgs is a JSON string.
+      return { effect, payload: { sessionId: SAMPLE_SESSION, timestamp: Date.now(), cwd, toolName: tool, toolArgs: JSON.stringify(command), toolResult: { resultType: "success", textResultForLlm: text } } };
     case "pi":
       return { effect, payload: { type: event, sessionId: SAMPLE_SESSION, cwd, toolName: tool, input: command, content: text, isError: false } };
     case "opencode":

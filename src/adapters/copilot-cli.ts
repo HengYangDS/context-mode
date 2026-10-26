@@ -84,9 +84,22 @@ function readResult(v: unknown, casing: Casing, failure: boolean): ToolResultInf
   return { isError, bytes: Buffer.byteLength(text), text };
 }
 
+// D-HQ-COPILOT-EVENT-1: the documented camelCase payload (docs.github.com/en/copilot/reference/hooks-configuration)
+// names no event. Each event has its own key set: toolResult = postToolUse, toolName = preToolUse,
+// prompt = userPromptSubmitted, source = sessionStart. A payload that names its event keeps that name.
+const EVENT_BY_KEY: readonly (readonly [string, string])[] = [
+  ["toolResult", "postToolUse"], ["toolName", "preToolUse"], ["prompt", "userPromptSubmitted"], ["source", "sessionStart"],
+];
+
+function eventName(raw: Record<string, unknown>): unknown {
+  if (typeof raw.hookEventName === "string") return raw.hookEventName;
+  if (raw.hook_event_name !== undefined) return raw.hook_event_name;
+  return EVENT_BY_KEY.find(([key]) => Object.hasOwn(raw, key))?.[1];
+}
+
 export function decode(raw: unknown): CanonicalHookEvent {
   if (!isRecord(raw)) throw new Error("copilot-cli: hook payload is not a JSON object");
-  const name = typeof raw.hookEventName === "string" ? raw.hookEventName : raw.hook_event_name;
+  const name = eventName(raw);
   const native = typeof name === "string" ? NATIVE_EVENTS[name] : undefined;
   if (native === undefined) throw new Error("copilot-cli: unknown hook event " + String(name));
   const k = KEYS[native.casing];
