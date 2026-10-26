@@ -117,6 +117,36 @@ test("[M6] release/smoke: codex clones <repo>@<ref>, writes the config.toml entr
   assert.deepEqual(smokeHomes(fx), [], "throwaway HOME removed");
 });
 
+// D-RN-WIN-1: v2.0.0-next.1 smoke (windows-latest) failed "spawnSync codex ENOENT": npm on Windows puts only
+// codex.cmd/codex.ps1 on PATH. An npm-style .cmd shim per agent CLI, in a dir whose name has a space.
+function winShim(fx, name, src) {
+  const dir = path.join(fx.root, "npm bin");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${name}.js`), `${src}\n`);
+  writeFileSync(path.join(dir, `${name}.cmd`), `@"${process.execPath}" "%~dp0${name}.js" %*\r\n`);
+  fx.PATH = [dir, fx.PATH].join(path.delimiter);
+  fx.env = { TEMP: fx.tmp, TMP: fx.tmp, SystemRoot: process.env.SystemRoot, ComSpec: process.env.ComSpec };
+}
+
+test("[RN] release/smoke: on Windows codex is the npm codex.cmd shim; smoke runs it and passes (D-RN-WIN-1)", { skip: POSIX && "cmd.exe is Windows only" }, (t) => {
+  const fx = fixture(t);
+  winShim(fx, "codex", STUBS.codex);
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "codex", "--repo", fx.repo);
+  assert.equal(r.status, 0, r.err);
+  assert.ok(r.out.startsWith("codex: PASS: "), r.out);
+  assert.deepEqual(smokeHomes(fx), [], "throwaway HOME removed");
+});
+
+test("[RN] release/smoke: on Windows gemini is the npm gemini.cmd shim; smoke runs it with every argument (D-RN-WIN-1)", { skip: POSIX && "cmd.exe is Windows only" }, (t) => {
+  const fx = fixture(t);
+  winShim(fx, "gemini", `require("fs").writeFileSync(require("path").join(process.env.TMPDIR, "probe-gemini.json"), JSON.stringify(process.argv.slice(2)));`);
+  const r = smoke(fx, "--ref", "release-staging", "--agent", "gemini", "--repo", fx.repo);
+  assert.equal(r.status, 0, r.err);
+  assert.ok(r.out.startsWith("gemini: PASS: "), r.out);
+  assert.deepEqual(JSON.parse(readFileSync(path.join(fx.tmp, "probe-gemini.json"), "utf8")),
+    ["extensions", "install", fx.repo, "--ref", "release-staging", "--auto-update"]);
+});
+
 test("[M6] release/smoke: codex FAIL when the installed server does not answer as context-mode", { skip: !POSIX }, (t) => {
   const fx = fixture(t, { stubs: ["codex"], serverName: "other" });
   const r = smoke(fx, "--ref", "release-staging", "--agent", "codex", "--repo", fx.repo);

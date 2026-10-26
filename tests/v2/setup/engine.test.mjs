@@ -3,6 +3,7 @@
 // docs/v2/spikes/setup/S-V1.md (v1 entries). E2E style: temp HOME, a fake package dir (server.mjs answers MCP
 // initialize + tools/list, hook.mjs answers a hook call), fake agent binaries on a temp PATH.
 import { test } from "node:test";
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -10,7 +11,7 @@ import path from "node:path";
 
 import { ADAPTERS } from "../../../src/adapters/table.ts";
 import { TOOL_ORDER } from "../../../src/core/contracts/constants.ts";
-import { assertWritable, buildRegistry, hostBin, runDoctor, runRemove, runSetup, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
+import { assertWritable, buildRegistry, hostBin, runDoctor, runRemove, runSetup, spawnForm, whichBin, winCmdLine, LOCK_FILE, BACKUP_DIR } from "../../../src/setup/index.ts";
 
 const NODE = process.execPath;
 
@@ -329,6 +330,33 @@ test("whichBin: on Windows only PATHEXT names match (npm's <bin>.cmd shim), PATH
 test("winCmdLine: quotes each argument for cmd.exe /d /s /c", () => {
   assert.equal(winCmdLine("C:\\a b\\claude.cmd", ["plugin", "add", "C:\\x y", ""]), '""C:\\a b\\claude.cmd" plugin add "C:\\x y" """');
   assert.equal(winCmdLine("c.cmd", ['say "hi"']), '"c.cmd "say ""hi""""');
+});
+
+// D-RN-WIN-1: release smoke spawned `codex` by bare name on Windows and got ENOENT (npm puts only codex.cmd/.ps1 on
+// PATH). setup and smoke now share one spawn form: a .cmd/.bat shim runs through cmd.exe /d /s /c, any other file as is.
+test("spawnForm: a Windows .cmd/.bat shim runs through cmd.exe /d /s /c; any other file runs as is (D-RN-WIN-1)", () => {
+  const comspec = "C:\\Windows\\system32\\cmd.exe";
+  assert.deepEqual(spawnForm("C:\\n p\\codex.cmd", ["mcp", "list", "--json"], { ComSpec: comspec }, "win32"),
+    { command: comspec, args: ["/d", "/s", "/c", '""C:\\n p\\codex.cmd" mcp list --json"'], windowsVerbatimArguments: true });
+  assert.deepEqual(spawnForm("C:\\x\\GEMINI.BAT", ["a"], { COMSPEC: comspec }, "win32").command, comspec, "extension and env key in any case");
+  assert.equal(spawnForm("C:\\x\\q.cmd", [], {}, "win32").command, "cmd.exe", "no ComSpec: cmd.exe from PATH");
+  assert.deepEqual(spawnForm("C:\\x\\claude.exe", ["a"], {}, "win32"), { command: "C:\\x\\claude.exe", args: ["a"], windowsVerbatimArguments: false });
+  assert.deepEqual(spawnForm("/usr/bin/codex.cmd", ["a"], {}, "linux"), { command: "/usr/bin/codex.cmd", args: ["a"], windowsVerbatimArguments: false });
+});
+
+test("spawnForm: on Windows an npm-style .cmd shim in a dir with a space runs and gets every argument (D-RN-WIN-1)", { skip: process.platform !== "win32" && "cmd.exe is Windows only" }, (t) => {
+  const s = sandbox(t);
+  const dir = path.join(s.root, "npm bin");
+  mkdirSync(dir);
+  writeFileSync(path.join(dir, "echo-args.js"), "process.stdout.write(JSON.stringify(process.argv.slice(2)));\n");
+  writeFileSync(path.join(dir, "echo-args.cmd"), `@"${process.execPath}" "%~dp0echo-args.js" %*\r\n`);
+  const env = { ...process.env, PATH: dir };
+  const file = whichBin("echo-args", env);
+  assert.equal(file, path.join(dir, "echo-args.cmd"));
+  const f = spawnForm(file, ["mcp", "list", "--json", "a b"], env);
+  const r = spawnSync(f.command, f.args, { env, encoding: "utf8", windowsVerbatimArguments: f.windowsVerbatimArguments, windowsHide: true });
+  assert.equal(r.status, 0, `${r.error ?? ""} ${r.stderr}`);
+  assert.deepEqual(JSON.parse(r.stdout), ["mcp", "list", "--json", "a b"]);
 });
 
 // D-INST-1: `gemini extensions install <dir>` asks "trust this folder?" and waits for a key even with --consent, so a
