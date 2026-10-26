@@ -27,7 +27,13 @@ before(() => {
 after(() => {
   process.env.HOME = oldHome;
   if (oldProject !== undefined) process.env.CLAUDE_PROJECT_DIR = oldProject;
-  rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  // The entries keep their journal DB handle open until the process exits (D-HF-INPROC-JOURNAL-1), and Windows
+  // refuses to delete an open file. Only that case is tolerated; the OS temp dir is cleaned later (D-HQ-CI-WINRM-1).
+  try {
+    rmSync(root, { recursive: true, force: true, maxRetries: 3 });
+  } catch (err) {
+    if (process.platform !== "win32" || (err.code !== "EPERM" && err.code !== "EBUSY")) throw err;
+  }
 });
 
 function rows(agent) {
