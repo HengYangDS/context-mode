@@ -88,7 +88,7 @@ var require_src = __commonJS({
 // src/entries/cli.ts
 import { spawn as spawn2 } from "node:child_process";
 import { readFileSync as readFileSync5, realpathSync as realpathSync5 } from "node:fs";
-import path6 from "node:path";
+import path7 from "node:path";
 import { fileURLToPath as fileURLToPath2 } from "node:url";
 
 // src/core/contracts/constants.ts
@@ -1461,7 +1461,7 @@ import { spawnSync as spawnSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
 import { existsSync as existsSync7, mkdirSync as mkdirSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import os from "node:os";
-import path5 from "node:path";
+import path6 from "node:path";
 
 // node_modules/@clack/prompts/dist/index.mjs
 var dist_exports = {};
@@ -4364,7 +4364,7 @@ import { tmpdir } from "node:os";
 import { join as join3 } from "node:path";
 var isObj = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
 var keyPath = (...parts) => parts.join(".");
-var finding = (file, path7, reason) => ({ file, path: path7, reason });
+var finding = (file, path8, reason) => ({ file, path: path8, reason });
 function stripJsonc(text2) {
   let out2 = "";
   let inStr = false;
@@ -4879,16 +4879,16 @@ var TomlValue = class {
     return n3;
   }
 };
-function setPath(target, path7, value) {
+function setPath(target, path8, value) {
   let cur = target;
-  for (let k = 0; k < path7.length - 1; k += 1) {
-    const next = cur[path7[k]];
-    if (next === void 0) cur[path7[k]] = {};
+  for (let k = 0; k < path8.length - 1; k += 1) {
+    const next = cur[path8[k]];
+    if (next === void 0) cur[path8[k]] = {};
     else if (!isPlainObject(next)) throw new SyntaxError("key conflict");
-    cur = cur[path7[k]];
+    cur = cur[path8[k]];
   }
-  if (cur[path7[path7.length - 1]] !== void 0) throw new SyntaxError("duplicate key");
-  cur[path7[path7.length - 1]] = value;
+  if (cur[path8[path8.length - 1]] !== void 0) throw new SyntaxError("duplicate key");
+  cur[path8[path8.length - 1]] = value;
 }
 function scanToml(text2) {
   const value = {};
@@ -4906,11 +4906,11 @@ function scanToml(text2) {
       if (line.startsWith("[[")) throw new SyntaxError("array of tables");
       const close = line.indexOf("]");
       if (close < 0) throw new SyntaxError("header");
-      const path7 = tomlKeyPath(line.slice(1, close));
+      const path8 = tomlKeyPath(line.slice(1, close));
       if (tables.length > 0) tables[tables.length - 1].end = i2;
-      tables.push({ path: path7, start: i2, end: text2.length });
+      tables.push({ path: path8, start: i2, end: text2.length });
       let cur = value;
-      for (const seg of path7) {
+      for (const seg of path8) {
         if (cur[seg] === void 0) cur[seg] = {};
         if (!isPlainObject(cur[seg])) throw new SyntaxError("table conflict");
         cur = cur[seg];
@@ -4932,16 +4932,16 @@ function scanToml(text2) {
   }
   return { value, tables };
 }
-function parseHostConfig(agent, path7, text2, format) {
+function parseHostConfig(agent, path8, text2, format) {
   try {
     return format === "toml" ? scanToml(text2).value : scanJson(text2, format).value;
   } catch {
-    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path7, format });
+    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path8, format });
   }
 }
-function hostConfigValueAt(value, path7) {
+function hostConfigValueAt(value, path8) {
   let cur = value;
-  for (const seg of path7) {
+  for (const seg of path8) {
     if (!isPlainObject(cur)) return void 0;
     cur = cur[seg];
   }
@@ -4974,32 +4974,32 @@ function indentUnit(root, clean) {
 function render(value, unit, base) {
   return JSON.stringify(value, null, unit).split("\n").join("\n" + base);
 }
-function nest(path7, value) {
+function nest(path8, value) {
   let out2 = value;
-  for (let k = path7.length - 1; k >= 0; k -= 1) out2 = { [path7[k]]: out2 };
+  for (let k = path8.length - 1; k >= 0; k -= 1) out2 = { [path8[k]]: out2 };
   return out2;
 }
-function setJsonText(text2, format, path7, value) {
+function setJsonText(text2, format, path8, value) {
   const doc = scanJson(text2, format);
   const unit = indentUnit(doc.root, doc.clean);
-  if (doc.root === null) return render(nest(path7, value), unit, "") + "\n";
+  if (doc.root === null) return render(nest(path8, value), unit, "") + "\n";
   let node = doc.root;
   let depth = 0;
-  while (depth < path7.length && node.kind === "object") {
-    const hit = node.members.find((m3) => m3.key === path7[depth]);
+  while (depth < path8.length && node.kind === "object") {
+    const hit = node.members.find((m3) => m3.key === path8[depth]);
     if (hit === void 0) break;
     node = hit.node;
     depth += 1;
   }
-  if (depth === path7.length) {
+  if (depth === path8.length) {
     return text2.slice(0, node.start) + render(value, unit, lineIndent(doc.clean, node.start)) + text2.slice(node.end);
   }
-  if (node.kind !== "object") throw new SyntaxError("not an object at " + path7.slice(0, depth).join("."));
-  const rest = nest(path7.slice(depth + 1), value);
+  if (node.kind !== "object") throw new SyntaxError("not an object at " + path8.slice(0, depth).join("."));
+  const rest = nest(path8.slice(depth + 1), value);
   const last = node.members[node.members.length - 1];
   if (last === void 0) {
     const base2 = lineIndent(doc.clean, node.start);
-    const member2 = "\n" + base2 + unit + JSON.stringify(path7[depth]) + ": " + render(rest, unit, base2 + unit) + "\n" + base2;
+    const member2 = "\n" + base2 + unit + JSON.stringify(path8[depth]) + ": " + render(rest, unit, base2 + unit) + "\n" + base2;
     return text2.slice(0, node.start + 1) + member2 + text2.slice(node.end - 1);
   }
   const base = lineIndent(doc.clean, last.keyStart);
@@ -5007,7 +5007,7 @@ function setJsonText(text2, format, path7, value) {
   while (" 	\r\n".includes(doc.clean[at])) at += 1;
   const trailing = doc.clean[at] === ",";
   const insertAt = trailing ? at + 1 : last.node.end;
-  const member = (trailing ? "" : ",") + "\n" + base + JSON.stringify(path7[depth]) + ": " + render(rest, unit, base);
+  const member = (trailing ? "" : ",") + "\n" + base + JSON.stringify(path8[depth]) + ": " + render(rest, unit, base);
   return text2.slice(0, insertAt) + member + text2.slice(insertAt);
 }
 function tomlScalar(v) {
@@ -5023,20 +5023,20 @@ function tomlHeaderKey(seg) {
   }
   return seg;
 }
-function tomlBlock(path7, value) {
-  let out2 = "[" + path7.map(tomlHeaderKey).join(".") + "]\n";
+function tomlBlock(path8, value) {
+  let out2 = "[" + path8.map(tomlHeaderKey).join(".") + "]\n";
   const subs = [];
   for (const [k, v] of Object.entries(value)) {
-    if (isPlainObject(v)) subs.push(tomlBlock([...path7, k], v));
+    if (isPlainObject(v)) subs.push(tomlBlock([...path8, k], v));
     else out2 += tomlHeaderKey(k) + " = " + tomlScalar(v) + "\n";
   }
   return [out2, ...subs].join("\n");
 }
-function setTomlText(text2, path7, value) {
+function setTomlText(text2, path8, value) {
   if (!isPlainObject(value)) throw new SyntaxError("TOML edits replace a whole table");
   const doc = scanToml(text2);
-  const owned = doc.tables.filter((t2) => t2.path.length >= path7.length && path7.every((seg, k) => t2.path[k] === seg));
-  const block2 = tomlBlock(path7, value);
+  const owned = doc.tables.filter((t2) => t2.path.length >= path8.length && path8.every((seg, k) => t2.path[k] === seg));
+  const block2 = tomlBlock(path8, value);
   if (owned.length === 0) {
     const sep = text2 === "" ? "" : text2.endsWith("\n\n") ? "" : text2.endsWith("\n") ? "\n" : "\n\n";
     return text2 + sep + block2;
@@ -5050,27 +5050,27 @@ function setTomlText(text2, path7, value) {
   const tail = text2.slice(cursor3);
   return out2 + (tail === "" || block2.endsWith("\n\n") ? "" : "\n") + tail;
 }
-function setText(agent, path7, text2, format, key, value) {
+function setText(agent, path8, text2, format, key, value) {
   try {
     return format === "toml" ? setTomlText(text2, key, value) : setJsonText(text2, format, key, value);
   } catch {
-    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path7, format });
+    throw new CtxError("CONFIG_PARSE_FAILED", { agent, path: path8, format });
   }
 }
-function applyEdits(agent, path7, text2, format, wanted) {
-  const parsed = parseHostConfig(agent, path7, text2, format);
+function applyEdits(agent, path8, text2, format, wanted) {
+  const parsed = parseHostConfig(agent, path8, text2, format);
   let out2 = text2;
   const edits = [];
   for (const [key, after] of wanted) {
     const before = hostConfigValueAt(parsed, key);
     if (sameValue(before, after)) continue;
-    out2 = setText(agent, path7, out2, format, key, after);
+    out2 = setText(agent, path8, out2, format, key, after);
     edits.push({ path: key.join("."), before, after });
   }
   return { text: out2, format, edits };
 }
-function editHostConfigText(agent, path7, text2, format, wanted) {
-  return applyEdits(agent, path7, text2, format, wanted);
+function editHostConfigText(agent, path8, text2, format, wanted) {
+  return applyEdits(agent, path8, text2, format, wanted);
 }
 
 // src/core/ops/plugin-root.ts
@@ -5386,9 +5386,46 @@ function codexTrustEntries(hooksFile, doc, command) {
 
 // src/setup/engine.ts
 import { spawn, spawnSync } from "node:child_process";
-import { accessSync, closeSync, constants as fsc, existsSync as existsSync6, mkdirSync as mkdirSync2, mkdtempSync, openSync, readFileSync as readFileSync3, readSync, readdirSync as readdirSync4, realpathSync as realpathSync4, renameSync as renameSync2, rmSync, statSync, unlinkSync, writeFileSync as writeFileSync2 } from "node:fs";
+import { closeSync, existsSync as existsSync6, mkdirSync as mkdirSync2, mkdtempSync, openSync, readFileSync as readFileSync3, readSync, readdirSync as readdirSync4, realpathSync as realpathSync4, renameSync as renameSync2, rmSync, statSync as statSync2, unlinkSync, writeFileSync as writeFileSync2 } from "node:fs";
 import { tmpdir as tmpdir2 } from "node:os";
+import path5 from "node:path";
+
+// src/setup/spawn-bin.ts
+import { accessSync, constants as fsc, statSync } from "node:fs";
 import path4 from "node:path";
+var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
+var WIN_SHIM_EXTS = Object.freeze([".cmd", ".bat"]);
+var DEFAULT_COMSPEC = "cmd.exe";
+function envGet(env, k) {
+  return env[Object.keys(env).find((x2) => x2.toUpperCase() === k) ?? k];
+}
+function whichBin(bin, env, platform = process.platform) {
+  const get = (k) => envGet(env, k);
+  const win = platform === "win32";
+  const exts = win ? (get("PATHEXT") || WIN_EXT).split(";").filter(Boolean) : [""];
+  const names = win && path4.extname(bin) ? [bin] : exts.map((e) => bin + e.toLowerCase());
+  for (const dir of (get("PATH") ?? "").split(win ? ";" : ":").filter(Boolean)) {
+    for (const n3 of names) {
+      const f2 = path4.join(dir, n3);
+      try {
+        accessSync(f2, fsc.X_OK);
+        if (statSync(f2).isFile()) return f2;
+      } catch {
+      }
+    }
+  }
+  return void 0;
+}
+function winCmdLine(file, args) {
+  const q = (a2) => a2 === "" || /[\s"&|<>^()%!]/.test(a2) ? `"${a2.replace(/"/g, '""')}"` : a2;
+  return `"${[file, ...args].map(q).join(" ")}"`;
+}
+function spawnForm(file, args, env, platform = process.platform) {
+  if (platform === "win32" && WIN_SHIM_EXTS.includes(path4.extname(file).toLowerCase())) {
+    return { command: envGet(env, "COMSPEC") || DEFAULT_COMSPEC, args: ["/d", "/s", "/c", winCmdLine(file, args)], windowsVerbatimArguments: true };
+  }
+  return { command: file, args, windowsVerbatimArguments: false };
+}
 
 // src/setup/hook-sample.ts
 var SAMPLE_FILE = "big.log";
@@ -5464,24 +5501,6 @@ var MANIFEST = "manifest.json";
 var MANIFEST_DONE = "manifest.removed.json";
 var FILES = "files";
 var V1_HOOK_MARK = "context-mode hook";
-var WIN_EXT = ".COM;.EXE;.BAT;.CMD";
-function whichBin(bin, env, platform = process.platform) {
-  const get = (k) => env[Object.keys(env).find((x2) => x2.toUpperCase() === k) ?? k];
-  const win = platform === "win32";
-  const exts = win ? (get("PATHEXT") || WIN_EXT).split(";").filter(Boolean) : [""];
-  const names = win && path4.extname(bin) ? [bin] : exts.map((e) => bin + e.toLowerCase());
-  for (const dir of (get("PATH") ?? "").split(win ? ";" : ":").filter(Boolean)) {
-    for (const n3 of names) {
-      const f2 = path4.join(dir, n3);
-      try {
-        accessSync(f2, fsc.X_OK);
-        if (statSync(f2).isFile()) return f2;
-      } catch {
-      }
-    }
-  }
-  return void 0;
-}
 var which = whichBin;
 var REAL_HOST = Object.freeze({
   claude: { pkg: "@anthropic-ai/claude-code", extra: [["claude.exe"], ["node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe"]] }
@@ -5499,8 +5518,8 @@ function isNativeBinary(file) {
   return BINARY_MAGICS.some((m3) => hex.startsWith(m3));
 }
 function owningPackage(dir) {
-  for (let d = dir; ; d = path4.dirname(d)) {
-    const f2 = path4.join(d, "package.json");
+  for (let d = dir; ; d = path5.dirname(d)) {
+    const f2 = path5.join(d, "package.json");
     if (existsSync6(f2)) {
       try {
         return String(JSON.parse(readFileSync3(f2, "utf8")).name);
@@ -5508,7 +5527,7 @@ function owningPackage(dir) {
         return void 0;
       }
     }
-    if (path4.dirname(d) === d) return void 0;
+    if (path5.dirname(d) === d) return void 0;
   }
 }
 function hostBin(bin, env, platform = process.platform) {
@@ -5518,36 +5537,25 @@ function hostBin(bin, env, platform = process.platform) {
   const shims = [];
   for (const dir of (get("PATH") ?? "").split(platform === "win32" ? ";" : ":").filter(Boolean)) {
     const own2 = which(bin, { PATH: dir, ...get("PATHEXT") ? { PATHEXT: get("PATHEXT") } : {} }, platform);
-    for (const f2 of [own2, ...real.extra.map((p3) => path4.join(dir, ...p3))]) {
-      if (!f2 || !existsSync6(f2) || !statSync(f2).isFile()) continue;
+    for (const f2 of [own2, ...real.extra.map((p3) => path5.join(dir, ...p3))]) {
+      if (!f2 || !existsSync6(f2) || !statSync2(f2).isFile()) continue;
       const file = realpathSync4(f2);
-      if (isNativeBinary(file) || owningPackage(path4.dirname(file)) === real.pkg) return { file, shims };
+      if (isNativeBinary(file) || owningPackage(path5.dirname(file)) === real.pkg) return { file, shims };
       shims.push(f2);
     }
   }
   return { file: void 0, shims };
 }
-function winCmdLine(file, args) {
-  const q = (a2) => a2 === "" || /[\s"&|<>^()%!]/.test(a2) ? `"${a2.replace(/"/g, '""')}"` : a2;
-  return `"${[file, ...args].map(q).join(" ")}"`;
-}
 function runBin(bin, args, env, input) {
-  const file = hostBin(bin, env).file ?? bin;
-  if (process.platform === "win32" && /\.(cmd|bat)$/i.test(file)) {
-    return spawnSync(
-      env.ComSpec || "cmd.exe",
-      ["/d", "/s", "/c", winCmdLine(file, args)],
-      { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: true, windowsHide: true }
-    );
-  }
-  return spawnSync(file, args, { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsHide: true });
+  const f2 = spawnForm(hostBin(bin, env).file ?? bin, args, env);
+  return spawnSync(f2.command, f2.args, { env, encoding: "utf8", input, timeout: VERIFY_TIMEOUT_MS, windowsVerbatimArguments: f2.windowsVerbatimArguments, windowsHide: true });
 }
 function readOr(file) {
   return existsSync6(file) ? readFileSync3(file, "utf8") : void 0;
 }
 function atomicWrite(file, text2) {
-  mkdirSync2(path4.dirname(file), { recursive: true });
-  const tmp = path4.join(path4.dirname(file), `.${path4.basename(file)}.cm-tmp-${process.pid}`);
+  mkdirSync2(path5.dirname(file), { recursive: true });
+  const tmp = path5.join(path5.dirname(file), `.${path5.basename(file)}.cm-tmp-${process.pid}`);
   writeFileSync2(tmp, text2);
   renameSync2(tmp, file);
 }
@@ -5836,14 +5844,14 @@ function hookRegisteredCheck(row, env, list2) {
   return { name: "hook-registered", ok: false, detail: `${h2.file} lacks the context-mode hook entry` };
 }
 function hookRunsCheck(row, env) {
-  const root = mkdtempSync(path4.join(tmpdir2(), "cm-doctor-runs-"));
+  const root = mkdtempSync(path5.join(tmpdir2(), "cm-doctor-runs-"));
   try {
-    const home = path4.join(root, "home");
-    const proj = path4.join(root, "proj");
+    const home = path5.join(root, "home");
+    const proj = path5.join(root, "proj");
     mkdirSync2(home);
     mkdirSync2(proj);
     const text2 = sampleText();
-    writeFileSync2(path4.join(proj, SAMPLE_FILE), text2);
+    writeFileSync2(path5.join(proj, SAMPLE_FILE), text2);
     const { effect, payload } = hookSample(row.id, proj, text2);
     const sampleEnv = { ...env, HOME: home, USERPROFILE: home };
     delete sampleEnv.CLAUDE_PROJECT_DIR;
@@ -5858,7 +5866,7 @@ function hookRunsCheck(row, env) {
 var SEEN_SQL = "SELECT 1 FROM events WHERE agent = ? LIMIT 1";
 var NOT_SEEN_LINE = "not seen yet, run one tool call";
 function hookSeenCheck(row, home) {
-  const base = path4.join(home, STATE_DIR, PROJECTS_DIR_NAME);
+  const base = path5.join(home, STATE_DIR, PROJECTS_DIR_NAME);
   const dirs = existsSync6(base) ? readdirSync4(base) : [];
   let sqlite;
   try {
@@ -5867,7 +5875,7 @@ function hookSeenCheck(row, home) {
     sqlite = void 0;
   }
   for (const d of dirs) {
-    const file = path4.join(base, d, DB_FILE_NAME);
+    const file = path5.join(base, d, DB_FILE_NAME);
     if (!sqlite || !existsSync6(file)) continue;
     let db;
     try {
@@ -5883,7 +5891,7 @@ function hookSeenCheck(row, home) {
 function skillsCheck(row, pkgDir) {
   const s = row.skillInstall;
   if (s.kind === "package") {
-    const miss = COMMAND_SKILLS.map((n3) => path4.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync6(f2));
+    const miss = COMMAND_SKILLS.map((n3) => path5.join(pkgDir, s.via, n3, SKILL_FILE)).filter((f2) => !existsSync6(f2));
     return { name: "skills", ok: miss.length === 0, detail: miss.length ? `missing ${miss.join(", ")}` : void 0 };
   }
   const bad = s.files.filter((f2) => readOr(f2.file) !== (existsSync6(f2.src) ? renderSkill(readFileSync3(f2.src, "utf8"), s.prefixes) : void 0));
@@ -5908,16 +5916,16 @@ var Run = class {
     this.runId = runId;
   }
   get dir() {
-    return path4.join(this.root, BACKUP_DIR, this.runId);
+    return path5.join(this.root, BACKUP_DIR, this.runId);
   }
   save() {
-    if (this.manifest) atomicWrite(path4.join(this.dir, MANIFEST), JSON.stringify(this.manifest, null, 2));
+    if (this.manifest) atomicWrite(path5.join(this.dir, MANIFEST), JSON.stringify(this.manifest, null, 2));
   }
   record(e, bytes) {
     if (!this.manifest) this.manifest = { runId: this.runId, path: this.dir, entries: [] };
     if (bytes !== void 0) {
-      const rel = path4.join(FILES, String(this.manifest.entries.length));
-      atomicWrite(path4.join(this.dir, rel), bytes);
+      const rel = path5.join(FILES, String(this.manifest.entries.length));
+      atomicWrite(path5.join(this.dir, rel), bytes);
       e.backup = rel;
     }
     this.manifest.entries.push(e);
@@ -5937,12 +5945,12 @@ function undo(dir, entries, env) {
       continue;
     }
     if (!e.file) continue;
-    if (e.existed && e.backup) atomicWrite(e.file, readFileSync3(path4.join(dir, e.backup), "utf8"));
+    if (e.existed && e.backup) atomicWrite(e.file, readFileSync3(path5.join(dir, e.backup), "utf8"));
     else if (existsSync6(e.file)) unlinkSync(e.file);
   }
 }
 function takeLock(root, runId) {
-  const file = path4.join(root, LOCK_FILE);
+  const file = path5.join(root, LOCK_FILE);
   mkdirSync2(root, { recursive: true });
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
@@ -5962,17 +5970,17 @@ function takeLock(root, runId) {
   return `setup lock ${file} could not be taken`;
 }
 function detectAgents(reg, ctx) {
-  return reg.filter((r2) => existsSync6(path4.join(ctx.home, ...AGENT_HOME_DIR[r2.id])) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
+  return reg.filter((r2) => existsSync6(path5.join(ctx.home, ...AGENT_HOME_DIR[r2.id])) || r2.listCommand && which(r2.listCommand.bin, ctx.env)).map((r2) => r2.id);
 }
 async function runSetup(opts) {
   const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const runId = opts.runId ?? (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
-    if (!existsSync6(path4.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path4.join(ctx.pkgDir, f2)} is missing` };
+    if (!existsSync6(path5.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path5.join(ctx.pkgDir, f2)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
-  const root = path4.join(ctx.home, STATE_DIR);
+  const root = path5.join(ctx.home, STATE_DIR);
   if (!opts.dryRun) {
     const held = takeLock(root, runId);
     if (held) return { exitCode: 1, agents: [], error: held };
@@ -5982,7 +5990,7 @@ async function runSetup(opts) {
   let current;
   const onAbort = () => {
     if (current !== void 0 && !opts.dryRun) run.rollback(current, ctx.env);
-    if (!opts.dryRun) rmSync(path4.join(root, LOCK_FILE), { force: true });
+    if (!opts.dryRun) rmSync(path5.join(root, LOCK_FILE), { force: true });
   };
   opts.signal?.addEventListener("abort", onAbort, { once: true });
   try {
@@ -6001,7 +6009,7 @@ async function runSetup(opts) {
     }
   } finally {
     opts.signal?.removeEventListener("abort", onAbort);
-    if (!opts.dryRun) rmSync(path4.join(root, LOCK_FILE), { force: true });
+    if (!opts.dryRun) rmSync(path5.join(root, LOCK_FILE), { force: true });
   }
   return { exitCode: agents.some((a2) => a2.status === "FAIL") ? 1 : 0, agents, backupDir: run.manifest ? run.dir : void 0 };
 }
@@ -6052,10 +6060,10 @@ async function runDoctor(opts) {
   const ctx = { home: opts.home, pkgDir: opts.pkgDir, env: opts.env };
   const reg = buildRegistry(ctx);
   for (const f2 of ["server.mjs", "hook.mjs"]) {
-    if (!existsSync6(path4.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path4.join(ctx.pkgDir, f2)} is missing` };
+    if (!existsSync6(path5.join(ctx.pkgDir, f2))) return { exitCode: 1, agents: [], error: `preflight: ${path5.join(ctx.pkgDir, f2)} is missing` };
   }
   const ids = opts.agents ?? detectAgents(reg, ctx);
-  const run = new Run(path4.join(ctx.home, STATE_DIR), "doctor");
+  const run = new Run(path5.join(ctx.home, STATE_DIR), "doctor");
   const agents = [];
   for (const id of ids) {
     const row = reg.find((r2) => r2.id === id);
@@ -6095,22 +6103,22 @@ function isTrust(row, c3) {
 }
 function runRemove(opts) {
   const env = opts.env ?? process.env;
-  const root = path4.join(opts.home, STATE_DIR);
-  const base = path4.join(root, BACKUP_DIR);
+  const root = path5.join(opts.home, STATE_DIR);
+  const base = path5.join(root, BACKUP_DIR);
   if (!existsSync6(base)) return { exitCode: 0, restored: 0 };
   const held = takeLock(root, "remove");
   if (held) return { exitCode: 1, restored: 0, error: held };
   let restored = 0;
   try {
-    const runs = readdirSync4(base).map((r2) => path4.join(base, r2)).filter((d) => existsSync6(path4.join(d, MANIFEST))).sort().reverse();
+    const runs = readdirSync4(base).map((r2) => path5.join(base, r2)).filter((d) => existsSync6(path5.join(d, MANIFEST))).sort().reverse();
     for (const dir of runs) {
-      const m3 = JSON.parse(readFileSync3(path4.join(dir, MANIFEST), "utf8"));
+      const m3 = JSON.parse(readFileSync3(path5.join(dir, MANIFEST), "utf8"));
       undo(dir, m3.entries, env);
       restored += m3.entries.length;
-      renameSync2(path4.join(dir, MANIFEST), path4.join(dir, MANIFEST_DONE));
+      renameSync2(path5.join(dir, MANIFEST), path5.join(dir, MANIFEST_DONE));
     }
   } finally {
-    rmSync(path4.join(root, LOCK_FILE), { force: true });
+    rmSync(path5.join(root, LOCK_FILE), { force: true });
   }
   return { exitCode: 0, restored };
 }
@@ -6307,9 +6315,9 @@ async function report(ui, command, res, write) {
   const { text: text2, title } = buildIssueReport(command, res, ui);
   let file = "";
   if (write) {
-    const dir = path5.join(ui.ctx.home, STATE_DIR, REPORT_DIR);
+    const dir = path6.join(ui.ctx.home, STATE_DIR, REPORT_DIR);
     mkdirSync3(dir, { recursive: true });
-    file = path5.join(dir, `${command}-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.md`);
+    file = path6.join(dir, `${command}-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.md`);
     writeFileSync3(file, text2);
   }
   const gh = `gh issue create --repo ${ISSUE_REPO} --title ${JSON.stringify(title)} --body-file ${JSON.stringify(file || "<report>")}`;
@@ -6417,7 +6425,7 @@ async function remove(ui) {
     }
   }
   if (ui.f.dryRun) {
-    out(`Would restore every file recorded under ${path5.join(ui.ctx.home, STATE_DIR, "backups")}`);
+    out(`Would restore every file recorded under ${path6.join(ui.ctx.home, STATE_DIR, "backups")}`);
     return EXIT_OK;
   }
   const r2 = runRemove({ home: ui.ctx.home, env: ui.ctx.env });
@@ -6550,7 +6558,7 @@ async function upgrade(ui) {
     return EXIT_FAIL;
   }
   const root = `${spawnSync2(npm, ["root", "-g"], { env: ui.ctx.env, encoding: "utf8", shell }).stdout ?? ""}`.trim();
-  const cli = path5.join(root, "context-mode", "cli.mjs");
+  const cli = path6.join(root, "context-mode", "cli.mjs");
   if (!root || !existsSync7(cli)) {
     err(`FAIL upgrade: ${cli} not found after ${install}. Fix: ${install}`);
     return EXIT_FAIL;
@@ -6634,10 +6642,10 @@ function route(argv, version) {
 ` };
 }
 function main() {
-  const dir = path6.dirname(realpathSync5(fileURLToPath2(import.meta.url)));
+  const dir = path7.dirname(realpathSync5(fileURLToPath2(import.meta.url)));
   let version = "";
   try {
-    version = String(JSON.parse(readFileSync5(path6.join(dir, PACKAGE_FILE), "utf8")).version);
+    version = String(JSON.parse(readFileSync5(path7.join(dir, PACKAGE_FILE), "utf8")).version);
   } catch (err2) {
     process.stderr.write(`${SERVER_KEY}: cannot read ${PACKAGE_FILE}: ${err2.message}
 `);
@@ -6661,7 +6669,7 @@ function main() {
     process.exitCode = r2.code;
     return;
   }
-  const child = spawn2(process.execPath, [path6.join(dir, r2.file), ...r2.args], { stdio: "inherit" });
+  const child = spawn2(process.execPath, [path7.join(dir, r2.file), ...r2.args], { stdio: "inherit" });
   process.on("SIGINT", () => {
   });
   child.on("error", (err2) => {
