@@ -350,7 +350,8 @@ test("spawnForm: on Windows an npm-style .cmd shim in a dir with a space runs an
   mkdirSync(dir);
   writeFileSync(path.join(dir, "echo-args.js"), "process.stdout.write(JSON.stringify(process.argv.slice(2)));\n");
   writeFileSync(path.join(dir, "echo-args.cmd"), `@"${process.execPath}" "%~dp0echo-args.js" %*\r\n`);
-  const env = { ...process.env, PATH: dir };
+  // Windows spells it `Path`; drop it so the test PATH is the only PATH key (Node's spawn, like whichBin, uses the first).
+  const env = { ...Object.fromEntries(Object.entries(process.env).filter(([k]) => k.toUpperCase() !== "PATH")), PATH: dir };
   const file = whichBin("echo-args", env);
   assert.equal(file, path.join(dir, "echo-args.cmd"));
   const f = spawnForm(file, ["mcp", "list", "--json", "a b"], env);
