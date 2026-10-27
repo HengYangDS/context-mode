@@ -24,6 +24,7 @@ function zod3ToV4(v: unknown, depth = 0): z.ZodType {
   if (v == null || typeof v !== "object") return z.unknown();
 
   const obj = v as Record<string, unknown>;
+  if (obj._zod && typeof obj._zod === "object") return v as z.ZodType;
   if (!obj._def || typeof obj._def !== "object") return z.unknown();
 
   const def = obj._def as Record<string, unknown>;

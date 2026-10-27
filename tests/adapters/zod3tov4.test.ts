@@ -1,9 +1,23 @@
 import "../setup-home";
 import { describe, it, expect } from "vitest";
-import { z } from "zod";
+import { z } from "zod/v3";
+import z4 from "zod/v4";
 import { zod3ShapeToV4 } from "../../src/adapters/opencode/zod3tov4.js";
 
 describe("zod3ShapeToV4", () => {
+  it("preserves validation of native Zod 4 tool arguments", () => {
+    const shape = {
+      names: z4.array(z4.string().min(2)).max(2),
+      count: z4.coerce.number().int().min(1).default(1),
+    };
+    const converted = zod3ShapeToV4(shape);
+    const validator = z4.object(converted as Record<string, z4.ZodType>);
+
+    expect(validator.parse({ names: ["valid"], count: "2" })).toEqual({ names: ["valid"], count: 2 });
+    expect(validator.safeParse({ names: ["x"] }).success).toBe(false);
+    expect(validator.safeParse({ names: ["one", "two", "three"] }).success).toBe(false);
+  });
+
   it("converts a flat Zod 3 shape to Zod v4", () => {
     const z3Shape = {
       name: z.string().describe("User name"),
