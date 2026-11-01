@@ -4538,14 +4538,14 @@ EXAMPLE: ctx_purge(confirm: true, scope: "project")`,
       );
     }
 
-    // Close the persistent FTS5 content store handle BEFORE delegating to
-    // purgeSession so the store's lock is released on Windows. The handle
-    // is recreated lazily on the next getStore() call.
+    // Only a whole-project purge removes the persistent store. Session-scoped
+    // requests retain its handle and inode so the scoped row deletion cannot
+    // wipe sibling content or orphan another window's connection.
     let storePathForPurge: string | undefined;
     try {
       storePathForPurge = getStorePath();
     } catch { /* best effort — store path may be unresolvable on fresh install */ }
-    if (_store) {
+    if (effectiveScope === "project" && _store) {
       try { _store.cleanup(); } catch { /* best effort */ }
       _store = null;
     }

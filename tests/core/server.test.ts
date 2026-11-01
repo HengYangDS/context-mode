@@ -46,6 +46,8 @@ import {
   resolveSessionStorageDir,
   resolveStatsStorageDir,
   resolveContentStorePath,
+  resolveSessionDbPath,
+  SessionDB,
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
@@ -108,6 +110,62 @@ describe("shared content retention across MCP startup", () => {
     } finally {
       await client?.close();
       legacyPeer.close();
+      peer.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("session purge preserves shared content", () => {
+  test.each([
+    { label: "explicit session", args: { confirm: true, scope: "session", sessionId: "selected" }, removed: true },
+    { label: "inferred session", args: { confirm: true, sessionId: "selected" }, removed: true },
+    { label: "missing session ID", args: { confirm: true, scope: "session" }, removed: false },
+  ])("$label leaves the project store and sibling connection intact", async ({ args, removed }) => {
+    const root = mkdtempSync(join(tmpdir(), "context-mode-session-purge-"));
+    const storage = join(root, "storage");
+    const contentDir = join(storage, "content");
+    const sessionsDir = join(storage, "sessions");
+    mkdirSync(contentDir, { recursive: true });
+    mkdirSync(sessionsDir, { recursive: true });
+    const dbPath = resolveContentStorePath({ projectDir: root, contentDir });
+    const peer = new ContentStore(dbPath);
+    const sessions = new SessionDB({ dbPath: resolveSessionDbPath({ projectDir: root, sessionsDir }) });
+    const inode = statSync(dbPath).ino;
+    let client: Client | undefined;
+    try {
+      peer.index({ content: "# Shared witness\n\nSaffron kumquat pelican.", source: "shared-witness" });
+      for (const id of ["selected", "sibling"]) {
+        sessions.insertEvent(id, { type: "file", category: "file", data: `/${id}/witness.ts`, priority: 2 }, "PreToolUse");
+      }
+      client = new Client({ name: "session-purge-test", version: "1" });
+      await client.connect(new StdioClientTransport({
+        command: process.env.CONTEXT_MODE_TEST_MCP_RUNTIME ?? process.execPath,
+        args: [resolve(__dirname, "..", "..", process.env.CONTEXT_MODE_TEST_MCP_ENTRY ?? "server.bundle.mjs")],
+        cwd: root,
+        env: {
+          HOME: root, PATH: process.env.PATH ?? "", CONTEXT_MODE_DIR: storage,
+          CONTEXT_MODE_PLATFORM: "codex", CONTEXT_MODE_PROJECT_DIR: root, PWD: root,
+          CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
+        },
+        stderr: "pipe",
+      }));
+      const before = await client.callTool({ name: "ctx_search", arguments: { queries: ["Saffron kumquat"], source: "shared-witness" } });
+      expect(JSON.stringify(before)).toContain("Saffron kumquat pelican");
+      const result = await client.callTool({ name: "ctx_purge", arguments: args });
+      expect(result.isError === true, JSON.stringify(result)).toBe(!removed);
+      expect(existsSync(dbPath), "session purge must not unlink the shared project database").toBe(true);
+      expect(statSync(dbPath).ino).toBe(inode);
+      expect(sessions.getEvents("selected")).toHaveLength(removed ? 0 : 1);
+      expect(sessions.getEvents("sibling")).toHaveLength(1);
+      expect(peer.search("Saffron kumquat", 1).length).toBeGreaterThan(0);
+      peer.index({ content: "# Peer write\n\nJade coriander lantern.", source: "peer-after-purge" });
+      const after = await client.callTool({ name: "ctx_search", arguments: { queries: ["Jade coriander"], source: "peer-after-purge" } });
+      expect(after.isError, JSON.stringify(after)).not.toBe(true);
+      expect(JSON.stringify(after)).toContain("Jade coriander lantern");
+    } finally {
+      await client?.close();
+      sessions.close();
       peer.close();
       rmSync(root, { recursive: true, force: true });
     }
