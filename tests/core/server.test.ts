@@ -21,12 +21,16 @@ import {
   rmSync,
   readFileSync,
   existsSync,
+  statSync,
+  utimesSync,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 import { classifyNonZeroExit } from "../../src/exit-classify.js";
 import { PolyglotExecutor } from "../../src/executor.js";
@@ -41,6 +45,7 @@ import {
   resolveDefaultSessionDir,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
+  resolveContentStorePath,
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
@@ -52,6 +57,62 @@ const runtimes = detectRuntimes();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STORAGE_ENV_KEY = "CONTEXT_MODE_DIR";
 const savedStorageEnv = process.env[STORAGE_ENV_KEY];
+
+describe("shared content retention across MCP startup", () => {
+  test.each(["idle WAL", "old main DB"])("preserves a live %s and its legacy peer", async (ageTarget) => {
+    const root = mkdtempSync(join(tmpdir(), "context-mode-startup-retention-"));
+    const contentDir = join(root, "storage", "content");
+    const legacyDir = join(root, ".context-mode", "content");
+    mkdirSync(contentDir, { recursive: true });
+    mkdirSync(legacyDir, { recursive: true });
+    const dbPath = resolveContentStorePath({ projectDir: root, contentDir });
+    const peer = new ContentStore(dbPath);
+    const legacyPath = join(legacyDir, "legacy.db");
+    const legacyPeer = new ContentStore(legacyPath);
+    const inode = statSync(dbPath).ino;
+    const legacyInode = statSync(legacyPath).ino;
+    let client: Client | undefined;
+    try {
+      peer.index({ content: "# Witness\n\nAmber cinnamon pelican.", source: "retained-peer" });
+      for (let restart = 0; restart < 2; restart++) {
+        const old = new Date(Date.now() - (ageTarget === "idle WAL" ? 2 / 24 : 15) * 86400_000);
+        utimesSync(dbPath + (ageTarget === "idle WAL" ? "-wal" : ""), old, old);
+        client = new Client({ name: "startup-retention-test", version: "1" });
+        await client.connect(new StdioClientTransport({
+          command: process.execPath,
+          args: [resolve(__dirname, "..", "..", "server.bundle.mjs")],
+          cwd: root,
+          env: {
+            HOME: root,
+            PATH: process.env.PATH ?? "",
+            CONTEXT_MODE_DIR: join(root, "storage"),
+            CONTEXT_MODE_PLATFORM: "codex",
+            CONTEXT_MODE_PROJECT_DIR: root,
+            PWD: root,
+            CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
+          },
+          stderr: "pipe",
+        }));
+        const found = await client.callTool({ name: "ctx_search", arguments: { queries: ["Amber cinnamon"], source: "retained-peer" } });
+        expect(found.isError, JSON.stringify(found)).not.toBe(true);
+        expect(JSON.stringify(found)).toContain("Amber cinnamon pelican");
+        expect(statSync(dbPath).ino).toBe(inode);
+        expect(statSync(legacyPath).ino).toBe(legacyInode);
+        const indexed = await client.callTool({ name: "ctx_index", arguments: { content: "# New write\n\nMarigold turnip.", source: "post-startup" } });
+        expect(indexed.isError).not.toBe(true);
+        expect(peer.search("Marigold turnip", 1).length).toBeGreaterThan(0);
+        legacyPeer.index({ content: "# Legacy write\n\nCobalt sesame.", source: "legacy-write" });
+        await client.close();
+        client = undefined;
+      }
+    } finally {
+      await client?.close();
+      legacyPeer.close();
+      peer.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 afterEach(() => {
   if (savedStorageEnv === undefined) delete process.env[STORAGE_ENV_KEY];
