@@ -7,12 +7,12 @@
 
 import { describe, test, expect } from "vitest";
 import { strict as assert } from "node:assert";
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdtempSync, rmSync, statSync, utimesSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
-import { ContentStore, cleanupStaleDBs } from "../src/store.js";
+import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs } from "../src/store.js";
 import {
   withRetry,
   closeDB,
@@ -1137,6 +1137,31 @@ describe("Smart Chunk Titles", () => {
 });
 
 describe("DB Cleanup", () => {
+  test.each(["idle WAL", "old main DB"])("shared content cleanup preserves a live %s", (ageTarget) => {
+    const root = mkdtempSync(join(tmpdir(), "context-mode-shared-cleanup-"));
+    const dbPath = join(root, "project.db");
+    const writer = new ContentStore(dbPath);
+    let peer: ContentStore | undefined;
+    try {
+      writer.index({ content: "# Witness\n\nAmber cinnamon pelican.", source: "live-witness" });
+      peer = new ContentStore(dbPath);
+      const old = new Date(Date.now() - (ageTarget === "idle WAL" ? 2 / 24 : 15) * 86400_000);
+      utimesSync(dbPath + (ageTarget === "idle WAL" ? "-wal" : ""), old, old);
+      const before = statSync(dbPath).ino;
+
+      cleanupStaleContentDBs(root, 14);
+
+      assert.ok(existsSync(dbPath), "Age is not proof that a shared database is unused");
+      assert.equal(statSync(dbPath).ino, before);
+      writer.index({ content: "# New write\n\nMarigold turnip.", source: "post-cleanup" });
+      assert.ok(peer.search("Marigold turnip", 1).length > 0);
+    } finally {
+      peer?.close();
+      writer.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("cleanupStaleDBs removes files for dead PIDs", () => {
     const fakePid = 99999;
     const fakePath = join(tmpdir(), `context-mode-${fakePid}.db`);

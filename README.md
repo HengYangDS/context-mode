@@ -1218,7 +1218,7 @@ Indexed content persists in a per-project SQLite database at `~/.context-mode/co
 - **Cache hit (within TTL):** Returns a cache hint (~0.3KB) instead of re-fetching (48KB+). Model proceeds to `ctx_search`.
 - **Cache miss (TTL expired):** Re-fetches silently. No user action needed.
 - **`ttl: 0`** or **`force: true`:** Bypasses cache and re-fetches regardless of freshness.
-- **14-day cleanup:** Content databases and sources older than 14 days are removed on startup.
+- **14-day cleanup:** Sources older than 14 days are removed transactionally on startup. Shared project databases and their WAL/SHM files are not unlinked based on age: another window may still have them open.
 
 This means `--continue` sessions preserve indexed docs across restarts. No re-fetching, no wasted context tokens.
 
