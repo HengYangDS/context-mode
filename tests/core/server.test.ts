@@ -59,9 +59,12 @@ const runtimes = detectRuntimes();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STORAGE_ENV_KEY = "CONTEXT_MODE_DIR";
 const savedStorageEnv = process.env[STORAGE_ENV_KEY];
+const MCP_TEST_RUNTIME = process.env.CONTEXT_MODE_TEST_MCP_RUNTIME ?? process.execPath;
+const MCP_TEST_PACKAGE_ROOT = process.env.CONTEXT_MODE_TEST_PACKAGE_ROOT ?? resolve(__dirname, "..", "..");
+const MCP_TEST_ENTRIES = ["server.bundle.mjs", "cli.bundle.mjs"];
 
 describe("shared content retention across MCP startup", () => {
-  test.each(["idle WAL", "old main DB"])("preserves a live %s and its legacy peer", async (ageTarget) => {
+  test.each(["idle WAL", "old main DB"].flatMap(ageTarget => MCP_TEST_ENTRIES.map(entry => ({ ageTarget, entry }))))("preserves a live $ageTarget and its legacy peer [$entry]", async ({ ageTarget, entry }) => {
     const root = mkdtempSync(join(tmpdir(), "context-mode-startup-retention-"));
     const contentDir = join(root, "storage", "content");
     const legacyDir = join(root, ".context-mode", "content");
@@ -81,8 +84,8 @@ describe("shared content retention across MCP startup", () => {
         utimesSync(dbPath + (ageTarget === "idle WAL" ? "-wal" : ""), old, old);
         client = new Client({ name: "startup-retention-test", version: "1" });
         await client.connect(new StdioClientTransport({
-          command: process.execPath,
-          args: [resolve(__dirname, "..", "..", "server.bundle.mjs")],
+          command: MCP_TEST_RUNTIME,
+          args: [resolve(MCP_TEST_PACKAGE_ROOT, entry)],
           cwd: root,
           env: {
             HOME: root,
@@ -121,7 +124,7 @@ describe("session purge preserves shared content", () => {
     { label: "explicit session", args: { confirm: true, scope: "session", sessionId: "selected" }, removed: true },
     { label: "inferred session", args: { confirm: true, sessionId: "selected" }, removed: true },
     { label: "missing session ID", args: { confirm: true, scope: "session" }, removed: false },
-  ])("$label leaves the project store and sibling connection intact", async ({ args, removed }) => {
+  ].flatMap(scenario => MCP_TEST_ENTRIES.map(entry => ({ ...scenario, entry }))))("$label leaves the project store and sibling connection intact [$entry]", async ({ args, removed, entry }) => {
     const root = mkdtempSync(join(tmpdir(), "context-mode-session-purge-"));
     const storage = join(root, "storage");
     const contentDir = join(storage, "content");
@@ -140,8 +143,8 @@ describe("session purge preserves shared content", () => {
       }
       client = new Client({ name: "session-purge-test", version: "1" });
       await client.connect(new StdioClientTransport({
-        command: process.env.CONTEXT_MODE_TEST_MCP_RUNTIME ?? process.execPath,
-        args: [resolve(__dirname, "..", "..", process.env.CONTEXT_MODE_TEST_MCP_ENTRY ?? "server.bundle.mjs")],
+        command: MCP_TEST_RUNTIME,
+        args: [resolve(MCP_TEST_PACKAGE_ROOT, entry)],
         cwd: root,
         env: {
           HOME: root, PATH: process.env.PATH ?? "", CONTEXT_MODE_DIR: storage,
