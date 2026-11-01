@@ -12,7 +12,7 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { z } from "zod";
 import { PolyglotExecutor } from "./executor.js";
 import { runPool, type PoolJob } from "./runPool.js";
-import { ContentStore, cleanupStaleDBs, cleanupStaleContentDBs, type SearchResult, type IndexResult } from "./store.js";
+import { ContentStore, cleanupStaleDBs, type SearchResult, type IndexResult } from "./store.js";
 import { composeFetchCacheKey } from "./fetch-cache.js";
 import {
   readBashPolicies,
@@ -698,8 +698,8 @@ function getStorePath(): string {
 
 function getStore(): ContentStore {
   if (!_store) {
-    // Content DB cleanup on fresh start is handled by SessionStart hook.
-    // Server just opens whatever DB exists (or creates new if hook deleted it).
+    // Project stores can be shared by other live windows. Open the same
+    // database without treating an idle file or WAL as an abandoned process.
     const dbPath = getStorePath();
     _store = new ContentStore(dbPath);
 
@@ -723,14 +723,10 @@ function getStore(): ContentStore {
       }
     });
 
-    // One-time startup cleanup: remove stale content DBs (>14 days)
+    // Expire content through SQLite's multi-writer transaction, never by
+    // unlinking a project database or its WAL/SHM while peers may be open.
     try {
-      const contentDir = dirname(getStorePath());
-      cleanupStaleContentDBs(contentDir, 14);
       _store.cleanupStaleSources(14);
-      // Also clean legacy shared dir from before platform isolation
-      const legacyDir = join(homedir(), ".context-mode", "content");
-      if (existsSync(legacyDir)) cleanupStaleContentDBs(legacyDir, 0);
     } catch { /* best-effort */ }
 
     // Also clean old PID-based DBs from migration
@@ -4542,14 +4538,14 @@ EXAMPLE: ctx_purge(confirm: true, scope: "project")`,
       );
     }
 
-    // Close the persistent FTS5 content store handle BEFORE delegating to
-    // purgeSession so the store's lock is released on Windows. The handle
-    // is recreated lazily on the next getStore() call.
+    // Only a whole-project purge removes the persistent store. Session-scoped
+    // requests retain its handle and inode so the scoped row deletion cannot
+    // wipe sibling content or orphan another window's connection.
     let storePathForPurge: string | undefined;
     try {
       storePathForPurge = getStorePath();
     } catch { /* best effort — store path may be unresolvable on fresh install */ }
-    if (_store) {
+    if (effectiveScope === "project" && _store) {
       try { _store.cleanup(); } catch { /* best effort */ }
       _store = null;
     }

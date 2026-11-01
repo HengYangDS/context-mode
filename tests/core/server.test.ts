@@ -21,12 +21,16 @@ import {
   rmSync,
   readFileSync,
   existsSync,
+  statSync,
+  utimesSync,
 } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import { describe, test, expect, beforeAll, afterAll, afterEach } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
 import { classifyNonZeroExit } from "../../src/exit-classify.js";
 import { PolyglotExecutor } from "../../src/executor.js";
@@ -41,6 +45,9 @@ import {
   resolveDefaultSessionDir,
   resolveSessionStorageDir,
   resolveStatsStorageDir,
+  resolveContentStorePath,
+  resolveSessionDbPath,
+  SessionDB,
   StorageDirectoryError,
 } from "../../src/session/db.js";
 import { ROUTING_BLOCK } from "../../hooks/routing-block.mjs";
@@ -52,6 +59,121 @@ const runtimes = detectRuntimes();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const STORAGE_ENV_KEY = "CONTEXT_MODE_DIR";
 const savedStorageEnv = process.env[STORAGE_ENV_KEY];
+const MCP_TEST_RUNTIME = process.env.CONTEXT_MODE_TEST_MCP_RUNTIME ?? process.execPath;
+const MCP_TEST_PACKAGE_ROOT = process.env.CONTEXT_MODE_TEST_PACKAGE_ROOT ?? resolve(__dirname, "..", "..");
+const MCP_TEST_ENTRIES = ["server.bundle.mjs", "cli.bundle.mjs"];
+
+describe("shared content retention across MCP startup", () => {
+  test.each(["idle WAL", "old main DB"].flatMap(ageTarget => MCP_TEST_ENTRIES.map(entry => ({ ageTarget, entry }))))("preserves a live $ageTarget and its legacy peer [$entry]", async ({ ageTarget, entry }) => {
+    const root = mkdtempSync(join(tmpdir(), "context-mode-startup-retention-"));
+    const contentDir = join(root, "storage", "content");
+    const legacyDir = join(root, ".context-mode", "content");
+    mkdirSync(contentDir, { recursive: true });
+    mkdirSync(legacyDir, { recursive: true });
+    const dbPath = resolveContentStorePath({ projectDir: root, contentDir });
+    const peer = new ContentStore(dbPath);
+    const legacyPath = join(legacyDir, "legacy.db");
+    const legacyPeer = new ContentStore(legacyPath);
+    const inode = statSync(dbPath).ino;
+    const legacyInode = statSync(legacyPath).ino;
+    let client: Client | undefined;
+    try {
+      peer.index({ content: "# Witness\n\nAmber cinnamon pelican.", source: "retained-peer" });
+      for (let restart = 0; restart < 2; restart++) {
+        const old = new Date(Date.now() - (ageTarget === "idle WAL" ? 2 / 24 : 15) * 86400_000);
+        utimesSync(dbPath + (ageTarget === "idle WAL" ? "-wal" : ""), old, old);
+        client = new Client({ name: "startup-retention-test", version: "1" });
+        await client.connect(new StdioClientTransport({
+          command: MCP_TEST_RUNTIME,
+          args: [resolve(MCP_TEST_PACKAGE_ROOT, entry)],
+          cwd: root,
+          env: {
+            HOME: root,
+            PATH: process.env.PATH ?? "",
+            CONTEXT_MODE_DIR: join(root, "storage"),
+            CONTEXT_MODE_PLATFORM: "codex",
+            CONTEXT_MODE_PROJECT_DIR: root,
+            PWD: root,
+            CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
+          },
+          stderr: "pipe",
+        }));
+        const found = await client.callTool({ name: "ctx_search", arguments: { queries: ["Amber cinnamon"], source: "retained-peer" } });
+        expect(found.isError, JSON.stringify(found)).not.toBe(true);
+        expect(JSON.stringify(found)).toContain("Amber cinnamon pelican");
+        expect(statSync(dbPath).ino).toBe(inode);
+        expect(statSync(legacyPath).ino).toBe(legacyInode);
+        const indexed = await client.callTool({ name: "ctx_index", arguments: { content: "# New write\n\nMarigold turnip.", source: "post-startup" } });
+        expect(indexed.isError).not.toBe(true);
+        expect(peer.search("Marigold turnip", 1).length).toBeGreaterThan(0);
+        legacyPeer.index({ content: "# Legacy write\n\nCobalt sesame.", source: "legacy-write" });
+        await client.close();
+        client = undefined;
+      }
+    } finally {
+      await client?.close();
+      legacyPeer.close();
+      peer.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("session purge preserves shared content", () => {
+  test.each([
+    { label: "explicit session", args: { confirm: true, scope: "session", sessionId: "selected" }, removed: true },
+    { label: "inferred session", args: { confirm: true, sessionId: "selected" }, removed: true },
+    { label: "missing session ID", args: { confirm: true, scope: "session" }, removed: false },
+  ].flatMap(scenario => MCP_TEST_ENTRIES.map(entry => ({ ...scenario, entry }))))("$label leaves the project store and sibling connection intact [$entry]", async ({ args, removed, entry }) => {
+    const root = mkdtempSync(join(tmpdir(), "context-mode-session-purge-"));
+    const storage = join(root, "storage");
+    const contentDir = join(storage, "content");
+    const sessionsDir = join(storage, "sessions");
+    mkdirSync(contentDir, { recursive: true });
+    mkdirSync(sessionsDir, { recursive: true });
+    const dbPath = resolveContentStorePath({ projectDir: root, contentDir });
+    const peer = new ContentStore(dbPath);
+    const sessions = new SessionDB({ dbPath: resolveSessionDbPath({ projectDir: root, sessionsDir }) });
+    const inode = statSync(dbPath).ino;
+    let client: Client | undefined;
+    try {
+      peer.index({ content: "# Shared witness\n\nSaffron kumquat pelican.", source: "shared-witness" });
+      for (const id of ["selected", "sibling"]) {
+        sessions.insertEvent(id, { type: "file", category: "file", data: `/${id}/witness.ts`, priority: 2 }, "PreToolUse");
+      }
+      client = new Client({ name: "session-purge-test", version: "1" });
+      await client.connect(new StdioClientTransport({
+        command: MCP_TEST_RUNTIME,
+        args: [resolve(MCP_TEST_PACKAGE_ROOT, entry)],
+        cwd: root,
+        env: {
+          HOME: root, PATH: process.env.PATH ?? "", CONTEXT_MODE_DIR: storage,
+          CONTEXT_MODE_PLATFORM: "codex", CONTEXT_MODE_PROJECT_DIR: root, PWD: root,
+          CONTEXT_MODE_DISABLE_VERSION_CHECK: "1",
+        },
+        stderr: "pipe",
+      }));
+      const before = await client.callTool({ name: "ctx_search", arguments: { queries: ["Saffron kumquat"], source: "shared-witness" } });
+      expect(JSON.stringify(before)).toContain("Saffron kumquat pelican");
+      const result = await client.callTool({ name: "ctx_purge", arguments: args });
+      expect(result.isError === true, JSON.stringify(result)).toBe(!removed);
+      expect(existsSync(dbPath), "session purge must not unlink the shared project database").toBe(true);
+      expect(statSync(dbPath).ino).toBe(inode);
+      expect(sessions.getEvents("selected")).toHaveLength(removed ? 0 : 1);
+      expect(sessions.getEvents("sibling")).toHaveLength(1);
+      expect(peer.search("Saffron kumquat", 1).length).toBeGreaterThan(0);
+      peer.index({ content: "# Peer write\n\nJade coriander lantern.", source: "peer-after-purge" });
+      const after = await client.callTool({ name: "ctx_search", arguments: { queries: ["Jade coriander"], source: "peer-after-purge" } });
+      expect(after.isError, JSON.stringify(after)).not.toBe(true);
+      expect(JSON.stringify(after)).toContain("Jade coriander lantern");
+    } finally {
+      await client?.close();
+      sessions.close();
+      peer.close();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
 
 afterEach(() => {
   if (savedStorageEnv === undefined) delete process.env[STORAGE_ENV_KEY];
