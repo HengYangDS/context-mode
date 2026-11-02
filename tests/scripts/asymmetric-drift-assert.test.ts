@@ -40,6 +40,7 @@ const ROOT = resolve(__dirname, "..", "..");
 
 const PLACEHOLDER = "${CLAUDE_PLUGIN_ROOT}/start.mjs";
 const SKILLS_PATH = "./skills/";
+const NPM_PACK_TIMEOUT_MS = 120_000;
 const REQUIRED_PLUGIN_RUNTIME_FILES = [
   "start.mjs",
   "server.bundle.mjs",
@@ -63,7 +64,9 @@ function npmPackDryRunJson() {
   const options = {
     cwd: ROOT,
     encoding: "utf-8" as BufferEncoding,
-    timeout: 30_000,
+    // Run prepack while keeping lifecycle output out of npm's JSON stdout.
+    env: { ...process.env, npm_config_foreground_scripts: "false" },
+    timeout: NPM_PACK_TIMEOUT_MS,
   };
 
   if (process.platform === "win32") {
@@ -152,7 +155,7 @@ describe("Issue #531 — asymmetric-drift invariant", () => {
     }
     expect([...files].some((p) => p.startsWith("skills/"))).toBe(true);
     expect([...files].some((p) => p.startsWith(".claude/skills/"))).toBe(false);
-  });
+  }, NPM_PACK_TIMEOUT_MS + 10_000);
 
   test("build-chain asserter script exists at scripts/assert-asymmetric-drift.mjs", () => {
     // The script is the same check, invocable from the build chain so future
